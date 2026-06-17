@@ -1,0 +1,63 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Account {
+  id              String           @id @default(cuid())
+  name            String
+  type            String           // checking, savings, investment
+  balance         Float            @default(0)
+  transactions    Transaction[]
+  portfolioAssets PortfolioAsset[]
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+}
+
+model Category {
+  id           String        @id @default(cuid())
+  name         String
+  type         String        // income, expense, transfer
+  transactions Transaction[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+}
+
+model Transaction {
+  id            String   @id @default(cuid())
+  accountId     String
+  account       Account  @relation(fields: [accountId], references: [id])
+  categoryId    String
+  category      Category @relation(fields: [categoryId], references: [id])
+  subCategory   String?
+  paymentMethod String?
+  merchant      String
+  amount        Float
+  date          DateTime @default(now())
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model SavingsGoal {
+  id              String   @id @default(cuid())
+  name            String
+  targetAmount    Float
+  currentAmount   Float    @default(0)
+  autoAllocatePct Float    @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model PortfolioAsset {
+  id               String   @id @default(cuid())
+  accountId        String
+  account          Account  @relation(fields: [accountId], references: [id])
+  tickerSymbol     String
+  sharesOwned      Float
+  averageBuyPrice  Float
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
