@@ -88,6 +88,7 @@ export default function TransactionForm({ categories, onSuccess }: TransactionFo
             >
               <option value="expense">Dépense (-)</option>
               <option value="income">Revenu (+)</option>
+              <option value="Épargne/Invest.">Épargne / Invest.</option>
             </select>
           </div>
 
@@ -129,6 +130,7 @@ export default function TransactionForm({ categories, onSuccess }: TransactionFo
               <option value="Virement Bancaire">Virement Bancaire</option>
               <option value="Espèces">Espèces</option>
               <option value="Apple Pay">Apple Pay</option>
+              <option value="BMCE DIRECT">BMCE DIRECT</option>
             </select>
           </div>
 
