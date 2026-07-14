@@ -1,5 +1,9 @@
 "use client";
 
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { Trash2 } from "lucide-react";
+
 interface Transaction {
   id: string;
   date: string | Date;
@@ -21,6 +25,9 @@ export default function HistoryTable({
 }: {
   transactions: Transaction[];
 }) {
+  const router = useRouter();
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
   const formatMAD = (amt: number) =>
     new Intl.NumberFormat("fr-MA", {
       style: "currency",
@@ -33,6 +40,24 @@ export default function HistoryTable({
       month: "2-digit",
       year: "numeric",
     });
+
+  const handleDelete = async (tx: Transaction) => {
+    if (!confirm(`Supprimer la transaction "${tx.merchant}" (${formatMAD(tx.amount)}) du ${formatDate(tx.date)} ?`)) {
+      return;
+    }
+
+    setDeletingId(tx.id);
+    try {
+      const res = await fetch(`/api/transactions/${tx.id}`, { method: "DELETE" });
+      if (res.ok) {
+        router.refresh();
+      }
+    } catch (error) {
+      console.error("Delete Error:", error);
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   return (
     <div className="bg-[#1b253b] rounded-xl border border-slate-700 overflow-hidden shadow-2xl">
@@ -69,6 +94,9 @@ export default function HistoryTable({
               </th>
               <th className="py-3 px-5 font-bold uppercase tracking-wider border-b border-slate-800 text-right">
                 Montant
+              </th>
+              <th className="py-3 px-5 font-bold uppercase tracking-wider border-b border-slate-800 text-right">
+                Action
               </th>
             </tr>
           </thead>
@@ -117,13 +145,27 @@ export default function HistoryTable({
                     {tx.amount > 0 ? "+" : ""}
                     {formatMAD(tx.amount)}
                   </td>
+                  <td className="py-3 px-5 text-right">
+                    <button
+                      onClick={() => handleDelete(tx)}
+                      disabled={deletingId === tx.id}
+                      className="p-1.5 rounded-lg bg-slate-800 hover:bg-red-600/20 text-slate-400 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100 disabled:opacity-50"
+                      title="Supprimer"
+                    >
+                      {deletingId === tx.id ? (
+                        <div className="w-3.5 h-3.5 border-2 border-red-400/30 border-t-red-400 rounded-full animate-spin" />
+                      ) : (
+                        <Trash2 className="w-3.5 h-3.5" />
+                      )}
+                    </button>
+                  </td>
                 </tr>
               );
             })}
             {transactions.length === 0 && (
               <tr>
                 <td
-                  colSpan={7}
+                  colSpan={8}
                   className="py-20 text-center text-slate-500 italic"
                 >
                   Aucune transaction trouvée.

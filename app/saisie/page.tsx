@@ -2,15 +2,19 @@ import { prisma } from '@/lib/prisma';
 import TransactionForm from '@/app/components/TransactionForm';
 import HistoryTable from '@/app/components/HistoryTable';
 import { Database } from 'lucide-react';
+import { requireSession } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
 export default async function SaisiePage() {
+  const { userId } = await requireSession();
   const [categories, transactions] = await Promise.all([
     prisma.category.findMany({
+      where: { userId },
       orderBy: { name: 'asc' },
     }),
     prisma.transaction.findMany({
+      where: { userId },
       take: 50,
       orderBy: { date: 'desc' },
       include: {

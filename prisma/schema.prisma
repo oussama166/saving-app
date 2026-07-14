@@ -6,10 +6,44 @@ datasource db {
   provider = "sqlite"
 }
 
+// Compte utilisateur — authentification par email/mot de passe (voir
+// lib/auth.ts). Toutes les données financières sont désormais scopées par
+// userId : chaque compte a ses propres comptes bancaires, catégories,
+// transactions, objectifs, etc.
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  settings        UserSettings?
+  accounts        Account[]
+  categories      Category[]
+  transactions    Transaction[]
+  savingsGoals    SavingsGoal[]
+  medicalRecords  MedicalRecord[]
+  portfolioAssets PortfolioAsset[]
+  aiAdviceCache   AiAdviceCache[]
+}
+
+model UserSettings {
+  id                        String   @id @default(cuid())
+  userId                    String   @unique
+  user                      User     @relation(fields: [userId], references: [id])
+  referenceIncome           Float    @default(10000)
+  currency                  String   @default("MAD")
+  emergencyFundTargetMonths Float    @default(3)
+  updatedAt                 DateTime @updatedAt
+}
+
 model Account {
   id              String           @id @default(cuid())
+  userId          String
+  user            User             @relation(fields: [userId], references: [id])
   name            String
-  type            String           // checking, savings, investment
+  type            String // checking, savings, investment
   balance         Float            @default(0)
   transactions    Transaction[]
   portfolioAssets PortfolioAsset[]
@@ -18,46 +52,114 @@ model Account {
 }
 
 model Category {
-  id           String        @id @default(cuid())
-  name         String
-  type         String        // income, expense, transfer
-  transactions Transaction[]
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
+  id              String           @id @default(cuid())
+  userId          String
+  user            User             @relation(fields: [userId], references: [id])
+  name            String
+  type            String // income, expense, savings
+  order           Int              @default(0)
+  budgetPct       Float            @default(0) // % du revenu de référence (page Profil)
+  subCategories   SubCategory[]
+  transactions    Transaction[]
+  categoryArchive CategoryArchive?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+}
+
+// Somme cumulée des transactions archivées (exportées vers Google Sheets puis
+// supprimées de la base) pour une catégorie. Permet aux calculs "depuis le
+// début" (ex: solde du Fonds d'Urgence) de rester exacts même après un
+// nettoyage — on additionne toujours "transactions restantes en base" +
+// "archivedTotal" plutôt que de ne compter que ce qui reste physiquement.
+// Scopée indirectement via Category.userId, pas besoin de userId direct.
+model CategoryArchive {
+  id             String    @id @default(cuid())
+  categoryId     String    @unique
+  category       Category  @relation(fields: [categoryId], references: [id])
+  archivedTotal  Float     @default(0)
+  lastArchivedAt DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 }
 
 model Transaction {
-  id            String   @id @default(cuid())
+  id            String         @id @default(cuid())
+  userId        String
+  user          User           @relation(fields: [userId], references: [id])
   accountId     String
-  account       Account  @relation(fields: [accountId], references: [id])
+  account       Account        @relation(fields: [accountId], references: [id])
   categoryId    String
-  category      Category @relation(fields: [categoryId], references: [id])
+  category      Category       @relation(fields: [categoryId], references: [id])
   subCategory   String?
   paymentMethod String?
   merchant      String
   amount        Float
-  date          DateTime @default(now())
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  date          DateTime       @default(now())
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  medicalRecord MedicalRecord?
 }
 
 model SavingsGoal {
+  id                  String   @id @default(cuid())
+  userId              String
+  user                User     @relation(fields: [userId], references: [id])
+  name                String
+  targetAmount        Float
+  monthlyContribution Float    @default(0)
+  emoji               String?
+  currentAmount       Float    @default(0)
+  autoAllocatePct     Float    @default(0)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+}
+
+model MedicalRecord {
+  id                  String       @id @default(cuid())
+  userId              String
+  user                User         @relation(fields: [userId], references: [id])
+  transactionId       String?      @unique
+  transaction         Transaction? @relation(fields: [transactionId], references: [id])
+  provider            String
+  amount              Float
+  reimbursementStatus String       @default("PENDING") // PENDING, SUBMITTED, REIMBURSED
+  date                DateTime
+  createdAt            DateTime    @default(now())
+}
+
+model PortfolioAsset {
   id              String   @id @default(cuid())
-  name            String
-  targetAmount    Float
-  currentAmount   Float    @default(0)
-  autoAllocatePct Float    @default(0)
+  userId          String
+  user            User     @relation(fields: [userId], references: [id])
+  accountId       String
+  account         Account  @relation(fields: [accountId], references: [id])
+  tickerSymbol    String
+  sharesOwned     Float
+  averageBuyPrice Float
+  assetType       String   @default("Action") // Action, ETF, Crypto, OPCVM, Or
+  manualPrice     Float? // utilisé si pas de cotation live disponible
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 }
 
-model PortfolioAsset {
-  id               String   @id @default(cuid())
-  accountId        String
-  account          Account  @relation(fields: [accountId], references: [id])
-  tickerSymbol     String
-  sharesOwned      Float
-  averageBuyPrice  Float
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+model SubCategory {
+  id         String   @id @default(cuid())
+  name       String
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id])
+}
+
+// Cache des réponses IA (Coach IA, Stratégie & Conseils...) pour limiter la
+// consommation de tokens Gemini : une entrée par bloc de conseil (`key`) et
+// par utilisateur, régénérée seulement quand elle dépasse le TTL défini côté
+// route (ex: 7 jours), pas à chaque chargement de page.
+model AiAdviceCache {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  key         String
+  content     String // JSON.stringify() de la réponse structurée
+  generatedAt DateTime @default(now())
+
+  @@unique([userId, key])
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Plus, Check } from 'lucide-react';
 
@@ -8,6 +8,15 @@ interface Category {
   id: string;
   name: string;
   type: string;
+}
+
+interface SubCategory {
+  id: string;
+  name: string;
+}
+
+interface CategoryWithSubs extends Category {
+  subCategories: SubCategory[];
 }
 
 interface TransactionFormProps {
@@ -28,6 +37,21 @@ export default function TransactionForm({ categories, onSuccess }: TransactionFo
   });
 
   const [loading, setLoading] = useState(false);
+  const [categoriesWithSubs, setCategoriesWithSubs] = useState<CategoryWithSubs[]>([]);
+
+  // Charge les sous-catégories (dépendantes de la catégorie choisie) une
+  // seule fois au montage — alimente le dropdown "Sous-catégorie" ci-dessous.
+  useEffect(() => {
+    fetch('/api/categories')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success) setCategoriesWithSubs(data.data);
+      })
+      .catch((error) => console.error('Failed to load categories:', error));
+  }, []);
+
+  const availableSubCategories =
+    categoriesWithSubs.find((cat) => cat.id === formData.categoryId)?.subCategories ?? [];
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -96,7 +120,7 @@ export default function TransactionForm({ categories, onSuccess }: TransactionFo
             <label className="text-[10px] uppercase font-bold text-slate-500 tracking-widest ml-1">Enveloppe Master</label>
             <select
               value={formData.categoryId}
-              onChange={(e) => setFormData({ ...formData, categoryId: e.target.value })}
+              onChange={(e) => setFormData({ ...formData, categoryId: e.target.value, subCategory: '' })}
               className="bg-[#131b2c] border border-slate-700 text-slate-200 rounded-lg p-2.5 focus:border-blue-500 outline-none transition-colors text-sm"
               required
             >
@@ -110,13 +134,21 @@ export default function TransactionForm({ categories, onSuccess }: TransactionFo
 
           <div className="flex flex-col gap-1.5">
             <label className="text-[10px] uppercase font-bold text-slate-500 tracking-widest ml-1">Sous-catégorie</label>
-            <input
-              type="text"
-              placeholder="Ex: Supermarché..."
+            <select
               value={formData.subCategory}
               onChange={(e) => setFormData({ ...formData, subCategory: e.target.value })}
-              className="bg-[#131b2c] border border-slate-700 text-slate-200 rounded-lg p-2.5 focus:border-blue-500 outline-none transition-colors text-sm"
-            />
+              disabled={availableSubCategories.length === 0}
+              className="bg-[#131b2c] border border-slate-700 text-slate-200 rounded-lg p-2.5 focus:border-blue-500 outline-none transition-colors text-sm disabled:opacity-50"
+            >
+              <option value="">
+                {availableSubCategories.length === 0 ? 'Aucune sous-catégorie' : 'Sélectionner...'}
+              </option>
+              {availableSubCategories.map((sub) => (
+                <option key={sub.id} value={sub.name}>
+                  {sub.name}
+                </option>
+              ))}
+            </select>
           </div>
 
           <div className="flex flex-col gap-1.5">
@@ -129,6 +161,9 @@ export default function TransactionForm({ categories, onSuccess }: TransactionFo
               <option value="Carte Bancaire">Carte Bancaire</option>
               <option value="Virement Bancaire">Virement Bancaire</option>
               <option value="Espèces">Espèces</option>
+              <option value="Chèque">Chèque</option>
+              <option value="CIH Pay/Mobile">CIH Pay/Mobile</option>
+              <option value="PayPal">PayPal</option>
               <option value="Apple Pay">Apple Pay</option>
               <option value="BMCE DIRECT">BMCE DIRECT</option>
             </select>

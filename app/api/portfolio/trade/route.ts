@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { requireSession } from '@/lib/auth';
 
 export async function POST(req: Request) {
   try {
+    const { userId } = await requireSession();
     const { accountId, tickerSymbol, action, shares, pricePerShare } = await req.json();
 
     if (!accountId || !tickerSymbol || !action || !shares || !pricePerShare) {
@@ -12,14 +14,14 @@ export async function POST(req: Request) {
     const totalValue = shares * pricePerShare;
 
     const result = await prisma.$transaction(async (tx) => {
-      const account = await tx.account.findUnique({
-        where: { id: accountId },
+      const account = await tx.account.findFirst({
+        where: { id: accountId, userId },
       });
 
       if (!account) throw new Error('Account not found');
 
       const existingAsset = await tx.portfolioAsset.findFirst({
-        where: { accountId, tickerSymbol },
+        where: { accountId, tickerSymbol, userId },
       });
 
       if (action === 'BUY') {
@@ -43,6 +45,7 @@ export async function POST(req: Request) {
         } else {
           return await tx.portfolioAsset.create({
             data: {
+              userId,
               accountId,
               tickerSymbol,
               sharesOwned: shares,
@@ -72,9 +75,13 @@ export async function POST(req: Request) {
     });
 
     return NextResponse.json({ success: true, asset: result });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    if (error instanceof Error && error.message === 'UNAUTHENTICATED') {
+      return NextResponse.json({ error: 'Non authentifié' }, { status: 401 });
+    }
     console.error('Trade Engine Error:', error);
-    const status = error.message === 'Insufficient shares to sell' ? 400 : 500;
-    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status });
+    const message = error instanceof Error ? error.message : 'Internal Server Error';
+    const status = message === 'Insufficient shares to sell' ? 400 : 500;
+    return NextResponse.json({ error: message }, { status });
   }
 }

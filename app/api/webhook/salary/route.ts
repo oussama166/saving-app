@@ -1,18 +1,22 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { requireSession } from '@/lib/auth';
 
+// Note : webhook déclenché depuis l'app elle-même (session navigateur) pour
+// l'instant. Une vraie intégration externe (banque, service tiers) aurait
+// besoin d'un token dédié par utilisateur plutôt que du cookie de session.
 export async function POST(req: Request) {
   try {
+    const { userId } = await requireSession();
     const { amount } = await req.json();
 
-    // 1. Update Main Checking balance
     let account = await prisma.account.findFirst({
-      where: { name: 'Main Checking' },
+      where: { userId, name: 'Main Checking' },
     });
 
     if (!account) {
       account = await prisma.account.create({
-        data: { name: 'Main Checking', type: 'checking', balance: amount },
+        data: { userId, name: 'Main Checking', type: 'checking', balance: amount },
       });
     } else {
       await prisma.account.update({
@@ -21,9 +25,8 @@ export async function POST(req: Request) {
       });
     }
 
-    // 2. Query all Savings Goals for auto-allocation
     const savingsGoals = await prisma.savingsGoal.findMany({
-      where: { autoAllocatePct: { gt: 0 } },
+      where: { userId, autoAllocatePct: { gt: 0 } },
     });
 
     const updates = savingsGoals.map((goal) => {
@@ -40,6 +43,9 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ success: true, allocated: updates.length });
   } catch (error) {
+    if (error instanceof Error && error.message === 'UNAUTHENTICATED') {
+      return NextResponse.json({ error: 'Non authentifié' }, { status: 401 });
+    }
     console.error('Salary Webhook Error:', error);
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }

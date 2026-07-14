@@ -1,46 +1,45 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { notifyRefresh } from "@/lib/sse";
+import { requireSession } from "@/lib/auth";
 
+// Note : webhook déclenché depuis l'app elle-même (session navigateur) pour
+// l'instant. Une vraie intégration externe (Apple Pay, banque) aurait besoin
+// d'un token dédié par utilisateur plutôt que du cookie de session.
 export async function POST(req: Request) {
   try {
+    const { userId } = await requireSession();
     const { merchant, amount, date, location } = await req.json();
     const absAmount = Math.abs(amount);
 
-    // Use a transaction to ensure consistent reads and atomic updates
     const result = await prisma.$transaction(async (tx) => {
-      // 1. Find or create "Main Checking" account
       let account = await tx.account.findFirst({
-        where: { name: "Main Checking" },
+        where: { userId, name: "Main Checking" },
       });
 
       if (!account) {
         account = await tx.account.create({
-          data: { name: "Main Checking", type: "checking", balance: 0 },
+          data: { userId, name: "Main Checking", type: "checking", balance: 0 },
         });
       }
 
-      // 2. Find or create "Uncategorized" category
       let category = await tx.category.findFirst({
-        where: { name: "Uncategorized" },
+        where: { userId, name: "Uncategorized" },
       });
 
       if (!category) {
         category = await tx.category.create({
-          data: { name: "Uncategorized", type: "expense" },
+          data: { userId, name: "Uncategorized", type: "expense" },
         });
       }
 
-      // 3. Calculate "Safe to Spend"
-      // Safe to Spend = Checking Balance - Sum of all Savings Goals
-      const savingsGoals = await tx.savingsGoal.findMany();
+      const savingsGoals = await tx.savingsGoal.findMany({ where: { userId } });
       const totalSavingsLocked = savingsGoals.reduce(
         (acc, goal) => acc + goal.currentAmount,
         0,
       );
       const safeToSpend = account.balance - totalSavingsLocked;
 
-      // Rule: cannot spend if it drops safeToSpend below 0
       const isRejected = safeToSpend - absAmount < 0;
 
       const expenseAmount = absAmount * -1;
@@ -52,9 +51,9 @@ export async function POST(req: Request) {
         `Apple Pay Webhook: Merchant: ${merchantName}, Amount: ${expenseAmount}, Date: ${date}, Location: ${locationUser}, Safe to Spend: ${safeToSpend}, Rejected: ${isRejected}`,
       );
 
-      // 4. Create Transaction record (always logged)
       const transaction = await tx.transaction.create({
         data: {
+          userId,
           accountId: account.id,
           categoryId: category.id,
           merchant: merchantName,
@@ -63,7 +62,6 @@ export async function POST(req: Request) {
         },
       });
 
-      // 5. Update account balance only if NOT rejected
       if (!isRejected) {
         await tx.account.update({
           where: { id: account.id },
@@ -75,7 +73,6 @@ export async function POST(req: Request) {
     });
 
     if (result.isRejected) {
-      // Still notify refresh as a transaction was logged (rejected)
       notifyRefresh();
       return NextResponse.json(
         {
@@ -93,6 +90,9 @@ export async function POST(req: Request) {
       transaction: result.transaction,
     });
   } catch (error) {
+    if (error instanceof Error && error.message === 'UNAUTHENTICATED') {
+      return NextResponse.json({ error: 'Non authentifié' }, { status: 401 });
+    }
     console.error("Apple Pay Webhook Error:", error);
     return NextResponse.json(
       { error: "Internal Server Error" },

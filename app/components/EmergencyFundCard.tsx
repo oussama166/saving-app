@@ -6,10 +6,17 @@ import { ShieldCheck } from 'lucide-react';
 interface EmergencyFundCardProps {
   currentAmount: number;
   targetAmount: number;
+  monthsCovered: number;
+  targetMonths: number;
 }
 
-export default function EmergencyFundCard({ currentAmount, targetAmount }: EmergencyFundCardProps) {
-  const percentage = Math.min((currentAmount / targetAmount) * 100, 100);
+export default function EmergencyFundCard({
+  currentAmount,
+  targetAmount,
+  monthsCovered,
+  targetMonths,
+}: EmergencyFundCardProps) {
+  const percentage = targetAmount > 0 ? Math.min((currentAmount / targetAmount) * 100, 100) : 0;
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('fr-MA', {
@@ -24,7 +31,7 @@ export default function EmergencyFundCard({ currentAmount, targetAmount }: Emerg
       <div className="space-y-4">
         <div className="flex items-center gap-3">
           <ShieldCheck className="w-6 h-6 text-emerald-400" />
-          <h3 className="text-lg font-bold text-slate-200">Fonds d'Urgence (Sécurité)</h3>
+          <h3 className="text-lg font-bold text-slate-200">Fonds d&apos;Urgence (Sécurité)</h3>
         </div>
 
         <div className="pt-4">
@@ -52,7 +59,9 @@ export default function EmergencyFundCard({ currentAmount, targetAmount }: Emerg
       
       <div className="mt-6 p-4 bg-emerald-500/5 border border-emerald-500/10 rounded-lg">
         <p className="text-[11px] text-slate-400 leading-relaxed">
-          Votre fonds d'urgence couvre actuellement environ <span className="text-emerald-400 font-bold">3.5 mois</span> de dépenses essentielles. Continuez ainsi pour atteindre votre objectif de 6 mois.
+          Votre fonds d&apos;urgence couvre actuellement environ{' '}
+          <span className="text-emerald-400 font-bold">{monthsCovered.toFixed(1)} mois</span> de
+          dépenses essentielles. Continuez ainsi pour atteindre votre objectif de {targetMonths} mois.
         </p>
       </div>
     </div>
