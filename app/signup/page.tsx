@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { UserPlus } from 'lucide-react';
 import Logo from '../components/Logo';
+import PasswordInput from '../components/PasswordInput';
 import { useLanguage } from '../components/LanguageProvider';
 
 export default function SignupPage() {
@@ -96,13 +97,12 @@ export default function SignupPage() {
             <label className="text-[11px] font-bold uppercase tracking-widest text-subtle">
               {t('auth.password')}
             </label>
-            <input
-              type="password"
+            <PasswordInput
               required
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={setPassword}
               placeholder={t('auth.passwordMinChars')}
-              className="w-full bg-page border border-line text-body rounded-lg p-3 focus:border-blue-500 outline-none transition-colors text-sm"
+              autoComplete="new-password"
             />
           </div>
 
@@ -110,13 +110,12 @@ export default function SignupPage() {
             <label className="text-[11px] font-bold uppercase tracking-widest text-subtle">
               {t('auth.confirmPassword')}
             </label>
-            <input
-              type="password"
+            <PasswordInput
               required
               value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
+              onChange={setConfirmPassword}
               placeholder="••••••••"
-              className="w-full bg-page border border-line text-body rounded-lg p-3 focus:border-blue-500 outline-none transition-colors text-sm"
+              autoComplete="new-password"
             />
           </div>
 

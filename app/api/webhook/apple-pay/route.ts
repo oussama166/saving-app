@@ -1,16 +1,56 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { notifyRefresh } from "@/lib/sse";
-import { requireSession } from "@/lib/auth";
+import { requireWebhookAuth } from "@/lib/webhookAuth";
+import { guessTransactionCategory } from "@/lib/placeCategory";
 
-// Note : webhook déclenché depuis l'app elle-même (session navigateur) pour
-// l'instant. Une vraie intégration externe (Apple Pay, banque) aurait besoin
-// d'un token dédié par utilisateur plutôt que du cookie de session.
+// Accepte soit un token de webhook dédié (header `Authorization: Bearer
+// <token>`, généré depuis la page Profil — utilisé par l'iOS Shortcut),
+// soit le cookie de session classique (appel depuis l'app elle-même).
 export async function POST(req: Request) {
   try {
-    const { userId } = await requireSession();
-    const { merchant, amount, date, location } = await req.json();
+    const { userId } = await requireWebhookAuth(req);
+    const { merchant, amount, date, location, latitude, longitude } =
+      await req.json();
     const absAmount = Math.abs(amount);
+
+    // Best-effort : deviner la catégorie via la position GPS avant d'ouvrir
+    // la transaction DB (on ne veut pas garder une transaction SQLite
+    // ouverte pendant un appel réseau externe). Échec/absence de
+    // coordonnées => on retombe simplement sur "Uncategorized" comme avant.
+    //
+    // Le Shortcut iOS envoie parfois la latitude/longitude sans séparateur
+    // décimal (ex: 33.615887 -> 3361588763878096), probablement un souci de
+    // formatage côté Shortcuts (locale/type de champ JSON). On rejette toute
+    // valeur hors des bornes GPS valides plutôt que d'interroger Overpass
+    // avec des coordonnées absurdes ou de les stocker telles quelles.
+    const rawLat = typeof latitude === "number" ? latitude : Number(latitude);
+    const rawLng = typeof longitude === "number" ? longitude : Number(longitude);
+    const hasValidCoords =
+      Number.isFinite(rawLat) &&
+      Number.isFinite(rawLng) &&
+      Math.abs(rawLat) <= 90 &&
+      Math.abs(rawLng) <= 180;
+    const lat = hasValidCoords ? rawLat : null;
+    const lng = hasValidCoords ? rawLng : null;
+    if (latitude === undefined && longitude === undefined) {
+      console.log(
+        "Apple Pay Webhook: pas de latitude/longitude dans le body — catégorisation par position sautée (Uncategorized par défaut).",
+      );
+    } else if (!hasValidCoords) {
+      console.warn(
+        `Apple Pay Webhook: coordonnées GPS invalides ignorées (latitude=${latitude}, longitude=${longitude}) — vérifie le format envoyé par le Shortcut.`,
+      );
+    }
+    // Essaie d'abord de deviner la catégorie depuis le seul nom du marchand
+    // (gratuit, pas d'appel réseau) ; Geoapify n'est appelé qu'en repli, et
+    // seulement si des coordonnées valides sont disponibles.
+    const placeGuess = await guessTransactionCategory({ merchantName: merchant, lat, lng });
+    if (!placeGuess && lat !== null && lng !== null) {
+      console.log(
+        `Apple Pay Webhook: aucune catégorie devinée (nom + position) pour "${merchant}" — Uncategorized par défaut.`,
+      );
+    }
 
     const result = await prisma.$transaction(async (tx) => {
       let account = await tx.account.findFirst({
@@ -23,9 +63,17 @@ export async function POST(req: Request) {
         });
       }
 
-      let category = await tx.category.findFirst({
-        where: { userId, name: "Uncategorized" },
-      });
+      let category = placeGuess
+        ? await tx.category.findFirst({
+            where: { userId, name: placeGuess.categoryName },
+          })
+        : null;
+
+      if (!category) {
+        category = await tx.category.findFirst({
+          where: { userId, name: "Uncategorized" },
+        });
+      }
 
       if (!category) {
         category = await tx.category.create({
@@ -56,9 +104,14 @@ export async function POST(req: Request) {
           userId,
           accountId: account.id,
           categoryId: category.id,
+          subCategory: placeGuess?.subCategoryName ?? null,
           merchant: merchantName,
           amount: expenseAmount,
           date: new Date(date),
+          location: locationUser,
+          latitude: lat,
+          longitude: lng,
+          isRejected,
         },
       });
 
@@ -90,8 +143,8 @@ export async function POST(req: Request) {
       transaction: result.transaction,
     });
   } catch (error) {
-    if (error instanceof Error && error.message === 'UNAUTHENTICATED') {
-      return NextResponse.json({ error: 'Non authentifié' }, { status: 401 });
+    if (error instanceof Error && error.message === "UNAUTHENTICATED") {
+      return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
     }
     console.error("Apple Pay Webhook Error:", error);
     return NextResponse.json(

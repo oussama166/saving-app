@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyPassword, createSessionToken, SESSION_COOKIE, SESSION_COOKIE_OPTIONS } from '@/lib/auth';
+import { getRateLimitKey, isRateLimited, recordFailedAttempt, clearAttempts } from '@/lib/rateLimit';
 
 export async function POST(req: Request) {
   try {
@@ -11,17 +12,34 @@ export async function POST(req: Request) {
     }
 
     const normalizedEmail = email.trim().toLowerCase();
+    const rateLimitKey = getRateLimitKey(normalizedEmail, req);
+
+    const { limited, retryAfterSeconds } = isRateLimited(rateLimitKey);
+    if (limited) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: `Trop de tentatives. Réessaie dans ${Math.ceil((retryAfterSeconds ?? 60) / 60)} min.`,
+        },
+        { status: 429, headers: { 'Retry-After': String(retryAfterSeconds ?? 60) } },
+      );
+    }
+
     const user = await prisma.user.findUnique({ where: { email: normalizedEmail } });
 
     // Message volontairement identique dans les deux cas (email inconnu /
     // mot de passe incorrect) pour ne pas révéler si un email est enregistré.
-    const invalidCredentials = () =>
-      NextResponse.json({ success: false, error: 'Email ou mot de passe incorrect' }, { status: 401 });
+    const invalidCredentials = () => {
+      recordFailedAttempt(rateLimitKey);
+      return NextResponse.json({ success: false, error: 'Email ou mot de passe incorrect' }, { status: 401 });
+    };
 
     if (!user) return invalidCredentials();
 
     const validPassword = await verifyPassword(password, user.passwordHash);
     if (!validPassword) return invalidCredentials();
+
+    clearAttempts(rateLimitKey);
 
     const token = await createSessionToken({ userId: user.id, email: user.email });
 

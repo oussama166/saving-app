@@ -1,13 +1,13 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { requireSession } from '@/lib/auth';
+import { requireWebhookAuth } from '@/lib/webhookAuth';
 
-// Note : webhook déclenché depuis l'app elle-même (session navigateur) pour
-// l'instant. Une vraie intégration externe (banque, service tiers) aurait
-// besoin d'un token dédié par utilisateur plutôt que du cookie de session.
+// Accepte soit un token de webhook dédié (header `Authorization: Bearer
+// <token>`, généré depuis la page Profil), soit le cookie de session
+// classique (appel depuis l'app elle-même).
 export async function POST(req: Request) {
   try {
-    const { userId } = await requireSession();
+    const { userId } = await requireWebhookAuth(req);
     const { amount } = await req.json();
 
     let account = await prisma.account.findFirst({

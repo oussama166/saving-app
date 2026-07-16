@@ -15,8 +15,15 @@ model User {
   email        String   @unique
   passwordHash String
   name         String?
+  webhookToken String?  @unique // token dédié pour les webhooks externes (Apple Pay Shortcut, etc.), distinct du cookie de session
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+
+  emailVerified               Boolean   @default(false)
+  verificationToken            String?   @unique
+  verificationTokenExpiresAt   DateTime?
+  passwordResetToken           String?   @unique
+  passwordResetTokenExpiresAt  DateTime?
 
   settings        UserSettings?
   accounts        Account[]
@@ -96,6 +103,10 @@ model Transaction {
   merchant      String
   amount        Float
   date          DateTime       @default(now())
+  location      String? // adresse brute envoyée par le webhook Apple Pay (texte, pas géocodée)
+  latitude      Float? // coordonnée GPS au moment du paiement, utilisée pour deviner la catégorie (voir lib/placeCategory.ts)
+  longitude     Float?
+  isRejected    Boolean        @default(false) // true si le webhook a détecté un dépassement du "Safe to Spend" au moment du paiement
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
   medicalRecord MedicalRecord?

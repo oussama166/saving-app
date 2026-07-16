@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import TopNav from "./components/TopNav";
+import EmailVerificationBanner from "./components/EmailVerificationBanner";
 import { ThemeProvider, THEME_INIT_SCRIPT } from "./components/ThemeProvider";
 import { LanguageProvider } from "./components/LanguageProvider";
 import { getSession } from "@/lib/auth";
@@ -56,6 +57,7 @@ export default async function RootLayout({
             authenticated={Boolean(session)}
           >
             <TopNav />
+            <EmailVerificationBanner />
             {children}
           </LanguageProvider>
         </ThemeProvider>

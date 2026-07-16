@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { LogIn } from 'lucide-react';
 import Logo from '../components/Logo';
+import PasswordInput from '../components/PasswordInput';
 import { useLanguage } from '../components/LanguageProvider';
 
 function LoginForm() {
@@ -70,16 +71,20 @@ function LoginForm() {
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-[11px] font-bold uppercase tracking-widest text-subtle">
-              {t('auth.password')}
-            </label>
-            <input
-              type="password"
+            <div className="flex items-center justify-between">
+              <label className="text-[11px] font-bold uppercase tracking-widest text-subtle">
+                {t('auth.password')}
+              </label>
+              <Link href="/forgot-password" className="text-[11px] font-semibold text-blue-400 hover:text-blue-300">
+                {t('auth.forgotPasswordLink')}
+              </Link>
+            </div>
+            <PasswordInput
               required
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={setPassword}
               placeholder="••••••••"
-              className="w-full bg-page border border-line text-body rounded-lg p-3 focus:border-blue-500 outline-none transition-colors text-sm"
+              autoComplete="current-password"
             />
           </div>
 

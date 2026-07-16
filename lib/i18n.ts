@@ -75,6 +75,7 @@ const fr: Dict = {
   "common.savings": "Épargne/Invest.",
   "common.records": "enregistrement(s)",
   "common.confirm": "Confirmer",
+  "common.close": "Fermer",
 
   // Auth
   "auth.loginTitle": "Wealth OS",
@@ -99,6 +100,27 @@ const fr: Dict = {
   "auth.errorPasswordMismatch": "Les mots de passe ne correspondent pas.",
   "auth.errorPasswordTooShort":
     "Le mot de passe doit contenir au moins 8 caractères.",
+  "auth.forgotPasswordLink": "Mot de passe oublié ?",
+  "auth.forgotPasswordTitle": "Mot de passe oublié",
+  "auth.forgotPasswordSubtitle":
+    "Indique ton email, on t'envoie un lien de réinitialisation.",
+  "auth.forgotPasswordSent":
+    "Si un compte existe avec cet email, un lien de réinitialisation vient d'être envoyé.",
+  "auth.forgotPasswordSubmit": "Envoyer le lien",
+  "auth.backToLogin": "Retour à la connexion",
+  "auth.resetPasswordTitle": "Réinitialiser le mot de passe",
+  "auth.resetPasswordInvalidLink":
+    "Lien invalide ou expiré. Redemande un email de réinitialisation.",
+  "auth.resetPasswordSuccess":
+    "Mot de passe mis à jour. Redirection vers la connexion...",
+  "auth.newPassword": "Nouveau mot de passe",
+  "auth.resetPasswordSubmit": "Réinitialiser",
+
+  // Vérification d'email
+  "emailVerify.notVerified":
+    "Ton email n'est pas encore vérifié. Vérifie ta boîte de réception.",
+  "emailVerify.sent": "Email de vérification envoyé.",
+  "emailVerify.resend": "Renvoyer l'email",
 
   // Dashboard
   "dashboard.title": "Personal Wealth OS",
@@ -337,6 +359,7 @@ const en: Dict = {
   "common.savings": "Savings/Invest.",
   "common.records": "record(s)",
   "common.confirm": "Confirm",
+  "common.close": "Close",
 
   "auth.loginTitle": "Wealth OS",
   "auth.loginSubtitle": "Sign in to access your space.",
@@ -359,6 +382,26 @@ const en: Dict = {
   "auth.errorNetwork": "Network error, try again.",
   "auth.errorPasswordMismatch": "Passwords do not match.",
   "auth.errorPasswordTooShort": "Password must be at least 8 characters.",
+  "auth.forgotPasswordLink": "Forgot password?",
+  "auth.forgotPasswordTitle": "Forgot password",
+  "auth.forgotPasswordSubtitle":
+    "Enter your email and we'll send you a reset link.",
+  "auth.forgotPasswordSent":
+    "If an account exists with this email, a reset link has just been sent.",
+  "auth.forgotPasswordSubmit": "Send reset link",
+  "auth.backToLogin": "Back to sign in",
+  "auth.resetPasswordTitle": "Reset password",
+  "auth.resetPasswordInvalidLink":
+    "Invalid or expired link. Request a new reset email.",
+  "auth.resetPasswordSuccess": "Password updated. Redirecting to sign in...",
+  "auth.newPassword": "New password",
+  "auth.resetPasswordSubmit": "Reset password",
+
+  // Email verification
+  "emailVerify.notVerified":
+    "Your email isn't verified yet. Check your inbox.",
+  "emailVerify.sent": "Verification email sent.",
+  "emailVerify.resend": "Resend email",
 
   "dashboard.title": "Personal Wealth OS",
   "dashboard.welcome": "Welcome back. Your financial health score is",
@@ -587,6 +630,7 @@ const es: Dict = {
   "common.savings": "Ahorro/Inversión",
   "common.records": "registro(s)",
   "common.confirm": "Confirmar",
+  "common.close": "Cerrar",
 
   "auth.loginTitle": "Wealth OS",
   "auth.loginSubtitle": "Inicia sesión para acceder a tu espacio.",
@@ -610,6 +654,27 @@ const es: Dict = {
   "auth.errorPasswordMismatch": "Las contraseñas no coinciden.",
   "auth.errorPasswordTooShort":
     "La contraseña debe tener al menos 8 caracteres.",
+  "auth.forgotPasswordLink": "¿Olvidaste tu contraseña?",
+  "auth.forgotPasswordTitle": "Contraseña olvidada",
+  "auth.forgotPasswordSubtitle":
+    "Indica tu email y te enviaremos un enlace para restablecerla.",
+  "auth.forgotPasswordSent":
+    "Si existe una cuenta con este email, se acaba de enviar un enlace de restablecimiento.",
+  "auth.forgotPasswordSubmit": "Enviar enlace",
+  "auth.backToLogin": "Volver a iniciar sesión",
+  "auth.resetPasswordTitle": "Restablecer contraseña",
+  "auth.resetPasswordInvalidLink":
+    "Enlace inválido o caducado. Solicita un nuevo email de restablecimiento.",
+  "auth.resetPasswordSuccess":
+    "Contraseña actualizada. Redirigiendo al inicio de sesión...",
+  "auth.newPassword": "Nueva contraseña",
+  "auth.resetPasswordSubmit": "Restablecer",
+
+  // Verificación de email
+  "emailVerify.notVerified":
+    "Tu email aún no está verificado. Revisa tu bandeja de entrada.",
+  "emailVerify.sent": "Email de verificación enviado.",
+  "emailVerify.resend": "Reenviar email",
 
   "dashboard.title": "Personal Wealth OS",
   "dashboard.welcome":
@@ -842,6 +907,7 @@ const ar: Dict = {
   "common.savings": "ادخار/استثمار",
   "common.records": "سجل",
   "common.confirm": "تأكيد",
+  "common.close": "إغلاق",
 
   "auth.loginTitle": "Wealth OS",
   "auth.loginSubtitle": "سجّل الدخول للوصول إلى مساحتك.",
@@ -864,6 +930,27 @@ const ar: Dict = {
   "auth.errorNetwork": "خطأ في الشبكة، حاول مرة أخرى.",
   "auth.errorPasswordMismatch": "كلمتا المرور غير متطابقتين.",
   "auth.errorPasswordTooShort": "يجب أن تتكون كلمة المرور من 8 أحرف على الأقل.",
+  "auth.forgotPasswordLink": "نسيت كلمة المرور؟",
+  "auth.forgotPasswordTitle": "نسيت كلمة المرور",
+  "auth.forgotPasswordSubtitle":
+    "أدخل بريدك الإلكتروني وسنرسل لك رابط إعادة التعيين.",
+  "auth.forgotPasswordSent":
+    "إذا كان هناك حساب بهذا البريد الإلكتروني، فقد تم للتو إرسال رابط لإعادة تعيين كلمة المرور.",
+  "auth.forgotPasswordSubmit": "إرسال الرابط",
+  "auth.backToLogin": "العودة لتسجيل الدخول",
+  "auth.resetPasswordTitle": "إعادة تعيين كلمة المرور",
+  "auth.resetPasswordInvalidLink":
+    "رابط غير صالح أو منتهي الصلاحية. اطلب رسالة إعادة تعيين جديدة.",
+  "auth.resetPasswordSuccess":
+    "تم تحديث كلمة المرور. جارٍ التحويل إلى تسجيل الدخول...",
+  "auth.newPassword": "كلمة المرور الجديدة",
+  "auth.resetPasswordSubmit": "إعادة التعيين",
+
+  // التحقق من البريد الإلكتروني
+  "emailVerify.notVerified":
+    "لم يتم التحقق من بريدك الإلكتروني بعد. تحقق من صندوق الوارد.",
+  "emailVerify.sent": "تم إرسال بريد التحقق.",
+  "emailVerify.resend": "إعادة إرسال البريد",
 
   "dashboard.title": "Personal Wealth OS",
   "dashboard.welcome": "مرحبًا بعودتك. درجة صحتك المالية هي",

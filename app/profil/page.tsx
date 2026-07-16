@@ -6,11 +6,15 @@ import {
   FileSpreadsheet,
   Loader2,
   Download,
+  ShieldCheck,
+  MailWarning,
 } from "lucide-react";
 import ProfileAllocationEditor, {
   AllocationRow,
 } from "../components/ProfileAllocationEditor";
 import RealBudgetOptimizer from "../components/RealBudgetOptimizer";
+import WebhookTokenCard from "../components/WebhookTokenCard";
+import AccountSecurityCard from "../components/AccountSecurityCard";
 
 export default function ProfilPage() {
   const [referenceIncome, setReferenceIncome] = useState(10000);
@@ -21,6 +25,7 @@ export default function ProfilPage() {
   const [saved, setSaved] = useState(false);
   const [generatingBilan, setGeneratingBilan] = useState(false);
   const [bilanError, setBilanError] = useState<string | null>(null);
+  const [emailVerified, setEmailVerified] = useState<boolean | null>(null);
 
   useEffect(() => {
     fetch("/api/settings")
@@ -42,6 +47,13 @@ export default function ProfilPage() {
       })
       .catch((err) => console.error("Settings fetch error:", err))
       .finally(() => setLoading(false));
+
+    fetch("/api/auth/me")
+      .then((res) => res.json())
+      .then((result) => {
+        if (result.success) setEmailVerified(Boolean(result.user.emailVerified));
+      })
+      .catch((err) => console.error("Me fetch error:", err));
   }, []);
 
   const handleAllocationChange = (id: string, pct: number) => {
@@ -194,6 +206,14 @@ export default function ProfilPage() {
           </button>
         </div>
 
+        <AccountSecurityCard />
+
+        {emailVerified ? (
+          <WebhookTokenCard />
+        ) : (
+          <LockedWebhookCard verified={emailVerified} />
+        )}
+
         <p className="text-center text-[11px] text-faint pt-4">
           Système conçu pour épargne · Règle 50/30/20 enrichie
           {updatedAt &&
@@ -201,5 +221,68 @@ export default function ProfilPage() {
         </p>
       </div>
     </main>
+  );
+}
+
+function LockedWebhookCard({ verified }: { verified: boolean | null }) {
+  const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState(false);
+
+  const handleResend = async () => {
+    setSending(true);
+    try {
+      const res = await fetch("/api/auth/resend-verification", { method: "POST" });
+      const result = await res.json();
+      if (result.success) setSent(true);
+    } catch (err) {
+      console.error("Resend verification error:", err);
+    } finally {
+      setSending(false);
+    }
+  };
+
+  if (verified === null) {
+    return (
+      <div className="p-6 border bg-surface rounded-2xl border-line">
+        <div className="flex items-center gap-2 text-xs text-subtle">
+          <Loader2 className="w-4 h-4 animate-spin" />
+          Chargement...
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-6 border bg-surface rounded-2xl border-line space-y-4">
+      <div className="flex items-center gap-4">
+        <div className="p-3 border bg-orange-600/20 rounded-xl border-orange-500/20">
+          <ShieldCheck className="w-6 h-6 text-orange-400" />
+        </div>
+        <div>
+          <h2 className="text-sm font-black tracking-tight uppercase text-ink">
+            Token Webhook (iOS Shortcut)
+          </h2>
+          <p className="text-subtle text-xs mt-0.5 max-w-md">
+            Vérifie ton email pour débloquer la génération du token webhook (utilisé par
+            les iOS Shortcuts Apple Pay / Salaire).
+          </p>
+        </div>
+      </div>
+      <div className="flex items-center gap-3 border-t border-line-subtle pt-4">
+        <MailWarning className="w-4 h-4 text-orange-400 shrink-0" />
+        {sent ? (
+          <span className="text-xs text-emerald-400 font-medium">Email de vérification envoyé.</span>
+        ) : (
+          <button
+            onClick={handleResend}
+            disabled={sending}
+            className="flex items-center gap-2 text-xs font-bold text-orange-400 hover:text-orange-300 disabled:opacity-50"
+          >
+            {sending && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+            Renvoyer l&apos;email de vérification
+          </button>
+        )}
+      </div>
+    </div>
   );
 }

@@ -48,7 +48,7 @@ const navLinks = [
   { key: "nav.profil", icon: <User className="w-4 h-4" />, href: "/profil" },
 ];
 
-const AUTH_PATHS = ["/login", "/signup"];
+const AUTH_PATHS = ["/login", "/signup", "/forgot-password", "/reset-password"];
 
 export default function TopNav() {
   const pathname = usePathname();
@@ -95,7 +95,7 @@ export default function TopNav() {
   return (
     <nav className="bg-page border-b border-line-subtle text-body-soft sticky top-0 z-[60]">
       <div className="flex items-center justify-between h-16 px-4 mx-auto sm:px-6 lg:px-10">
-        <a className="flex items-center gap-2" href="/">
+        <Link className="flex items-center gap-2" href="/">
           <Logo
             size={30}
             className="shadow-lg shadow-blue-900/20 rounded-[9px]"
@@ -103,7 +103,7 @@ export default function TopNav() {
           <span className="text-lg font-black tracking-tighter text-ink">
             Wealth OS
           </span>
-        </a>
+        </Link>
 
         <div className="items-center hidden gap-1 lg:flex">
           {navLinks.map((link) => {
