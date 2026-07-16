@@ -80,20 +80,20 @@ export default function InterestSimulator({ showChart = true }: InterestSimulato
   const formatCUR = (val: number) => new Intl.NumberFormat('fr-MA', { style: 'currency', currency: 'MAD', maximumFractionDigits: 0 }).format(val);
 
   return (
-    <div className="bg-[#1b253b] rounded-2xl border border-slate-700 p-8 shadow-2xl">
+    <div className="bg-surface rounded-2xl border border-line p-8 shadow-2xl">
       <div className="flex justify-between items-center mb-8">
-        <h2 className="text-xl font-bold text-white tracking-tight">Interest Simulator</h2>
+        <h2 className="text-xl font-bold text-ink tracking-tight">Interest Simulator</h2>
         <span className="text-[10px] bg-blue-500/20 text-blue-400 px-2 py-1 rounded uppercase font-bold tracking-widest border border-blue-500/20">Pro Projection</span>
       </div>
 
       {/* Metrics Row */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-10">
-        <div className="bg-slate-900/50 p-4 rounded-xl border border-slate-700/50">
-          <span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Capital Investi</span>
-          <p className="text-xl font-bold text-slate-300 mt-1">{formatCUR(finalData.invested)}</p>
+        <div className="bg-surface-deep/50 p-4 rounded-xl border border-line/50">
+          <span className="text-[10px] text-subtle font-bold uppercase tracking-widest">Capital Investi</span>
+          <p className="text-xl font-bold text-body-soft mt-1">{formatCUR(finalData.invested)}</p>
         </div>
-        <div className="bg-slate-900/50 p-4 rounded-xl border border-slate-700/50">
-          <span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Intérêts Composés</span>
+        <div className="bg-surface-deep/50 p-4 rounded-xl border border-line/50">
+          <span className="text-[10px] text-subtle font-bold uppercase tracking-widest">Intérêts Composés</span>
           <p className="text-xl font-bold text-green-400 mt-1">+{formatCUR(finalData.interest)}</p>
         </div>
         <div className="bg-blue-600/10 p-4 rounded-xl border border-blue-500/20">
@@ -143,51 +143,51 @@ export default function InterestSimulator({ showChart = true }: InterestSimulato
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
         <div className="space-y-4">
           <div className="flex justify-between items-center">
-            <label className="text-xs font-bold text-slate-400 uppercase tracking-widest">DCA Mensuel</label>
-            <span className="text-sm font-bold text-white">{formatCUR(dca)}</span>
+            <label className="text-xs font-bold text-muted uppercase tracking-widest">DCA Mensuel</label>
+            <span className="text-sm font-bold text-ink">{formatCUR(dca)}</span>
           </div>
           <input
             type="range" min="100" max="10000" step="100"
             value={dca} onChange={(e) => setDca(parseInt(e.target.value))}
-            className="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
+            className="w-full h-1.5 bg-surface-strong rounded-lg appearance-none cursor-pointer accent-blue-500"
           />
         </div>
 
         <div className="space-y-4">
           <div className="flex justify-between items-center">
-            <label className="text-xs font-bold text-slate-400 uppercase tracking-widest">Horizon (Années)</label>
-            <span className="text-sm font-bold text-white">{horizon} ans</span>
+            <label className="text-xs font-bold text-muted uppercase tracking-widest">Horizon (Années)</label>
+            <span className="text-sm font-bold text-ink">{horizon} ans</span>
           </div>
           <input
             type="range" min="1" max="40" step="1"
             value={horizon} onChange={(e) => setHorizon(parseInt(e.target.value))}
-            className="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
+            className="w-full h-1.5 bg-surface-strong rounded-lg appearance-none cursor-pointer accent-blue-500"
           />
         </div>
 
         <div className="space-y-4">
           <div className="flex justify-between items-center">
-            <label className="text-xs font-bold text-slate-400 uppercase tracking-widest">Rendement Annuel</label>
-            <span className="text-sm font-bold text-white">{yieldRate}%</span>
+            <label className="text-xs font-bold text-muted uppercase tracking-widest">Rendement Annuel</label>
+            <span className="text-sm font-bold text-ink">{yieldRate}%</span>
           </div>
           <input
             type="range" min="1" max="20" step="1"
             value={yieldRate} onChange={(e) => setYieldRate(parseInt(e.target.value))}
-            className="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
+            className="w-full h-1.5 bg-surface-strong rounded-lg appearance-none cursor-pointer accent-blue-500"
           />
         </div>
       </div>
 
       {/* Scénarios de référence — dynamiques, basés sur le DCA/horizon réglés ci-dessus */}
-      <div className="mt-10 pt-8 border-t border-slate-800">
-        <h3 className="text-sm font-bold uppercase tracking-widest text-slate-400 mb-4">Scénarios de Référence</h3>
+      <div className="mt-10 pt-8 border-t border-line-subtle">
+        <h3 className="text-sm font-bold uppercase tracking-widest text-muted mb-4">Scénarios de Référence</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {referenceScenarios.map((s) => (
             <div key={s.label} className={`p-4 rounded-xl border ${s.color}`}>
               <p className="text-xs font-bold uppercase tracking-widest mb-1">
                 {s.emoji} {s.label} ({formatCUR(dca)}/m à {s.rate}%, {s.years} ans)
               </p>
-              <p className="text-lg font-black text-white">{formatCUR(s.value)}</p>
+              <p className="text-lg font-black text-ink">{formatCUR(s.value)}</p>
             </div>
           ))}
         </div>

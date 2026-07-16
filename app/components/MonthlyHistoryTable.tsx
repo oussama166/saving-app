@@ -22,9 +22,9 @@ const formatCUR = (val: number) =>
 
 export default function MonthlyHistoryTable({ data }: Props) {
   return (
-    <div className="bg-[#1b253b] rounded-2xl border border-slate-700 p-8 shadow-2xl space-y-8">
+    <div className="bg-surface rounded-2xl border border-line p-8 shadow-2xl space-y-8">
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-bold text-white tracking-tight">Historique Mensuel</h2>
+        <h2 className="text-xl font-bold text-ink tracking-tight">Historique Mensuel</h2>
         <span className="text-[10px] bg-blue-500/20 text-blue-400 px-2 py-1 rounded uppercase font-bold tracking-widest border border-blue-500/20">
           6 derniers mois
         </span>
@@ -57,7 +57,7 @@ export default function MonthlyHistoryTable({ data }: Props) {
       <div className="overflow-x-auto">
         <table className="w-full text-left">
           <thead>
-            <tr className="text-[10px] text-slate-500 uppercase tracking-widest border-b border-slate-800">
+            <tr className="text-[10px] text-subtle uppercase tracking-widest border-b border-line-subtle">
               <th className="pb-3 font-bold">Mois</th>
               <th className="pb-3 font-bold text-right">Revenu</th>
               <th className="pb-3 font-bold text-right">Dépensé</th>
@@ -69,18 +69,18 @@ export default function MonthlyHistoryTable({ data }: Props) {
           </thead>
           <tbody>
             {[...data].reverse().map((m) => (
-              <tr key={m.month} className="border-b border-slate-800/50 last:border-0">
-                <td className="py-3 text-sm font-semibold text-slate-200 capitalize">{m.label}</td>
-                <td className="py-3 text-sm text-right text-slate-300 font-mono">{formatCUR(m.income)}</td>
+              <tr key={m.month} className="border-b border-line-subtle/50 last:border-0">
+                <td className="py-3 text-sm font-semibold text-body capitalize">{m.label}</td>
+                <td className="py-3 text-sm text-right text-body-soft font-mono">{formatCUR(m.income)}</td>
                 <td className="py-3 text-sm text-right text-red-400 font-mono">{formatCUR(m.expenses)}</td>
                 <td className="py-3 text-sm text-right text-emerald-400 font-mono">{formatCUR(m.savings)}</td>
-                <td className="py-3 text-sm text-right text-slate-300">{m.savingsRatePct}%</td>
-                <td className="py-3 text-sm text-slate-400">
+                <td className="py-3 text-sm text-right text-body-soft">{m.savingsRatePct}%</td>
+                <td className="py-3 text-sm text-muted">
                   {m.topCategory ? `${m.topCategory.name} (${formatCUR(m.topCategory.amount)})` : '—'}
                 </td>
                 <td className="py-3 text-sm text-right">
                   {m.variationPct === null ? (
-                    <span className="text-slate-600">—</span>
+                    <span className="text-faint">—</span>
                   ) : (
                     <span
                       className={`inline-flex items-center gap-1 font-bold ${
@@ -88,7 +88,7 @@ export default function MonthlyHistoryTable({ data }: Props) {
                           ? 'text-red-400'
                           : m.variationPct < 0
                             ? 'text-emerald-400'
-                            : 'text-slate-400'
+                            : 'text-muted'
                       }`}
                     >
                       {m.variationPct > 0 ? (

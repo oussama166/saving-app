@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { Gauge, Sparkles, TrendingUp, TrendingDown, Info } from 'lucide-react';
+import { useLanguage } from './LanguageProvider';
+import { tParams } from '@/lib/i18n';
 
 interface BudgetDetail {
   categoryName: string;
@@ -38,40 +40,45 @@ const formatCUR = (val: number) =>
 
 // Classification simple du profil dépensier à partir de la règle 50/30/20 —
 // utilisée uniquement en repli si le Coach IA est indisponible.
-function getSpenderProfile(rule: Rule503020) {
+function getSpenderProfile(rule: Rule503020, t: ReturnType<typeof useLanguage>['t']) {
   if (rule.savings.pct >= 20) {
     return {
       emoji: '🟢',
-      label: 'Épargnant Discipliné',
-      desc: `Vous épargnez/investissez ${rule.savings.pct}% de vos revenus ce mois-ci, au niveau ou au-dessus de la règle des 20%.`,
+      label: t('coach.diagnostic.profileEpargnant'),
+      desc: tParams(t('coach.diagnostic.profileEpargnantDesc'), { pct: rule.savings.pct }),
       color: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20',
     };
   }
   if (rule.wants.pct > 35) {
     return {
       emoji: '🟠',
-      label: 'Dépensier Loisirs',
-      desc: `Vos dépenses "Envies" représentent ${rule.wants.pct}% de vos revenus, bien au-dessus des 30% recommandés.`,
+      label: t('coach.diagnostic.profileLoisirs'),
+      desc: tParams(t('coach.diagnostic.profileLoisirsDesc'), { pct: rule.wants.pct }),
       color: 'text-orange-400 bg-orange-500/10 border-orange-500/20',
     };
   }
   if (rule.needs.pct > 60) {
     return {
       emoji: '🔴',
-      label: 'Charges Serrées',
-      desc: `Vos charges essentielles ("Besoins") pèsent ${rule.needs.pct}% de vos revenus, au-dessus des 50% recommandés — peu de marge de manœuvre.`,
+      label: t('coach.diagnostic.profileCharges'),
+      desc: tParams(t('coach.diagnostic.profileChargesDesc'), { pct: rule.needs.pct }),
       color: 'text-red-400 bg-red-500/10 border-red-500/20',
     };
   }
   return {
     emoji: '🔵',
-    label: 'Équilibré',
-    desc: `Votre répartition Besoins/Envies/Épargne (${rule.needs.pct}% / ${rule.wants.pct}% / ${rule.savings.pct}%) reste proche de la règle 50/30/20.`,
+    label: t('coach.diagnostic.profileEquilibre'),
+    desc: tParams(t('coach.diagnostic.profileEquilibreDesc'), {
+      needs: rule.needs.pct,
+      wants: rule.wants.pct,
+      savings: rule.savings.pct,
+    }),
     color: 'text-blue-400 bg-blue-500/10 border-blue-500/20',
   };
 }
 
 export default function CoachDiagnosticTab({ budgetDetails, rule503020, emergencyFundMonths, healthScore }: Props) {
+  const { t } = useLanguage();
   const [diagnostic, setDiagnostic] = useState<Diagnostic | null>(null);
   const [generatedAt, setGeneratedAt] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -116,19 +123,19 @@ export default function CoachDiagnosticTab({ budgetDetails, rule503020, emergenc
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const staticProfile = getSpenderProfile(rule503020);
+  const staticProfile = getSpenderProfile(rule503020, t);
   const badge = (
     <>
       {loading && (
         <span className="ml-auto flex items-center gap-1.5 text-[10px] text-blue-400 font-bold uppercase tracking-widest">
           <Sparkles className="w-3 h-3 animate-pulse" />
-          Analyse IA...
+          {t('coach.analyzing')}
         </span>
       )}
       {!loading && diagnostic && !failed && (
         <span className="ml-auto flex items-center gap-1.5 text-[10px] text-emerald-400 font-bold uppercase tracking-widest">
           <Sparkles className="w-3 h-3" />
-          Coach IA
+          {t('coach.aiCoach')}
         </span>
       )}
     </>
@@ -137,11 +144,11 @@ export default function CoachDiagnosticTab({ budgetDetails, rule503020, emergenc
   if (loading) {
     return (
       <div className="space-y-6">
-        <div className="bg-[#1b253b] rounded-2xl border border-slate-700 p-8 animate-pulse space-y-3">
-          <div className="h-3 bg-slate-800 rounded w-1/3" />
-          <div className="h-3 bg-slate-800 rounded w-full" />
-          <div className="h-3 bg-slate-800 rounded w-5/6" />
-          <div className="h-3 bg-slate-800 rounded w-4/6" />
+        <div className="p-8 space-y-3 border bg-surface rounded-2xl border-line animate-pulse">
+          <div className="w-1/3 h-3 rounded bg-surface-alt" />
+          <div className="w-full h-3 rounded bg-surface-alt" />
+          <div className="w-5/6 h-3 rounded bg-surface-alt" />
+          <div className="w-4/6 h-3 rounded bg-surface-alt" />
         </div>
       </div>
     );
@@ -150,48 +157,52 @@ export default function CoachDiagnosticTab({ budgetDetails, rule503020, emergenc
   if (diagnostic && !failed) {
     return (
       <div className="space-y-6">
-        <div className="bg-[#1b253b] rounded-2xl border border-slate-700 p-8">
+        <div className="p-8 border bg-surface rounded-2xl border-line">
           <div className="flex items-center gap-3 mb-4">
             <Gauge className="w-5 h-5 text-blue-400" />
-            <h3 className="text-lg font-bold text-white tracking-tight">Profil Dépensier</h3>
+            <h3 className="text-lg font-bold tracking-tight text-ink">{t('coach.diagnostic.profil')}</h3>
             {badge}
           </div>
-          <p className="text-lg font-black text-white mb-2">{diagnostic.profilLabel}</p>
-          <p className="text-[13px] text-slate-400 leading-relaxed">{diagnostic.profilDesc}</p>
+          <p className="mb-2 text-lg font-black text-ink">{diagnostic.profilLabel}</p>
+          <p className="text-[13px] text-muted leading-relaxed">{diagnostic.profilDesc}</p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="p-5 rounded-2xl bg-emerald-500/10 border border-emerald-500/20">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="p-5 border rounded-2xl bg-emerald-500/10 border-emerald-500/20">
             <div className="flex items-center gap-2 mb-2">
               <TrendingUp className="w-4 h-4 text-emerald-400" />
-              <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-400">Point Fort</span>
+              <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-400">
+                {t('coach.diagnostic.pointFort')}
+              </span>
             </div>
-            <p className="text-[13px] text-slate-300 leading-relaxed">{diagnostic.pointFort}</p>
+            <p className="text-[13px] text-body-soft leading-relaxed">{diagnostic.pointFort}</p>
           </div>
-          <div className="p-5 rounded-2xl bg-red-500/10 border border-red-500/20">
+          <div className="p-5 border rounded-2xl bg-red-500/10 border-red-500/20">
             <div className="flex items-center gap-2 mb-2">
               <TrendingDown className="w-4 h-4 text-red-400" />
-              <span className="text-[10px] font-bold uppercase tracking-widest text-red-400">Point Faible</span>
+              <span className="text-[10px] font-bold uppercase tracking-widest text-red-400">
+                {t('coach.diagnostic.pointFaible')}
+              </span>
             </div>
-            <p className="text-[13px] text-slate-300 leading-relaxed">{diagnostic.pointFaible}</p>
+            <p className="text-[13px] text-body-soft leading-relaxed">{diagnostic.pointFaible}</p>
           </div>
         </div>
 
-        <div className="bg-[#1b253b] rounded-2xl border border-slate-700 p-8">
+        <div className="p-8 border bg-surface rounded-2xl border-line">
           <div className="flex items-center gap-3 mb-4">
             <Sparkles className="w-5 h-5 text-blue-400" />
-            <h3 className="text-lg font-bold text-white tracking-tight">Recommandation du Mois</h3>
-            <span className="ml-auto text-[10px] text-slate-500 font-bold uppercase tracking-widest">
-              Score Santé : {healthScore}%
+            <h3 className="text-lg font-bold tracking-tight text-ink">{t('coach.diagnostic.recommandationMonth')}</h3>
+            <span className="ml-auto text-[10px] text-subtle font-bold uppercase tracking-widest">
+              {t('coach.diagnostic.scoreLabel')} {healthScore}%
             </span>
           </div>
-          <p className="text-[13px] text-slate-400 leading-relaxed">{diagnostic.recommandation}</p>
+          <p className="text-[13px] text-muted leading-relaxed">{diagnostic.recommandation}</p>
 
           {generatedAt && (
-            <p className="text-[10px] text-slate-600 italic pt-4 mt-4 border-t border-slate-800">
-              Analyse générée le{' '}
+            <p className="text-[10px] text-faint italic pt-4 mt-4 border-t border-line-subtle">
+              {t('coach.generatedOn')}{' '}
               {new Date(generatedAt).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })}
-              , actualisée une fois par semaine.
+              , {t('coach.weeklyRefresh')}
             </p>
           )}
         </div>
@@ -206,78 +217,88 @@ export default function CoachDiagnosticTab({ budgetDetails, rule503020, emergenc
   const pointFort = budgeted.filter((b) => b.usedPct <= 50).sort((a, b) => a.usedPct - b.usedPct)[0] ?? null;
 
   const recommendation = pointFaible
-    ? `Priorité : "${pointFaible.categoryName}" a déjà consommé ${pointFaible.usedPct}% de son budget (${formatCUR(
-        pointFaible.spentAmount,
-      )} / ${formatCUR(pointFaible.budgetedAmount)}). Ralentissez sur cette catégorie jusqu'à la fin du mois.`
+    ? tParams(t('coach.diagnostic.recoPriority'), {
+        category: pointFaible.categoryName,
+        pct: pointFaible.usedPct,
+        spent: formatCUR(pointFaible.spentAmount),
+        budget: formatCUR(pointFaible.budgetedAmount),
+      })
     : emergencyFundMonths < 3
-      ? `Aucune catégorie en dépassement ce mois-ci. Concentrez l'effort sur le fonds d'urgence : il ne couvre que ${emergencyFundMonths.toFixed(1)} mois de dépenses (cible : 3 mois minimum).`
-      : `Aucune catégorie en dépassement et fonds d'urgence solide (${emergencyFundMonths.toFixed(1)} mois). Continuez sur cette lancée et envisagez d'augmenter vos versements d'investissement.`;
+      ? tParams(t('coach.diagnostic.recoEmergencyLow'), { months: emergencyFundMonths.toFixed(1) })
+      : tParams(t('coach.diagnostic.recoStrong'), { months: emergencyFundMonths.toFixed(1) });
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className={`p-6 rounded-2xl border ${staticProfile.color} lg:col-span-1`}>
           <div className="flex items-center gap-2 mb-3">
             <Gauge className="w-5 h-5" />
-            <span className="text-[10px] font-bold uppercase tracking-widest">Profil Dépensier</span>
+            <span className="text-[10px] font-bold uppercase tracking-widest">{t('coach.diagnostic.profil')}</span>
           </div>
-          <p className="text-lg font-black mb-2">
+          <p className="mb-2 text-lg font-black">
             {staticProfile.emoji} {staticProfile.label}
           </p>
           <p className="text-[12px] leading-relaxed opacity-90">{staticProfile.desc}</p>
         </div>
 
-        <div className="p-6 rounded-2xl border border-slate-700 bg-[#1b253b] lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
+        <div className="grid grid-cols-1 gap-4 p-6 border rounded-2xl border-line bg-surface lg:col-span-2 sm:grid-cols-2">
+          <div className="p-4 border rounded-xl bg-emerald-500/10 border-emerald-500/20">
             <div className="flex items-center gap-2 mb-2">
               <TrendingUp className="w-4 h-4 text-emerald-400" />
-              <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-400">Point Fort</span>
+              <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-400">
+                {t('coach.diagnostic.pointFort')}
+              </span>
             </div>
             {pointFort ? (
-              <p className="text-[13px] text-slate-300 leading-relaxed">
-                <span className="font-bold text-slate-100">{pointFort.categoryName}</span> : seulement{' '}
-                {pointFort.usedPct}% du budget utilisé ({formatCUR(pointFort.spentAmount)} /{' '}
-                {formatCUR(pointFort.budgetedAmount)}).
+              <p className="text-[13px] text-body-soft leading-relaxed">
+                {tParams(t('coach.diagnostic.pointFortTemplate'), {
+                  category: pointFort.categoryName,
+                  pct: pointFort.usedPct,
+                  spent: formatCUR(pointFort.spentAmount),
+                  budget: formatCUR(pointFort.budgetedAmount),
+                })}
               </p>
             ) : (
-              <p className="text-[13px] text-slate-500 italic">Pas de catégorie nettement sous-consommée ce mois-ci.</p>
+              <p className="text-[13px] text-subtle italic">{t('coach.diagnostic.noPointFort')}</p>
             )}
           </div>
 
-          <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20">
+          <div className="p-4 border rounded-xl bg-red-500/10 border-red-500/20">
             <div className="flex items-center gap-2 mb-2">
               <TrendingDown className="w-4 h-4 text-red-400" />
-              <span className="text-[10px] font-bold uppercase tracking-widest text-red-400">Point Faible</span>
+              <span className="text-[10px] font-bold uppercase tracking-widest text-red-400">
+                {t('coach.diagnostic.pointFaible')}
+              </span>
             </div>
             {pointFaible ? (
-              <p className="text-[13px] text-slate-300 leading-relaxed">
-                <span className="font-bold text-slate-100">{pointFaible.categoryName}</span> : déjà{' '}
-                {pointFaible.usedPct}% du budget utilisé ({formatCUR(pointFaible.spentAmount)} /{' '}
-                {formatCUR(pointFaible.budgetedAmount)}).
+              <p className="text-[13px] text-body-soft leading-relaxed">
+                {tParams(t('coach.diagnostic.pointFaibleTemplate'), {
+                  category: pointFaible.categoryName,
+                  pct: pointFaible.usedPct,
+                  spent: formatCUR(pointFaible.spentAmount),
+                  budget: formatCUR(pointFaible.budgetedAmount),
+                })}
               </p>
             ) : (
-              <p className="text-[13px] text-slate-500 italic">Aucune catégorie au-dessus de 80% du budget. 👍</p>
+              <p className="text-[13px] text-subtle italic">{t('coach.diagnostic.noPointFaible')}</p>
             )}
           </div>
         </div>
       </div>
 
-      <div className="bg-[#1b253b] rounded-2xl border border-slate-700 p-8">
+      <div className="p-8 border bg-surface rounded-2xl border-line">
         <div className="flex items-center gap-3 mb-4">
           <Sparkles className="w-5 h-5 text-blue-400" />
-          <h3 className="text-lg font-bold text-white tracking-tight">Recommandation du Mois</h3>
-          <span className="ml-auto text-[10px] text-slate-500 font-bold uppercase tracking-widest">
-            Score Santé : {healthScore}%
+          <h3 className="text-lg font-bold tracking-tight text-ink">{t('coach.diagnostic.recommandationMonth')}</h3>
+          <span className="ml-auto text-[10px] text-subtle font-bold uppercase tracking-widest">
+            {t('coach.diagnostic.scoreLabel')} {healthScore}%
           </span>
         </div>
-        <p className="text-[13px] text-slate-400 leading-relaxed">{recommendation}</p>
+        <p className="text-[13px] text-muted leading-relaxed">{recommendation}</p>
 
-        <div className="mt-6 pt-4 border-t border-slate-800 flex items-start gap-2">
-          <Info className="w-3.5 h-3.5 text-slate-600 mt-0.5 shrink-0" />
-          <p className="text-[10px] text-slate-600 italic leading-relaxed">
-            Coach IA indisponible pour le moment — diagnostic de repli basé sur des règles simples (seuils sur vos
-            catégories budgétaires).
-          </p>
+        <div className="flex items-start gap-2 pt-4 mt-6 border-t border-line-subtle">
+          <Info className="w-3.5 h-3.5 text-faint mt-0.5 shrink-0" />
+          <p className="text-[10px] text-faint italic leading-relaxed">{t('coach.diagnostic.aiFallbackNotice')}</p>
         </div>
       </div>
     </div>

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { notifyRefresh } from '@/lib/sse';
 import { requireSession } from '@/lib/auth';
+import { getTransactionsPage } from '@/lib/transactions';
 
 export async function POST(req: Request) {
   try {
@@ -63,19 +64,31 @@ export async function POST(req: Request) {
   }
 }
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
     const { userId } = await requireSession();
-    const transactions = await prisma.transaction.findMany({
-      where: { userId },
-      take: 50,
-      orderBy: { date: 'desc' },
-      include: {
-        category: true,
-        account: true,
-      },
+    const { searchParams } = new URL(req.url);
+
+    const typeParam = searchParams.get('type');
+    const type = typeParam === 'income' || typeParam === 'expense' || typeParam === 'savings' ? typeParam : undefined;
+    const sortByParam = searchParams.get('sortBy');
+    const sortBy = sortByParam === 'amount' ? 'amount' : 'date';
+    const sortDirParam = searchParams.get('sortDir');
+    const sortDir = sortDirParam === 'asc' ? 'asc' : 'desc';
+
+    const { transactions, total, summary } = await getTransactionsPage(userId, {
+      search: searchParams.get('search') || undefined,
+      type,
+      categoryId: searchParams.get('categoryId') || undefined,
+      dateFrom: searchParams.get('dateFrom') || undefined,
+      dateTo: searchParams.get('dateTo') || undefined,
+      sortBy,
+      sortDir,
+      limit: Number(searchParams.get('limit')) || 50,
+      offset: Number(searchParams.get('offset')) || 0,
     });
-    return NextResponse.json({ success: true, data: transactions });
+
+    return NextResponse.json({ success: true, data: transactions, total, summary });
   } catch (error) {
     if (error instanceof Error && error.message === 'UNAUTHENTICATED') {
       return NextResponse.json({ success: false, error: 'Non authentifié' }, { status: 401 });

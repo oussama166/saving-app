@@ -18,7 +18,7 @@ interface CustomTooltipProps {
 const CustomTooltip = ({ active, payload }: CustomTooltipProps) => {
   if (active && payload && payload.length) {
     return (
-      <div className="bg-[#131b2c] border border-slate-700 text-slate-200 p-2 rounded-lg shadow-xl">
+      <div className="bg-page border border-line text-body p-2 rounded-lg shadow-xl">
         <p className="text-xs font-bold">{`${payload[0].name}: ${payload[0].value}%`}</p>
       </div>
     );
@@ -30,10 +30,10 @@ export default function AssetAllocation({ data }: { data: AllocationSlice[] }) {
   const hasData = data.some((d) => d.value > 0);
 
   return (
-    <div className="bg-[#1b253b] rounded-xl border border-slate-700 p-6">
+    <div className="bg-surface rounded-xl border border-line p-6">
       <div className="flex items-center gap-3 mb-6">
         <PieChartIcon className="w-6 h-6 text-blue-400" />
-        <h3 className="text-lg font-bold text-slate-200">Répartition du Patrimoine</h3>
+        <h3 className="text-lg font-bold text-body">Répartition du Patrimoine</h3>
       </div>
 
       {hasData ? (
@@ -63,7 +63,7 @@ export default function AssetAllocation({ data }: { data: AllocationSlice[] }) {
             {data.map((item) => (
               <div key={item.name} className="flex items-center gap-2">
                 <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }} />
-                <span className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">
+                <span className="text-[11px] font-medium text-muted uppercase tracking-wider">
                   {item.name} ({item.value}%)
                 </span>
               </div>
@@ -71,7 +71,7 @@ export default function AssetAllocation({ data }: { data: AllocationSlice[] }) {
           </div>
         </>
       ) : (
-        <div className="h-[300px] flex items-center justify-center text-slate-500 text-sm italic">
+        <div className="h-[300px] flex items-center justify-center text-subtle text-sm italic">
           Aucun actif ou compte à répartir pour le moment.
         </div>
       )}

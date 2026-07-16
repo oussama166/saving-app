@@ -3,11 +3,14 @@
 import { useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { Zap, LogIn } from 'lucide-react';
+import { LogIn } from 'lucide-react';
+import Logo from '../components/Logo';
+import { useLanguage } from '../components/LanguageProvider';
 
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { t } = useLanguage();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -25,31 +28,29 @@ function LoginForm() {
       });
       const result = await res.json();
       if (!result.success) {
-        setError(result.error || 'Connexion impossible');
+        setError(result.error || t('auth.errorLoginFailed'));
         return;
       }
       const next = searchParams.get('next') || '/';
       router.push(next);
       router.refresh();
     } catch {
-      setError('Erreur réseau, réessaie.');
+      setError(t('auth.errorNetwork'));
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <main className="min-h-screen bg-[#131b2c] flex items-center justify-center p-6 text-slate-200 font-sans">
+    <main className="min-h-screen bg-page flex items-center justify-center p-6 text-body font-sans">
       <div className="w-full max-w-md space-y-8">
         <div className="flex flex-col items-center gap-3">
-          <div className="bg-blue-600 p-3 rounded-xl shadow-lg shadow-blue-900/20">
-            <Zap className="w-7 h-7 text-white fill-current" />
-          </div>
-          <h1 className="text-2xl font-black tracking-tighter text-white">Wealth OS</h1>
-          <p className="text-slate-500 text-sm">Connecte-toi pour accéder à ton espace.</p>
+          <Logo size={56} className="shadow-lg shadow-blue-900/20 rounded-2xl" />
+          <h1 className="text-2xl font-black tracking-tighter text-ink">{t('auth.loginTitle')}</h1>
+          <p className="text-subtle text-sm">{t('auth.loginSubtitle')}</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="bg-[#1b253b] border border-slate-700 rounded-2xl p-8 space-y-5">
+        <form onSubmit={handleSubmit} className="bg-surface border border-line rounded-2xl p-8 space-y-5">
           {error && (
             <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-[13px]">
               {error}
@@ -57,26 +58,28 @@ function LoginForm() {
           )}
 
           <div className="space-y-1.5">
-            <label className="text-[11px] font-bold uppercase tracking-widest text-slate-500">Email</label>
+            <label className="text-[11px] font-bold uppercase tracking-widest text-subtle">{t('auth.email')}</label>
             <input
               type="email"
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="toi@example.com"
-              className="w-full bg-[#131b2c] border border-slate-700 text-slate-200 rounded-lg p-3 focus:border-blue-500 outline-none transition-colors text-sm"
+              className="w-full bg-page border border-line text-body rounded-lg p-3 focus:border-blue-500 outline-none transition-colors text-sm"
             />
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-[11px] font-bold uppercase tracking-widest text-slate-500">Mot de passe</label>
+            <label className="text-[11px] font-bold uppercase tracking-widest text-subtle">
+              {t('auth.password')}
+            </label>
             <input
               type="password"
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
-              className="w-full bg-[#131b2c] border border-slate-700 text-slate-200 rounded-lg p-3 focus:border-blue-500 outline-none transition-colors text-sm"
+              className="w-full bg-page border border-line text-body rounded-lg p-3 focus:border-blue-500 outline-none transition-colors text-sm"
             />
           </div>
 
@@ -90,15 +93,15 @@ function LoginForm() {
             ) : (
               <>
                 <LogIn className="w-4 h-4" />
-                Se connecter
+                {t('auth.loginButton')}
               </>
             )}
           </button>
 
-          <p className="text-center text-[13px] text-slate-500">
-            Pas encore de compte ?{' '}
+          <p className="text-center text-[13px] text-subtle">
+            {t('auth.noAccount')}{' '}
             <Link href="/signup" className="text-blue-400 font-semibold hover:text-blue-300">
-              Créer un compte
+              {t('auth.createAccount')}
             </Link>
           </p>
         </form>

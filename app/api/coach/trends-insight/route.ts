@@ -4,6 +4,8 @@ import { z } from 'zod';
 import { coachModel } from '@/lib/aiProvider';
 import { getCachedAdvice, setCachedAdvice } from '@/lib/aiCache';
 import { requireSession } from '@/lib/auth';
+import { getUserLocale } from '@/lib/getLocale';
+import { aiLanguageInstruction } from '@/lib/i18n';
 
 const CACHE_KEY = 'trends-insight';
 
@@ -36,6 +38,7 @@ interface CategoryPoint {
 export async function POST(req: Request) {
   try {
     const { userId } = await requireSession();
+    const locale = await getUserLocale(userId);
     const { monthly, topCategories } = (await req.json()) as {
       monthly: MonthlyPoint[];
       topCategories: CategoryPoint[];
@@ -48,7 +51,7 @@ export async function POST(req: Request) {
     // 1. Cache hebdomadaire — évite un appel LLM à chaque chargement de page.
     const cached = await getCachedAdvice<{ synthese: string; pointAttention: string; recommandation: string }>(
       userId,
-      CACHE_KEY,
+      `${CACHE_KEY}:${locale}`,
     );
 
     if (cached) {
@@ -61,7 +64,7 @@ export async function POST(req: Request) {
     }
 
     // 2. Cache absent ou périmé (> 7 jours) — on régénère.
-    const systemPrompt = `Tu es un conseiller financier basé à Tanger, Maroc, spécialisé en analyse de tendances budgétaires. Style: ultra concis, chiffré, jamais générique.`;
+    const systemPrompt = `Tu es un conseiller financier basé à Tanger, Maroc, spécialisé en analyse de tendances budgétaires. Style: ultra concis, chiffré, jamais générique. ${aiLanguageInstruction(locale)}`;
 
     const monthlyLines = monthly
       .map(
@@ -92,7 +95,7 @@ Donne une synthèse de la tendance générale, le point d'attention le plus impo
       schema: insightSchema,
     });
 
-    const generatedAt = await setCachedAdvice(userId, CACHE_KEY, object);
+    const generatedAt = await setCachedAdvice(userId, `${CACHE_KEY}:${locale}`, object);
 
     return NextResponse.json({ success: true, advice: object, cached: false, generatedAt });
   } catch (error) {

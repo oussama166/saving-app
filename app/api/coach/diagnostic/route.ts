@@ -4,6 +4,8 @@ import { z } from 'zod';
 import { coachModel } from '@/lib/aiProvider';
 import { getCachedAdvice, setCachedAdvice } from '@/lib/aiCache';
 import { requireSession } from '@/lib/auth';
+import { getUserLocale } from '@/lib/getLocale';
+import { aiLanguageInstruction } from '@/lib/i18n';
 
 const CACHE_KEY = 'diagnostic-coach';
 
@@ -37,6 +39,7 @@ interface Rule503020 {
 export async function POST(req: Request) {
   try {
     const { userId } = await requireSession();
+    const locale = await getUserLocale(userId);
     const { budgetDetails, rule503020, emergencyFundMonths, healthScore } = (await req.json()) as {
       budgetDetails: BudgetDetail[];
       rule503020: Rule503020;
@@ -55,7 +58,7 @@ export async function POST(req: Request) {
       pointFort: string;
       pointFaible: string;
       recommandation: string;
-    }>(userId, CACHE_KEY);
+    }>(userId, `${CACHE_KEY}:${locale}`);
 
     if (cached) {
       return NextResponse.json({
@@ -67,7 +70,7 @@ export async function POST(req: Request) {
     }
 
     // 2. Cache absent ou périmé (> 7 jours) — on régénère.
-    const systemPrompt = `Tu es un coach financier basé à Tanger, Maroc. Style: direct, chiffré, jamais générique. Tu analyses le mois en cours de l'utilisateur pour lui donner un diagnostic honnête.`;
+    const systemPrompt = `Tu es un coach financier basé à Tanger, Maroc. Style: direct, chiffré, jamais générique. Tu analyses le mois en cours de l'utilisateur pour lui donner un diagnostic honnête. ${aiLanguageInstruction(locale)}`;
 
     const budgetLines = budgetDetails
       .filter((b) => b.budgetedAmount > 0)
@@ -91,7 +94,7 @@ Donne un profil dépensier, un point fort, un point faible et une recommandation
       schema: diagnosticSchema,
     });
 
-    const generatedAt = await setCachedAdvice(userId, CACHE_KEY, object);
+    const generatedAt = await setCachedAdvice(userId, `${CACHE_KEY}:${locale}`, object);
 
     return NextResponse.json({ success: true, advice: object, cached: false, generatedAt });
   } catch (error) {

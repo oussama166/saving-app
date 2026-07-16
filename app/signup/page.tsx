@@ -3,10 +3,13 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Zap, UserPlus } from 'lucide-react';
+import { UserPlus } from 'lucide-react';
+import Logo from '../components/Logo';
+import { useLanguage } from '../components/LanguageProvider';
 
 export default function SignupPage() {
   const router = useRouter();
+  const { t } = useLanguage();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -19,11 +22,11 @@ export default function SignupPage() {
     setError(null);
 
     if (password !== confirmPassword) {
-      setError('Les mots de passe ne correspondent pas.');
+      setError(t('auth.errorPasswordMismatch'));
       return;
     }
     if (password.length < 8) {
-      setError('Le mot de passe doit contenir au moins 8 caractères.');
+      setError(t('auth.errorPasswordTooShort'));
       return;
     }
 
@@ -36,32 +39,28 @@ export default function SignupPage() {
       });
       const result = await res.json();
       if (!result.success) {
-        setError(result.error || 'Inscription impossible');
+        setError(result.error || t('auth.errorSignupFailed'));
         return;
       }
       router.push('/');
       router.refresh();
     } catch {
-      setError('Erreur réseau, réessaie.');
+      setError(t('auth.errorNetwork'));
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <main className="min-h-screen bg-[#131b2c] flex items-center justify-center p-6 text-slate-200 font-sans">
+    <main className="min-h-screen bg-page flex items-center justify-center p-6 text-body font-sans">
       <div className="w-full max-w-md space-y-8">
         <div className="flex flex-col items-center gap-3">
-          <div className="bg-blue-600 p-3 rounded-xl shadow-lg shadow-blue-900/20">
-            <Zap className="w-7 h-7 text-white fill-current" />
-          </div>
-          <h1 className="text-2xl font-black tracking-tighter text-white">Wealth OS</h1>
-          <p className="text-slate-500 text-sm text-center">
-            Crée ton compte — catégories et budget 50/30/20 prêts à l&apos;emploi dès l&apos;inscription.
-          </p>
+          <Logo size={56} className="shadow-lg shadow-blue-900/20 rounded-2xl" />
+          <h1 className="text-2xl font-black tracking-tighter text-ink">{t('auth.loginTitle')}</h1>
+          <p className="text-subtle text-sm text-center">{t('auth.signupSubtitle')}</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="bg-[#1b253b] border border-slate-700 rounded-2xl p-8 space-y-5">
+        <form onSubmit={handleSubmit} className="bg-surface border border-line rounded-2xl p-8 space-y-5">
           {error && (
             <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-[13px]">
               {error}
@@ -69,43 +68,47 @@ export default function SignupPage() {
           )}
 
           <div className="space-y-1.5">
-            <label className="text-[11px] font-bold uppercase tracking-widest text-slate-500">Nom (optionnel)</label>
+            <label className="text-[11px] font-bold uppercase tracking-widest text-subtle">
+              {t('auth.nameOptional')}
+            </label>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Oussama"
-              className="w-full bg-[#131b2c] border border-slate-700 text-slate-200 rounded-lg p-3 focus:border-blue-500 outline-none transition-colors text-sm"
+              className="w-full bg-page border border-line text-body rounded-lg p-3 focus:border-blue-500 outline-none transition-colors text-sm"
             />
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-[11px] font-bold uppercase tracking-widest text-slate-500">Email</label>
+            <label className="text-[11px] font-bold uppercase tracking-widest text-subtle">{t('auth.email')}</label>
             <input
               type="email"
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="toi@example.com"
-              className="w-full bg-[#131b2c] border border-slate-700 text-slate-200 rounded-lg p-3 focus:border-blue-500 outline-none transition-colors text-sm"
+              className="w-full bg-page border border-line text-body rounded-lg p-3 focus:border-blue-500 outline-none transition-colors text-sm"
             />
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-[11px] font-bold uppercase tracking-widest text-slate-500">Mot de passe</label>
+            <label className="text-[11px] font-bold uppercase tracking-widest text-subtle">
+              {t('auth.password')}
+            </label>
             <input
               type="password"
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="8 caractères minimum"
-              className="w-full bg-[#131b2c] border border-slate-700 text-slate-200 rounded-lg p-3 focus:border-blue-500 outline-none transition-colors text-sm"
+              placeholder={t('auth.passwordMinChars')}
+              className="w-full bg-page border border-line text-body rounded-lg p-3 focus:border-blue-500 outline-none transition-colors text-sm"
             />
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-[11px] font-bold uppercase tracking-widest text-slate-500">
-              Confirmer le mot de passe
+            <label className="text-[11px] font-bold uppercase tracking-widest text-subtle">
+              {t('auth.confirmPassword')}
             </label>
             <input
               type="password"
@@ -113,7 +116,7 @@ export default function SignupPage() {
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               placeholder="••••••••"
-              className="w-full bg-[#131b2c] border border-slate-700 text-slate-200 rounded-lg p-3 focus:border-blue-500 outline-none transition-colors text-sm"
+              className="w-full bg-page border border-line text-body rounded-lg p-3 focus:border-blue-500 outline-none transition-colors text-sm"
             />
           </div>
 
@@ -127,15 +130,15 @@ export default function SignupPage() {
             ) : (
               <>
                 <UserPlus className="w-4 h-4" />
-                Créer mon compte
+                {t('auth.signupButton')}
               </>
             )}
           </button>
 
-          <p className="text-center text-[13px] text-slate-500">
-            Déjà un compte ?{' '}
+          <p className="text-center text-[13px] text-subtle">
+            {t('auth.hasAccount')}{' '}
             <Link href="/login" className="text-blue-400 font-semibold hover:text-blue-300">
-              Se connecter
+              {t('auth.loginLink')}
             </Link>
           </p>
         </form>

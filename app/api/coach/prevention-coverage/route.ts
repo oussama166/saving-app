@@ -4,6 +4,8 @@ import { z } from 'zod';
 import { coachModel } from '@/lib/aiProvider';
 import { getCachedAdvice, setCachedAdvice } from '@/lib/aiCache';
 import { requireSession } from '@/lib/auth';
+import { getUserLocale } from '@/lib/getLocale';
+import { aiLanguageInstruction } from '@/lib/i18n';
 
 const CACHE_KEY = 'prevention-coverage';
 
@@ -25,6 +27,7 @@ const adviceSchema = z.object({
 export async function POST(req: Request) {
   try {
     const { userId } = await requireSession();
+    const locale = await getUserLocale(userId);
     const { spentThisMonth, weightOnIncomePct, remaining, pendingReimbursementTotal, pendingCount, recordsCount } =
       await req.json();
 
@@ -42,7 +45,7 @@ export async function POST(req: Request) {
       couvertureCnss: string;
       mutuelle: string;
       pharmacieGeneriques: string;
-    }>(userId, CACHE_KEY);
+    }>(userId, `${CACHE_KEY}:${locale}`);
 
     if (cached) {
       return NextResponse.json({
@@ -54,7 +57,7 @@ export async function POST(req: Request) {
     }
 
     // 2. Cache absent ou périmé (> 7 jours) — on régénère.
-    const systemPrompt = `Tu es un conseiller santé/prévoyance basé à Tanger, Maroc. Style: ultra concis, chiffré quand pertinent, jamais générique. Bonne connaissance du système marocain (CNSS, AMO, mutuelles privées, pharmacies, génériques).`;
+    const systemPrompt = `Tu es un conseiller santé/prévoyance basé à Tanger, Maroc. Style: ultra concis, chiffré quand pertinent, jamais générique. Bonne connaissance du système marocain (CNSS, AMO, mutuelles privées, pharmacies, génériques). ${aiLanguageInstruction(locale)}`;
 
     const userPrompt = `Situation santé de l'utilisateur :
 - Dépenses santé ce mois-ci : ${Math.round(spentThisMonth)} DH
@@ -72,7 +75,7 @@ Rédige 4 blocs de conseils courts et personnalisés à cette situation : Bilan 
       schema: adviceSchema,
     });
 
-    const generatedAt = await setCachedAdvice(userId, CACHE_KEY, object);
+    const generatedAt = await setCachedAdvice(userId, `${CACHE_KEY}:${locale}`, object);
 
     return NextResponse.json({ success: true, advice: object, cached: false, generatedAt });
   } catch (error) {

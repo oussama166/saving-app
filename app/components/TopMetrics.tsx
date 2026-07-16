@@ -54,17 +54,17 @@ export default function TopMetrics({ metrics }: TopMetricsProps) {
       {cards.map((card, i) => (
         <div
           key={i}
-          className="bg-slate-800/50 border border-slate-700 p-5 rounded-2xl flex flex-col justify-between"
+          className="bg-surface-alt/50 border border-line p-5 rounded-2xl flex flex-col justify-between"
         >
           <div className="flex justify-between items-start">
-            <span className="text-slate-400 text-xs font-semibold uppercase tracking-wider">
+            <span className="text-muted text-xs font-semibold uppercase tracking-wider">
               {card.title}
             </span>
             {card.icon}
           </div>
           <div className="mt-4">
             <p className={`text-2xl font-bold ${card.color}`}>{card.value}</p>
-            <p className="text-[10px] text-slate-500 font-medium mt-1">
+            <p className="text-[10px] text-subtle font-medium mt-1">
               {card.desc}
             </p>
           </div>

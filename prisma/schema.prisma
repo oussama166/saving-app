@@ -35,6 +35,7 @@ model UserSettings {
   referenceIncome           Float    @default(10000)
   currency                  String   @default("MAD")
   emergencyFundTargetMonths Float    @default(3)
+  language                  String   @default("fr") // fr, ar, en, es — voir lib/i18n.ts
   updatedAt                 DateTime @updatedAt
 }
 

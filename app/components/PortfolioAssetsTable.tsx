@@ -98,14 +98,14 @@ export default function PortfolioAssetsTable({ assets, globalLiveValue, globalCo
     <div className="space-y-6">
       {/* Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-slate-900/50 p-4 rounded-xl border border-slate-700/50">
-          <span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">
+        <div className="bg-surface-deep/50 p-4 rounded-xl border border-line/50">
+          <span className="text-[10px] text-subtle font-bold uppercase tracking-widest">
             Valeur Totale Portfolio
           </span>
-          <p className="text-xl font-bold text-slate-200 mt-1">{formatDH(globalLiveValue)}</p>
+          <p className="text-xl font-bold text-body mt-1">{formatDH(globalLiveValue)}</p>
         </div>
-        <div className="bg-slate-900/50 p-4 rounded-xl border border-slate-700/50">
-          <span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">
+        <div className="bg-surface-deep/50 p-4 rounded-xl border border-line/50">
+          <span className="text-[10px] text-subtle font-bold uppercase tracking-widest">
             Plus-value Latente
           </span>
           <p className={`text-xl font-bold mt-1 ${globalProfit >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
@@ -125,45 +125,45 @@ export default function PortfolioAssetsTable({ assets, globalLiveValue, globalCo
       </div>
 
       {/* Assets Table */}
-      <div className="bg-[#1b253b] rounded-xl border border-slate-700 overflow-hidden">
-        <div className="p-5 border-b border-slate-800 flex items-center gap-2">
+      <div className="bg-surface rounded-xl border border-line overflow-hidden">
+        <div className="p-5 border-b border-line-subtle flex items-center gap-2">
           <TrendingUp className="w-4 h-4 text-blue-400" />
-          <h3 className="text-sm font-bold uppercase tracking-widest text-white">Vos Actifs Financiers</h3>
-          <span className="text-[10px] text-slate-500 ml-auto italic">
+          <h3 className="text-sm font-bold uppercase tracking-widest text-ink">Vos Actifs Financiers</h3>
+          <span className="text-[10px] text-subtle ml-auto italic">
             * Les prix peuvent être mis à jour manuellement
           </span>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-left text-[11px]">
             <thead>
-              <tr className="text-slate-500 bg-slate-900/50">
-                <th className="py-3 px-5 font-bold uppercase tracking-wider border-b border-slate-800">Actif</th>
-                <th className="py-3 px-5 font-bold uppercase tracking-wider border-b border-slate-800">Type</th>
-                <th className="py-3 px-5 font-bold uppercase tracking-wider border-b border-slate-800">Quantité</th>
-                <th className="py-3 px-5 font-bold uppercase tracking-wider border-b border-slate-800">
+              <tr className="text-subtle bg-surface-deep/50">
+                <th className="py-3 px-5 font-bold uppercase tracking-wider border-b border-line-subtle">Actif</th>
+                <th className="py-3 px-5 font-bold uppercase tracking-wider border-b border-line-subtle">Type</th>
+                <th className="py-3 px-5 font-bold uppercase tracking-wider border-b border-line-subtle">Quantité</th>
+                <th className="py-3 px-5 font-bold uppercase tracking-wider border-b border-line-subtle">
                   Prix Achat
                 </th>
-                <th className="py-3 px-5 font-bold uppercase tracking-wider border-b border-slate-800">
+                <th className="py-3 px-5 font-bold uppercase tracking-wider border-b border-line-subtle">
                   Prix Actuel
                 </th>
-                <th className="py-3 px-5 font-bold uppercase tracking-wider border-b border-slate-800">Valeur</th>
-                <th className="py-3 px-5 font-bold uppercase tracking-wider border-b border-slate-800">
+                <th className="py-3 px-5 font-bold uppercase tracking-wider border-b border-line-subtle">Valeur</th>
+                <th className="py-3 px-5 font-bold uppercase tracking-wider border-b border-line-subtle">
                   Rendement
                 </th>
-                <th className="py-3 px-5 font-bold uppercase tracking-wider border-b border-slate-800 text-right">
+                <th className="py-3 px-5 font-bold uppercase tracking-wider border-b border-line-subtle text-right">
                   Actions
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800/50">
+            <tbody className="divide-y divide-line-subtle/50">
               {assets.map((asset) => (
-                <tr key={asset.id} className="hover:bg-slate-800/30 transition-colors group">
-                  <td className="py-3 px-5 font-bold text-slate-200">{asset.tickerSymbol}</td>
-                  <td className="py-3 px-5 text-slate-400">{asset.assetType}</td>
-                  <td className="py-3 px-5 text-slate-400">{asset.sharesOwned}</td>
-                  <td className="py-3 px-5 text-slate-400">{formatDH(asset.averageBuyPrice)}</td>
-                  <td className="py-3 px-5 text-slate-400">{formatDH(asset.livePrice)}</td>
-                  <td className="py-3 px-5 font-bold text-slate-200">{formatDH(asset.liveValue)}</td>
+                <tr key={asset.id} className="hover:bg-surface-alt/30 transition-colors group">
+                  <td className="py-3 px-5 font-bold text-body">{asset.tickerSymbol}</td>
+                  <td className="py-3 px-5 text-muted">{asset.assetType}</td>
+                  <td className="py-3 px-5 text-muted">{asset.sharesOwned}</td>
+                  <td className="py-3 px-5 text-muted">{formatDH(asset.averageBuyPrice)}</td>
+                  <td className="py-3 px-5 text-muted">{formatDH(asset.livePrice)}</td>
+                  <td className="py-3 px-5 font-bold text-body">{formatDH(asset.liveValue)}</td>
                   <td
                     className={`py-3 px-5 font-bold flex items-center gap-1 ${
                       asset.profitPercentage >= 0 ? 'text-emerald-400' : 'text-red-400'
@@ -181,13 +181,13 @@ export default function PortfolioAssetsTable({ assets, globalLiveValue, globalCo
                     <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button
                         onClick={() => handleEdit(asset)}
-                        className="p-1.5 rounded-lg bg-slate-800 hover:bg-blue-600/20 text-slate-400 hover:text-blue-400 transition-colors"
+                        className="p-1.5 rounded-lg bg-surface-alt hover:bg-blue-600/20 text-muted hover:text-blue-400 transition-colors"
                       >
                         <Pencil className="w-3.5 h-3.5" />
                       </button>
                       <button
                         onClick={() => handleDelete(asset.id)}
-                        className="p-1.5 rounded-lg bg-slate-800 hover:bg-red-600/20 text-slate-400 hover:text-red-400 transition-colors"
+                        className="p-1.5 rounded-lg bg-surface-alt hover:bg-red-600/20 text-muted hover:text-red-400 transition-colors"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
@@ -197,7 +197,7 @@ export default function PortfolioAssetsTable({ assets, globalLiveValue, globalCo
               ))}
               {assets.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="py-16 text-center text-slate-500 italic">
+                  <td colSpan={8} className="py-16 text-center text-subtle italic">
                     Aucun actif enregistré. Ajoute ta première position ci-dessous.
                   </td>
                 </tr>
@@ -208,19 +208,19 @@ export default function PortfolioAssetsTable({ assets, globalLiveValue, globalCo
       </div>
 
       {/* Add / Update Form */}
-      <div className="bg-[#1b253b] rounded-xl border border-slate-700 p-6">
+      <div className="bg-surface rounded-xl border border-line p-6">
         <div className="flex items-center gap-3 mb-6">
           <div className="bg-emerald-500/10 p-2 rounded-lg border border-emerald-500/20">
             <PlusCircle className="w-5 h-5 text-emerald-500" />
           </div>
-          <h3 className="text-lg font-bold text-white tracking-tight">
+          <h3 className="text-lg font-bold text-ink tracking-tight">
             {form.id ? "Modifier l'actif" : 'Ajouter ou mettre à jour un actif'}
           </h3>
         </div>
 
         <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-6 gap-4">
           <div className="flex flex-col gap-1.5 md:col-span-2">
-            <label className="text-[10px] uppercase font-bold text-slate-500 tracking-widest ml-1">
+            <label className="text-[10px] uppercase font-bold text-subtle tracking-widest ml-1">
               Nom de l&apos;actif
             </label>
             <input
@@ -228,17 +228,17 @@ export default function PortfolioAssetsTable({ assets, globalLiveValue, globalCo
               placeholder="Ex: Itissalat..."
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
-              className="bg-[#131b2c] border border-slate-700 text-slate-200 rounded-lg p-2.5 focus:border-blue-500 outline-none transition-colors text-sm"
+              className="bg-page border border-line text-body rounded-lg p-2.5 focus:border-blue-500 outline-none transition-colors text-sm"
               required
             />
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <label className="text-[10px] uppercase font-bold text-slate-500 tracking-widest ml-1">Type</label>
+            <label className="text-[10px] uppercase font-bold text-subtle tracking-widest ml-1">Type</label>
             <select
               value={form.assetType}
               onChange={(e) => setForm({ ...form, assetType: e.target.value })}
-              className="bg-[#131b2c] border border-slate-700 text-slate-200 rounded-lg p-2.5 focus:border-blue-500 outline-none transition-colors text-sm"
+              className="bg-page border border-line text-body rounded-lg p-2.5 focus:border-blue-500 outline-none transition-colors text-sm"
             >
               {ASSET_TYPE_OPTIONS.map((opt) => (
                 <option key={opt.value} value={opt.value}>
@@ -249,20 +249,20 @@ export default function PortfolioAssetsTable({ assets, globalLiveValue, globalCo
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <label className="text-[10px] uppercase font-bold text-slate-500 tracking-widest ml-1">Quantité</label>
+            <label className="text-[10px] uppercase font-bold text-subtle tracking-widest ml-1">Quantité</label>
             <input
               type="number"
               step="any"
               placeholder="0"
               value={form.sharesOwned}
               onChange={(e) => setForm({ ...form, sharesOwned: e.target.value })}
-              className="bg-[#131b2c] border border-slate-700 text-slate-200 rounded-lg p-2.5 focus:border-blue-500 outline-none transition-colors text-sm"
+              className="bg-page border border-line text-body rounded-lg p-2.5 focus:border-blue-500 outline-none transition-colors text-sm"
               required
             />
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <label className="text-[10px] uppercase font-bold text-slate-500 tracking-widest ml-1">
+            <label className="text-[10px] uppercase font-bold text-subtle tracking-widest ml-1">
               Prix Achat
             </label>
             <input
@@ -271,13 +271,13 @@ export default function PortfolioAssetsTable({ assets, globalLiveValue, globalCo
               placeholder="DH"
               value={form.averageBuyPrice}
               onChange={(e) => setForm({ ...form, averageBuyPrice: e.target.value })}
-              className="bg-[#131b2c] border border-slate-700 text-slate-200 rounded-lg p-2.5 focus:border-blue-500 outline-none transition-colors text-sm"
+              className="bg-page border border-line text-body rounded-lg p-2.5 focus:border-blue-500 outline-none transition-colors text-sm"
               required
             />
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <label className="text-[10px] uppercase font-bold text-slate-500 tracking-widest ml-1">
+            <label className="text-[10px] uppercase font-bold text-subtle tracking-widest ml-1">
               Prix Actuel
             </label>
             <input
@@ -286,12 +286,12 @@ export default function PortfolioAssetsTable({ assets, globalLiveValue, globalCo
               placeholder="DH (optionnel)"
               value={form.manualPrice}
               onChange={(e) => setForm({ ...form, manualPrice: e.target.value })}
-              className="bg-[#131b2c] border border-slate-700 text-slate-200 rounded-lg p-2.5 focus:border-blue-500 outline-none transition-colors text-sm"
+              className="bg-page border border-line text-body rounded-lg p-2.5 focus:border-blue-500 outline-none transition-colors text-sm"
             />
           </div>
 
           <div className="flex flex-col justify-end gap-1.5 md:col-span-6">
-            <p className="text-[10px] text-slate-500 mb-1">
+            <p className="text-[10px] text-subtle mb-1">
               Laisse &quot;Prix Actuel&quot; vide pour laisser l&apos;app essayer une cotation automatique (utile
               pour Crypto/ETF cotés à l&apos;international) — sinon le prix saisi ici fait foi (recommandé pour
               Action MASI, OPCVM, Or).
@@ -315,7 +315,7 @@ export default function PortfolioAssetsTable({ assets, globalLiveValue, globalCo
                 <button
                   type="button"
                   onClick={() => setForm(EMPTY_FORM)}
-                  className="text-slate-400 hover:text-slate-200 text-sm font-medium px-4"
+                  className="text-muted hover:text-body text-sm font-medium px-4"
                 >
                   Annuler
                 </button>

@@ -62,7 +62,7 @@ export default function FinanceAgent() {
   };
 
   return (
-    <div className="fixed bottom-6 right-6 z-50">
+    <div className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-50">
       {/* Toggle Button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
@@ -80,14 +80,14 @@ export default function FinanceAgent() {
       </button>
 
       {isOpen && (
-        <div className="absolute bottom-20 right-0 w-80 md:w-96 bg-white rounded-2xl shadow-2xl border border-gray-100 flex flex-col overflow-hidden animate-in slide-in-from-bottom-4 duration-300">
+        <div className="fixed sm:absolute inset-x-4 bottom-20 sm:inset-x-auto sm:right-0 w-auto sm:w-80 md:w-96 max-w-full bg-white rounded-2xl shadow-2xl border border-gray-100 flex flex-col overflow-hidden animate-in slide-in-from-bottom-4 duration-300">
           <div className="bg-blue-600 p-4 text-white">
             <h3 className="font-bold">Pro Finance Agent</h3>
             <p className="text-xs opacity-80">AI-Powered Financial Insights</p>
           </div>
 
           {/* Scrollable Area */}
-          <div className="flex-1 max-h-[600px] overflow-y-scroll p-4 space-y-4 bg-gray-50">
+          <div className="flex-1 max-h-[60vh] sm:max-h-[600px] overflow-y-scroll p-4 space-y-4 bg-gray-50">
             {messages.length === 0 && (
               <div className="text-center py-8">
                 <p className="text-sm text-gray-500">Ask me anything about your finances!</p>

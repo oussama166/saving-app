@@ -46,11 +46,11 @@ export default async function PortfolioPage() {
   }));
 
   return (
-    <main className="min-h-screen bg-[#131b2c] p-8 text-slate-200 font-sans">
+    <main className="min-h-screen bg-page p-4 sm:p-6 lg:p-8 text-body font-sans">
       <div className="max-w-7xl mx-auto space-y-8">
         <header>
-          <h1 className="text-3xl font-bold tracking-tight text-white">Portfolio & Épargne</h1>
-          <p className="text-slate-500 text-sm mt-1">
+          <h1 className="text-3xl font-bold tracking-tight text-ink">Portfolio & Épargne</h1>
+          <p className="text-subtle text-sm mt-1">
             Vue globale de vos actifs et liquidités. Mise à jour en temps réel.
           </p>
         </header>

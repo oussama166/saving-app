@@ -18,8 +18,8 @@ export default function Visualizations({ data }: VisualizationsProps) {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
       {/* Donut Chart */}
-      <div className="bg-slate-800/50 border border-slate-700 p-6 rounded-2xl h-[400px] flex flex-col">
-        <h3 className="text-sm font-bold uppercase tracking-widest text-slate-400 mb-4">Expenses by Category</h3>
+      <div className="bg-surface-alt/50 border border-line p-6 rounded-2xl h-[400px] flex flex-col">
+        <h3 className="text-sm font-bold uppercase tracking-widest text-muted mb-4">Expenses by Category</h3>
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
             <Pie
@@ -45,8 +45,8 @@ export default function Visualizations({ data }: VisualizationsProps) {
       </div>
 
       {/* Bar Chart */}
-      <div className="bg-slate-800/50 border border-slate-700 p-6 rounded-2xl h-[400px] flex flex-col">
-        <h3 className="text-sm font-bold uppercase tracking-widest text-slate-400 mb-4">Budget vs Actual</h3>
+      <div className="bg-surface-alt/50 border border-line p-6 rounded-2xl h-[400px] flex flex-col">
+        <h3 className="text-sm font-bold uppercase tracking-widest text-muted mb-4">Budget vs Actual</h3>
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={data.budgetVsActual}>
             <XAxis 

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Sparkles } from "lucide-react";
+import { useLanguage } from "./LanguageProvider";
 
 interface Props {
   referenceIncome: number;
@@ -18,21 +19,6 @@ interface Advice {
   erreursFatales: string;
 }
 
-const BLOCK_META = [
-  { key: "banques" as const, emoji: "🏦", title: "Banques & Épargne" },
-  {
-    key: "investissementMaroc" as const,
-    emoji: "📈",
-    title: "Investissement au Maroc",
-  },
-  {
-    key: "investissementInternational" as const,
-    emoji: "🌍",
-    title: "Investissement International",
-  },
-  { key: "erreursFatales" as const, emoji: "⚠️", title: "Erreurs Fatales" },
-];
-
 export default function TangerFinancialAdvice({
   referenceIncome,
   emergencyFundBalance,
@@ -40,10 +26,26 @@ export default function TangerFinancialAdvice({
   totalGoalsTarget,
   totalGoalsSaved,
 }: Props) {
+  const { t } = useLanguage();
   const [advice, setAdvice] = useState<Advice | null>(null);
   const [generatedAt, setGeneratedAt] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
+
+  const BLOCK_META = [
+    { key: "banques" as const, emoji: "🏦", title: t("coach.tanger.banques") },
+    {
+      key: "investissementMaroc" as const,
+      emoji: "📈",
+      title: t("coach.tanger.investMaroc"),
+    },
+    {
+      key: "investissementInternational" as const,
+      emoji: "🌍",
+      title: t("coach.tanger.investIntl"),
+    },
+    { key: "erreursFatales" as const, emoji: "⚠️", title: t("coach.tanger.erreurs") },
+  ];
 
   useEffect(() => {
     let cancelled = false;
@@ -91,21 +93,21 @@ export default function TangerFinancialAdvice({
   ]);
 
   return (
-    <div className="bg-[#1b253b] rounded-2xl border border-slate-700 p-8">
+    <div className="bg-surface rounded-2xl border border-line p-8">
       <div className="flex items-center gap-3 mb-6">
-        <h2 className="text-xl font-bold text-white tracking-tight">
-          Conseils Financiers
+        <h2 className="text-xl font-bold text-ink tracking-tight">
+          {t("coach.tanger.title")}
         </h2>
         {loading && (
           <span className="ml-auto flex items-center gap-1.5 text-[10px] text-blue-400 font-bold uppercase tracking-widest">
             <Sparkles className="w-3 h-3 animate-pulse" />
-            Analyse IA...
+            {t("coach.analyzing")}
           </span>
         )}
         {!loading && advice && !failed && (
           <span className="ml-auto flex items-center gap-1.5 text-[10px] text-emerald-400 font-bold uppercase tracking-widest">
             <Sparkles className="w-3 h-3" />
-            Coach IA
+            {t("coach.aiCoach")}
           </span>
         )}
       </div>
@@ -114,9 +116,9 @@ export default function TangerFinancialAdvice({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-pulse">
           {BLOCK_META.map((b) => (
             <div key={b.key} className="space-y-2">
-              <div className="h-3 bg-slate-800 rounded w-1/2" />
-              <div className="h-3 bg-slate-800 rounded w-full" />
-              <div className="h-3 bg-slate-800 rounded w-5/6" />
+              <div className="h-3 bg-surface-alt rounded w-1/2" />
+              <div className="h-3 bg-surface-alt rounded w-full" />
+              <div className="h-3 bg-surface-alt rounded w-5/6" />
             </div>
           ))}
         </div>
@@ -125,29 +127,29 @@ export default function TangerFinancialAdvice({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {BLOCK_META.map((b) => (
               <div key={b.key} className="space-y-2">
-                <p className="text-sm font-bold text-slate-200">
+                <p className="text-sm font-bold text-body">
                   {b.emoji} {b.title}
                 </p>
-                <p className="text-[13px] text-slate-400 leading-relaxed">
+                <p className="text-[13px] text-muted leading-relaxed">
                   {advice[b.key]}
                 </p>
               </div>
             ))}
           </div>
           {generatedAt && (
-            <p className="text-[10px] text-slate-600 italic pt-6">
-              Analyse générée le{" "}
+            <p className="text-[10px] text-faint italic pt-6">
+              {t("coach.generatedOn")}{" "}
               {new Date(generatedAt).toLocaleDateString("fr-FR", {
                 day: "2-digit",
                 month: "short",
                 year: "numeric",
               })}
-              , actualisée une fois par semaine.
+              , {t("coach.weeklyRefresh")}
             </p>
           )}
         </>
       ) : (
-        <StaticFallback />
+        <StaticFallback t={t} />
       )}
     </div>
   );
@@ -155,48 +157,24 @@ export default function TangerFinancialAdvice({
 
 // Contenu générique conservé comme repli si l'appel au Coach IA échoue
 // (clé API manquante, quota dépassé, erreur réseau...).
-function StaticFallback() {
+function StaticFallback({ t }: { t: ReturnType<typeof useLanguage>["t"] }) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
       <div className="space-y-2">
-        <p className="text-sm font-bold text-slate-200">🏦 Banques & Épargne</p>
-        <p className="text-[13px] text-slate-400 leading-relaxed">
-          Privilégiez les banques sans frais comme CIH Bank (Code30) ou
-          Attijariwafa (L&apos;bankalik) pour séparer l&apos;argent de vos
-          dépenses courantes de l&apos;épargne. Le Plan Épargne Logement (PEL)
-          est intéressant pour acheter un appartement à Tanger avec un taux
-          préférentiel fiscalement.
-        </p>
+        <p className="text-sm font-bold text-body">🏦 {t("coach.tanger.banques")}</p>
+        <p className="text-[13px] text-muted leading-relaxed">{t("coach.tanger.staticBanques")}</p>
       </div>
       <div className="space-y-2">
-        <p className="text-sm font-bold text-slate-200">
-          📈 Investissement au Maroc
-        </p>
-        <p className="text-[13px] text-slate-400 leading-relaxed">
-          Bourse de Casablanca (MASI) via votre banque ou application de
-          courtage. Privilégiez les grandes capitalisations (IAM, Attijariwafa,
-          LafargeHolcim) qui versent des dividendes réguliers. Les OPCVM sont
-          une option managée mais surveillez les frais d&apos;entrée !
-        </p>
+        <p className="text-sm font-bold text-body">📈 {t("coach.tanger.investMaroc")}</p>
+        <p className="text-[13px] text-muted leading-relaxed">{t("coach.tanger.staticInvestMaroc")}</p>
       </div>
       <div className="space-y-2">
-        <p className="text-sm font-bold text-slate-200">
-          🌍 Investissement International
-        </p>
-        <p className="text-[13px] text-slate-400 leading-relaxed">
-          Diversifiez votre risque ! Selon la législation de l&apos;Office des
-          Changes, utilisez votre dotation e-commerce ou touristique pour
-          investir périodiquement (DCA) sur des ETF mondiaux via des courtiers.
-        </p>
+        <p className="text-sm font-bold text-body">🌍 {t("coach.tanger.investIntl")}</p>
+        <p className="text-[13px] text-muted leading-relaxed">{t("coach.tanger.staticInvestIntl")}</p>
       </div>
       <div className="space-y-2">
-        <p className="text-sm font-bold text-slate-200">⚠️ Erreurs Fatales</p>
-        <p className="text-[13px] text-slate-400 leading-relaxed">
-          Ne prenez JAMAIS un crédit consommation (taux &gt; 12%) pour investir
-          en bourse ou en crypto ! N&apos;investissez pas l&apos;argent du mois
-          ou votre fonds d&apos;urgence. Le marché est fait pour l&apos;argent
-          dont vous n&apos;aurez pas besoin pendant 5 ans minimum.
-        </p>
+        <p className="text-sm font-bold text-body">⚠️ {t("coach.tanger.erreurs")}</p>
+        <p className="text-[13px] text-muted leading-relaxed">{t("coach.tanger.staticErreurs")}</p>
       </div>
     </div>
   );

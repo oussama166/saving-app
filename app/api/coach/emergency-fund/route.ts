@@ -4,6 +4,8 @@ import { z } from 'zod';
 import { coachModel } from '@/lib/aiProvider';
 import { getCachedAdvice, setCachedAdvice } from '@/lib/aiCache';
 import { requireSession } from '@/lib/auth';
+import { getUserLocale } from '@/lib/getLocale';
+import { aiLanguageInstruction } from '@/lib/i18n';
 
 const CACHE_KEY = 'emergency-fund';
 
@@ -24,6 +26,7 @@ const adviceSchema = z.object({
 export async function POST(req: Request) {
   try {
     const { userId } = await requireSession();
+    const locale = await getUserLocale(userId);
     const {
       emergencyFundBalance,
       emergencyFundTarget,
@@ -43,7 +46,7 @@ export async function POST(req: Request) {
     // 1. Cache hebdomadaire — évite un appel Gemini à chaque chargement de page.
     const cached = await getCachedAdvice<{ objectif: string; methode: string; recommandations: string[] }>(
       userId,
-      CACHE_KEY,
+      `${CACHE_KEY}:${locale}`,
     );
 
     if (cached) {
@@ -58,7 +61,7 @@ export async function POST(req: Request) {
     // 2. Cache absent ou périmé (> 7 jours) — on régénère.
     const gapAmount = emergencyFundTarget - emergencyFundBalance;
 
-    const systemPrompt = `Tu es un conseiller financier basé à Tanger, Maroc, spécialisé en fonds d'urgence. Style: ultra concis, chiffré, jamais générique. Connaissance de l'écosystème bancaire marocain (CIH, Attijariwafa, Bank Of Africa, Bons du Trésor).`;
+    const systemPrompt = `Tu es un conseiller financier basé à Tanger, Maroc, spécialisé en fonds d'urgence. Style: ultra concis, chiffré, jamais générique. Connaissance de l'écosystème bancaire marocain (CIH, Attijariwafa, Bank Of Africa, Bons du Trésor). ${aiLanguageInstruction(locale)}`;
 
     const userPrompt = `Situation du Fonds d'Urgence :
 - Solde actuel : ${Math.round(emergencyFundBalance)} DH
@@ -76,7 +79,7 @@ Donne un diagnostic + une méthode + des recommandations, chacun en UNE phrase c
       schema: adviceSchema,
     });
 
-    const generatedAt = await setCachedAdvice(userId, CACHE_KEY, object);
+    const generatedAt = await setCachedAdvice(userId, `${CACHE_KEY}:${locale}`, object);
 
     return NextResponse.json({ success: true, advice: object, cached: false, generatedAt });
   } catch (error) {

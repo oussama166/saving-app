@@ -22,11 +22,11 @@ export default async function ObjectifsPage() {
   const totalGoalsSaved = goals.reduce((acc, g) => acc + g.currentAmount, 0);
 
   return (
-    <main className="min-h-screen bg-[#131b2c] p-8 text-slate-200 font-sans">
+    <main className="min-h-screen bg-page p-4 sm:p-6 lg:p-8 text-body font-sans">
       <div className="max-w-7xl mx-auto space-y-10">
         <header>
-          <h1 className="text-3xl font-bold tracking-tight text-white">Objectifs Personnels & Financiers</h1>
-          <p className="text-slate-500 text-sm mt-1 italic">
+          <h1 className="text-3xl font-bold tracking-tight text-ink">Objectifs Personnels & Financiers</h1>
+          <p className="text-subtle text-sm mt-1 italic">
             La discipline d&apos;aujourd&apos;hui crée la liberté de demain.
           </p>
         </header>
@@ -36,7 +36,7 @@ export default async function ObjectifsPage() {
         <section>
           <div className="flex items-center gap-3 mb-6">
             <div className="w-1.5 h-6 bg-blue-500 rounded-full" />
-            <h2 className="text-xl font-bold tracking-tight text-white">La Magie des Intérêts Composés</h2>
+            <h2 className="text-xl font-bold tracking-tight text-ink">La Magie des Intérêts Composés</h2>
           </div>
           <InterestSimulator showChart={false} />
         </section>

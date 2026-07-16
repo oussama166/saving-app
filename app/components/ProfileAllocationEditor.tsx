@@ -34,14 +34,14 @@ export default function ProfileAllocationEditor({
   const isValid = Math.abs(totalPct - 100) < 0.5;
 
   return (
-    <div className="bg-[#1b253b] rounded-2xl border border-slate-700 p-8 space-y-8">
+    <div className="bg-surface rounded-2xl border border-line p-8 space-y-8">
       {/* Revenu de référence */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
-          <h3 className="text-base font-bold text-white">Revenu Mensuel Net de Référence</h3>
-          <p className="text-[12px] text-slate-500 mt-0.5">Base de calcul pour toutes les enveloppes.</p>
+          <h3 className="text-base font-bold text-ink">Revenu Mensuel Net de Référence</h3>
+          <p className="text-[12px] text-subtle mt-0.5">Base de calcul pour toutes les enveloppes.</p>
         </div>
-        <div className="flex items-center gap-2 bg-[#131b2c] border border-slate-700 rounded-xl px-4 py-2.5">
+        <div className="flex items-center gap-2 bg-page border border-line rounded-xl px-4 py-2.5">
           <input
             type="number"
             min={0}
@@ -50,7 +50,7 @@ export default function ProfileAllocationEditor({
             onChange={(e) => onReferenceIncomeChange(Number(e.target.value))}
             className="bg-transparent text-blue-400 font-bold text-xl w-32 text-right outline-none"
           />
-          <span className="text-slate-500 font-bold text-sm">DH</span>
+          <span className="text-subtle font-bold text-sm">DH</span>
         </div>
       </div>
 
@@ -58,8 +58,8 @@ export default function ProfileAllocationEditor({
       <div className="space-y-5">
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div>
-            <h3 className="text-base font-bold text-white">Allocations Enregistrées (%)</h3>
-            <p className="text-[12px] text-slate-500 mt-0.5">Chaque enveloppe est un pourcentage du revenu de référence.</p>
+            <h3 className="text-base font-bold text-ink">Allocations Enregistrées (%)</h3>
+            <p className="text-[12px] text-subtle mt-0.5">Chaque enveloppe est un pourcentage du revenu de référence.</p>
           </div>
           <span
             className={`text-[11px] font-bold uppercase tracking-widest px-3 py-1.5 rounded-full border flex items-center gap-1.5 ${
@@ -77,8 +77,8 @@ export default function ProfileAllocationEditor({
           {allocations.map((a) => (
             <div key={a.id} className="space-y-2">
               <div className="flex items-center justify-between gap-4">
-                <span className="text-sm font-semibold text-slate-200">{a.name}</span>
-                <span className="text-xs text-slate-500 font-mono">{formatCUR((a.budgetPct / 100) * referenceIncome)}</span>
+                <span className="text-sm font-semibold text-body">{a.name}</span>
+                <span className="text-xs text-subtle font-mono">{formatCUR((a.budgetPct / 100) * referenceIncome)}</span>
               </div>
               <div className="flex items-center gap-3">
                 <input
@@ -88,9 +88,9 @@ export default function ProfileAllocationEditor({
                   step={0.5}
                   value={a.budgetPct}
                   onChange={(e) => onAllocationChange(a.id, Number(e.target.value))}
-                  className="flex-1 h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                  className="flex-1 h-1.5 bg-surface-strong rounded-lg appearance-none cursor-pointer accent-blue-500"
                 />
-                <div className="flex items-center gap-1 bg-[#131b2c] border border-slate-700 rounded-lg px-2 py-1.5 w-20 justify-center">
+                <div className="flex items-center gap-1 bg-page border border-line rounded-lg px-2 py-1.5 w-20 justify-center">
                   <input
                     type="number"
                     min={0}
@@ -100,7 +100,7 @@ export default function ProfileAllocationEditor({
                     onChange={(e) => onAllocationChange(a.id, Number(e.target.value))}
                     className="bg-transparent text-emerald-400 font-bold text-sm w-10 text-right outline-none"
                   />
-                  <span className="text-slate-500 text-[11px]">%</span>
+                  <span className="text-subtle text-[11px]">%</span>
                 </div>
               </div>
             </div>
@@ -109,8 +109,8 @@ export default function ProfileAllocationEditor({
       </div>
 
       {/* Save */}
-      <div className="flex items-center justify-between gap-4 pt-2 border-t border-slate-800">
-        <p className="text-[12px] text-slate-500">
+      <div className="flex items-center justify-between gap-4 pt-2 border-t border-line-subtle">
+        <p className="text-[12px] text-subtle">
           {saved ? (
             <span className="text-emerald-400 font-semibold">Configuration enregistrée !</span>
           ) : isValid ? (

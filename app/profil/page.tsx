@@ -1,9 +1,16 @@
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
-import { SlidersHorizontal, FileSpreadsheet, Loader2, Download } from 'lucide-react';
-import ProfileAllocationEditor, { AllocationRow } from '../components/ProfileAllocationEditor';
-import RealBudgetOptimizer from '../components/RealBudgetOptimizer';
+import { useEffect, useState } from "react";
+import {
+  SlidersHorizontal,
+  FileSpreadsheet,
+  Loader2,
+  Download,
+} from "lucide-react";
+import ProfileAllocationEditor, {
+  AllocationRow,
+} from "../components/ProfileAllocationEditor";
+import RealBudgetOptimizer from "../components/RealBudgetOptimizer";
 
 export default function ProfilPage() {
   const [referenceIncome, setReferenceIncome] = useState(10000);
@@ -16,31 +23,37 @@ export default function ProfilPage() {
   const [bilanError, setBilanError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch('/api/settings')
+    fetch("/api/settings")
       .then((res) => res.json())
       .then((result) => {
         if (result.success) {
           setReferenceIncome(result.data.referenceIncome);
           setAllocations(
-            result.data.categories.map((c: { id: string; name: string; budgetPct: number }) => ({
-              id: c.id,
-              name: c.name,
-              budgetPct: c.budgetPct,
-            })),
+            result.data.categories.map(
+              (c: { id: string; name: string; budgetPct: number }) => ({
+                id: c.id,
+                name: c.name,
+                budgetPct: c.budgetPct,
+              }),
+            ),
           );
           setUpdatedAt(result.data.updatedAt);
         }
       })
-      .catch((err) => console.error('Settings fetch error:', err))
+      .catch((err) => console.error("Settings fetch error:", err))
       .finally(() => setLoading(false));
   }, []);
 
   const handleAllocationChange = (id: string, pct: number) => {
     setSaved(false);
-    setAllocations((prev) => prev.map((a) => (a.id === id ? { ...a, budgetPct: pct } : a)));
+    setAllocations((prev) =>
+      prev.map((a) => (a.id === id ? { ...a, budgetPct: pct } : a)),
+    );
   };
 
-  const handleApplyReal = (realAllocations: { id: string; budgetPct: number }[]) => {
+  const handleApplyReal = (
+    realAllocations: { id: string; budgetPct: number }[],
+  ) => {
     setSaved(false);
     setAllocations((prev) =>
       prev.map((a) => {
@@ -54,13 +67,13 @@ export default function ProfilPage() {
     setGeneratingBilan(true);
     setBilanError(null);
     try {
-      const res = await fetch('/api/reports/bilan');
+      const res = await fetch("/api/reports/bilan");
       if (!res.ok) {
-        throw new Error('Échec de la génération du bilan');
+        throw new Error("Échec de la génération du bilan");
       }
       const blob = await res.blob();
       const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
+      const a = document.createElement("a");
       const today = new Date().toISOString().slice(0, 10);
       a.href = url;
       a.download = `bilan-financier-${today}.xlsx`;
@@ -69,8 +82,8 @@ export default function ProfilPage() {
       a.remove();
       window.URL.revokeObjectURL(url);
     } catch (err) {
-      console.error('Bilan generation error:', err);
-      setBilanError('Impossible de générer le bilan. Réessayez.');
+      console.error("Bilan generation error:", err);
+      setBilanError("Impossible de générer le bilan. Réessayez.");
     } finally {
       setGeneratingBilan(false);
     }
@@ -80,12 +93,15 @@ export default function ProfilPage() {
     setSaving(true);
     setSaved(false);
     try {
-      const res = await fetch('/api/settings', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+      const res = await fetch("/api/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           referenceIncome,
-          allocations: allocations.map((a) => ({ id: a.id, budgetPct: a.budgetPct })),
+          allocations: allocations.map((a) => ({
+            id: a.id,
+            budgetPct: a.budgetPct,
+          })),
         }),
       });
       const result = await res.json();
@@ -94,35 +110,36 @@ export default function ProfilPage() {
         setUpdatedAt(new Date().toISOString());
       }
     } catch (err) {
-      console.error('Settings save error:', err);
+      console.error("Settings save error:", err);
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <main className="min-h-screen bg-[#131b2c] p-8 text-slate-200 font-sans">
-      <div className="max-w-7xl mx-auto space-y-8">
-        <div className="bg-[#1b253b] rounded-2xl border border-slate-700 p-6 flex items-center gap-4">
-          <div className="bg-blue-600/20 p-3 rounded-xl border border-blue-500/20">
+    <main className="min-h-screen p-4 sm:p-6 lg:p-8 font-sans bg-page text-body">
+      <div className="mx-auto space-y-8 max-w-7xl">
+        <div className="flex items-center gap-4 p-6 border bg-surface rounded-2xl border-line">
+          <div className="p-3 border bg-blue-600/20 rounded-xl border-blue-500/20">
             <SlidersHorizontal className="w-6 h-6 text-blue-400" />
           </div>
           <div>
-            <h1 className="text-xl font-black tracking-tight text-white uppercase">
+            <h1 className="text-xl font-black tracking-tight uppercase text-ink">
               Paramétrage &amp; Profil Intelligent
             </h1>
-            <p className="text-slate-500 text-sm mt-0.5">
-              Adaptez la théorie financière du 50/30/20 à la réalité concrète de votre vie à Tanger.
+            <p className="text-subtle text-sm mt-0.5">
+              Adaptez la théorie financière du 50/30/20 à la réalité concrète de
+              votre vie à Tanger.
             </p>
           </div>
         </div>
 
         {loading ? (
           <div className="flex items-center justify-center py-24">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500" />
+            <div className="w-12 h-12 border-b-2 border-blue-500 rounded-full animate-spin" />
           </div>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+          <div className="grid items-start grid-cols-1 gap-8 lg:grid-cols-2">
             <ProfileAllocationEditor
               referenceIncome={referenceIncome}
               onReferenceIncomeChange={(v) => {
@@ -139,20 +156,23 @@ export default function ProfilPage() {
           </div>
         )}
 
-        <div className="bg-[#1b253b] rounded-2xl border border-slate-700 p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="flex flex-col items-start justify-between gap-4 p-6 border bg-surface rounded-2xl border-line sm:flex-row sm:items-center">
           <div className="flex items-center gap-4">
-            <div className="bg-emerald-600/20 p-3 rounded-xl border border-emerald-500/20">
+            <div className="p-3 border bg-emerald-600/20 rounded-xl border-emerald-500/20">
               <FileSpreadsheet className="w-6 h-6 text-emerald-400" />
             </div>
             <div>
-              <h2 className="text-sm font-black tracking-tight text-white uppercase">
+              <h2 className="text-sm font-black tracking-tight uppercase text-ink">
                 Générateur de Bilan Excel
               </h2>
-              <p className="text-slate-500 text-xs mt-0.5 max-w-md">
-                Export .xlsx complet : résumé mensuel &amp; budget, historique de toutes les transactions,
-                et patrimoine (portefeuille, objectifs, fonds d&apos;urgence).
+              <p className="text-subtle text-xs mt-0.5 max-w-md">
+                Export .xlsx complet : résumé mensuel &amp; budget, historique
+                de toutes les transactions, et patrimoine (portefeuille,
+                objectifs, fonds d&apos;urgence).
               </p>
-              {bilanError && <p className="text-red-400 text-xs mt-1">{bilanError}</p>}
+              {bilanError && (
+                <p className="mt-1 text-xs text-red-400">{bilanError}</p>
+              )}
             </div>
           </div>
           <button
@@ -174,9 +194,10 @@ export default function ProfilPage() {
           </button>
         </div>
 
-        <p className="text-center text-[11px] text-slate-600 pt-4">
-          Système conçu pour Tanger, Maroc · Règle 50/30/20 enrichie
-          {updatedAt && ` · Dernière mise à jour : ${new Date(updatedAt).toLocaleDateString('fr-FR')}`}
+        <p className="text-center text-[11px] text-faint pt-4">
+          Système conçu pour épargne · Règle 50/30/20 enrichie
+          {updatedAt &&
+            ` · Dernière mise à jour : ${new Date(updatedAt).toLocaleDateString("fr-FR")}`}
         </p>
       </div>
     </main>

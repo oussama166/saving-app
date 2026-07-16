@@ -54,13 +54,13 @@ export default function PortfolioTabs({
 
   return (
     <div className="space-y-6">
-      <div className="flex gap-2 border-b border-slate-800">
+      <div className="flex gap-2 border-b border-line-subtle">
         <button
           onClick={() => setTab('fund')}
           className={`flex items-center gap-2 px-4 py-3 text-sm font-bold uppercase tracking-wider border-b-2 transition-colors ${
             tab === 'fund'
               ? 'border-emerald-500 text-emerald-400'
-              : 'border-transparent text-slate-500 hover:text-slate-300'
+              : 'border-transparent text-subtle hover:text-body-soft'
           }`}
         >
           <ShieldCheck className="w-4 h-4" />
@@ -71,7 +71,7 @@ export default function PortfolioTabs({
           className={`flex items-center gap-2 px-4 py-3 text-sm font-bold uppercase tracking-wider border-b-2 transition-colors ${
             tab === 'portfolio'
               ? 'border-blue-500 text-blue-400'
-              : 'border-transparent text-slate-500 hover:text-slate-300'
+              : 'border-transparent text-subtle hover:text-body-soft'
           }`}
         >
           <Briefcase className="w-4 h-4" />
@@ -100,33 +100,33 @@ export default function PortfolioTabs({
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <AssetAllocation data={allocationData} />
 
-            <div className="bg-[#1b253b] rounded-xl border border-slate-700 overflow-hidden">
-              <div className="p-5 border-b border-slate-800">
-                <h3 className="text-sm font-bold uppercase tracking-widest text-white">Comptes</h3>
+            <div className="bg-surface rounded-xl border border-line overflow-hidden">
+              <div className="p-5 border-b border-line-subtle">
+                <h3 className="text-sm font-bold uppercase tracking-widest text-ink">Comptes</h3>
               </div>
-              <div className="divide-y divide-slate-800">
+              <div className="divide-y divide-line-subtle">
                 {accounts.map((account) => {
                   const meta = ACCOUNT_TYPE_META[account.type] ?? { label: account.type, icon: Wallet };
                   const Icon = meta.icon;
                   return (
                     <div key={account.id} className="flex items-center justify-between p-4">
                       <div className="flex items-center gap-3">
-                        <div className="bg-slate-800 p-2 rounded-lg border border-slate-700">
-                          <Icon className="w-4 h-4 text-slate-400" />
+                        <div className="bg-surface-alt p-2 rounded-lg border border-line">
+                          <Icon className="w-4 h-4 text-muted" />
                         </div>
                         <div>
-                          <p className="text-sm font-bold text-slate-200">{account.name}</p>
-                          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+                          <p className="text-sm font-bold text-body">{account.name}</p>
+                          <p className="text-[10px] font-bold text-subtle uppercase tracking-widest">
                             {meta.label}
                           </p>
                         </div>
                       </div>
-                      <p className="text-sm font-mono font-bold text-slate-200">{formatDH(account.balance)}</p>
+                      <p className="text-sm font-mono font-bold text-body">{formatDH(account.balance)}</p>
                     </div>
                   );
                 })}
                 {accounts.length === 0 && (
-                  <div className="p-8 text-center text-slate-500 text-sm italic">Aucun compte trouvé.</div>
+                  <div className="p-8 text-center text-subtle text-sm italic">Aucun compte trouvé.</div>
                 )}
               </div>
             </div>

@@ -30,9 +30,9 @@ export default function FinancialRatios({ ratios }: Props) {
   ];
 
   return (
-    <div className="bg-[#1b253b] rounded-2xl border border-slate-700 p-8 shadow-2xl space-y-6">
+    <div className="bg-surface rounded-2xl border border-line p-8 shadow-2xl space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-bold text-white tracking-tight">Ratios Financiers</h2>
+        <h2 className="text-xl font-bold text-ink tracking-tight">Ratios Financiers</h2>
         <span className="text-[10px] bg-blue-500/20 text-blue-400 px-2 py-1 rounded uppercase font-bold tracking-widest border border-blue-500/20">
           Mois en cours
         </span>
@@ -42,18 +42,18 @@ export default function FinancialRatios({ ratios }: Props) {
         {items.map((item) => (
           <div key={item.label} className="space-y-2">
             <div className="flex justify-between items-center">
-              <span className="text-xs font-semibold text-slate-300">{item.label}</span>
-              <span className={`text-xs font-bold ${item.warn ? 'text-red-400' : 'text-slate-300'}`}>
+              <span className="text-xs font-semibold text-body-soft">{item.label}</span>
+              <span className={`text-xs font-bold ${item.warn ? 'text-red-400' : 'text-body-soft'}`}>
                 {item.pct}% · {formatCUR(item.amount)}
               </span>
             </div>
-            <div className="w-full bg-slate-700 h-2 rounded-full overflow-hidden">
+            <div className="w-full bg-surface-strong h-2 rounded-full overflow-hidden">
               <div
                 className={`h-full rounded-full transition-all duration-700 ${item.color}`}
                 style={{ width: `${Math.min(item.pct, 100)}%` }}
               />
             </div>
-            <div className="flex justify-between text-[10px] text-slate-500 font-bold uppercase tracking-tighter">
+            <div className="flex justify-between text-[10px] text-subtle font-bold uppercase tracking-tighter">
               <span>0%</span>
               <span>Cible : {item.target}%</span>
             </div>
@@ -61,10 +61,10 @@ export default function FinancialRatios({ ratios }: Props) {
         ))}
       </div>
 
-      <div className="p-4 bg-slate-900/50 rounded-xl border border-slate-700/50 flex items-center justify-between">
+      <div className="p-4 bg-surface-deep/50 rounded-xl border border-line/50 flex items-center justify-between">
         <div>
-          <span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Reste à Vivre</span>
-          <p className="text-[10px] text-slate-600 italic mt-0.5">Revenu − Charges Fixes − Épargne</p>
+          <span className="text-[10px] text-subtle font-bold uppercase tracking-widest">Reste à Vivre</span>
+          <p className="text-[10px] text-faint italic mt-0.5">Revenu − Charges Fixes − Épargne</p>
         </div>
         <p className={`text-xl font-black ${ratios.resteAVivre < 0 ? 'text-red-400' : 'text-blue-400'}`}>
           {formatCUR(ratios.resteAVivre)}

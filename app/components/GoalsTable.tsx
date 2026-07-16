@@ -81,34 +81,34 @@ export default function GoalsTable({ goals }: { goals: Goal[] }) {
 
   return (
     <div className="space-y-6">
-      <div className="bg-[#1b253b] rounded-xl border border-slate-700 overflow-hidden">
-        <div className="p-5 border-b border-slate-800 flex items-center gap-2">
+      <div className="bg-surface rounded-xl border border-line overflow-hidden">
+        <div className="p-5 border-b border-line-subtle flex items-center gap-2">
           <Target className="w-4 h-4 text-blue-400" />
-          <h3 className="text-sm font-bold uppercase tracking-widest text-white">Vos Objectifs en Cours</h3>
+          <h3 className="text-sm font-bold uppercase tracking-widest text-ink">Vos Objectifs en Cours</h3>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-left text-[11px]">
             <thead>
-              <tr className="text-slate-500 bg-slate-900/50">
-                <th className="py-3 px-5 font-bold uppercase tracking-wider border-b border-slate-800">Objectif</th>
-                <th className="py-3 px-5 font-bold uppercase tracking-wider border-b border-slate-800">Cible (DH)</th>
-                <th className="py-3 px-5 font-bold uppercase tracking-wider border-b border-slate-800">Épargné</th>
-                <th className="py-3 px-5 font-bold uppercase tracking-wider border-b border-slate-800">
+              <tr className="text-subtle bg-surface-deep/50">
+                <th className="py-3 px-5 font-bold uppercase tracking-wider border-b border-line-subtle">Objectif</th>
+                <th className="py-3 px-5 font-bold uppercase tracking-wider border-b border-line-subtle">Cible (DH)</th>
+                <th className="py-3 px-5 font-bold uppercase tracking-wider border-b border-line-subtle">Épargné</th>
+                <th className="py-3 px-5 font-bold uppercase tracking-wider border-b border-line-subtle">
                   Contrib/mois
                 </th>
-                <th className="py-3 px-5 font-bold uppercase tracking-wider border-b border-slate-800 w-40">
+                <th className="py-3 px-5 font-bold uppercase tracking-wider border-b border-line-subtle w-40">
                   Progression
                 </th>
-                <th className="py-3 px-5 font-bold uppercase tracking-wider border-b border-slate-800">
+                <th className="py-3 px-5 font-bold uppercase tracking-wider border-b border-line-subtle">
                   Mois restants
                 </th>
-                <th className="py-3 px-5 font-bold uppercase tracking-wider border-b border-slate-800">Statut</th>
-                <th className="py-3 px-5 font-bold uppercase tracking-wider border-b border-slate-800 text-right">
+                <th className="py-3 px-5 font-bold uppercase tracking-wider border-b border-line-subtle">Statut</th>
+                <th className="py-3 px-5 font-bold uppercase tracking-wider border-b border-line-subtle text-right">
                   Actions
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800/50">
+            <tbody className="divide-y divide-line-subtle/50">
               {goals.map((goal) => {
                 const progressPct = goal.targetAmount > 0 ? Math.min((goal.currentAmount / goal.targetAmount) * 100, 100) : 0;
                 const remaining = Math.max(goal.targetAmount - goal.currentAmount, 0);
@@ -116,17 +116,17 @@ export default function GoalsTable({ goals }: { goals: Goal[] }) {
                 const status = getStatus(progressPct);
 
                 return (
-                  <tr key={goal.id} className="hover:bg-slate-800/30 transition-colors group">
-                    <td className="py-3 px-5 font-bold text-slate-200">
+                  <tr key={goal.id} className="hover:bg-surface-alt/30 transition-colors group">
+                    <td className="py-3 px-5 font-bold text-body">
                       {goal.emoji} {goal.name}
                     </td>
-                    <td className="py-3 px-5 text-slate-400">{formatDH(goal.targetAmount)}</td>
-                    <td className="py-3 px-5 text-slate-400">{formatDH(goal.currentAmount)}</td>
-                    <td className="py-3 px-5 text-slate-400">{formatDH(goal.monthlyContribution)}</td>
+                    <td className="py-3 px-5 text-muted">{formatDH(goal.targetAmount)}</td>
+                    <td className="py-3 px-5 text-muted">{formatDH(goal.currentAmount)}</td>
+                    <td className="py-3 px-5 text-muted">{formatDH(goal.monthlyContribution)}</td>
                     <td className="py-3 px-5">
                       <div className="flex flex-col gap-1.5">
-                        <span className="text-[10px] text-slate-500 font-bold">{progressPct.toFixed(1)}%</span>
-                        <div className="w-full bg-slate-700 h-1.5 rounded-full overflow-hidden">
+                        <span className="text-[10px] text-subtle font-bold">{progressPct.toFixed(1)}%</span>
+                        <div className="w-full bg-surface-strong h-1.5 rounded-full overflow-hidden">
                           <div
                             className="h-full rounded-full bg-blue-500 transition-all duration-500"
                             style={{ width: `${progressPct}%` }}
@@ -134,7 +134,7 @@ export default function GoalsTable({ goals }: { goals: Goal[] }) {
                         </div>
                       </div>
                     </td>
-                    <td className="py-3 px-5 text-slate-400">{monthsLeft !== null ? monthsLeft : '—'}</td>
+                    <td className="py-3 px-5 text-muted">{monthsLeft !== null ? monthsLeft : '—'}</td>
                     <td className="py-3 px-5">
                       <span className={`text-[9px] px-1.5 py-0.5 rounded border font-bold uppercase ${status.color}`}>
                         {status.emoji} {status.label}
@@ -144,13 +144,13 @@ export default function GoalsTable({ goals }: { goals: Goal[] }) {
                       <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button
                           onClick={() => handleEdit(goal)}
-                          className="p-1.5 rounded-lg bg-slate-800 hover:bg-blue-600/20 text-slate-400 hover:text-blue-400 transition-colors"
+                          className="p-1.5 rounded-lg bg-surface-alt hover:bg-blue-600/20 text-muted hover:text-blue-400 transition-colors"
                         >
                           <Pencil className="w-3.5 h-3.5" />
                         </button>
                         <button
                           onClick={() => handleDelete(goal.id)}
-                          className="p-1.5 rounded-lg bg-slate-800 hover:bg-red-600/20 text-slate-400 hover:text-red-400 transition-colors"
+                          className="p-1.5 rounded-lg bg-surface-alt hover:bg-red-600/20 text-muted hover:text-red-400 transition-colors"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
@@ -161,7 +161,7 @@ export default function GoalsTable({ goals }: { goals: Goal[] }) {
               })}
               {goals.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="py-16 text-center text-slate-500 italic">
+                  <td colSpan={8} className="py-16 text-center text-subtle italic">
                     Aucun objectif pour le moment. Ajoute le premier ci-dessous.
                   </td>
                 </tr>
@@ -172,55 +172,55 @@ export default function GoalsTable({ goals }: { goals: Goal[] }) {
       </div>
 
       {/* Add / Update Form */}
-      <div className="bg-[#1b253b] rounded-xl border border-slate-700 p-6">
+      <div className="bg-surface rounded-xl border border-line p-6">
         <div className="flex items-center gap-3 mb-6">
           <div className="bg-emerald-500/10 p-2 rounded-lg border border-emerald-500/20">
             <PlusCircle className="w-5 h-5 text-emerald-500" />
           </div>
-          <h3 className="text-lg font-bold text-white tracking-tight">
+          <h3 className="text-lg font-bold text-ink tracking-tight">
             {form.id ? "Modifier l'objectif" : 'Ajouter un objectif'}
           </h3>
         </div>
 
         <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-6 gap-4">
           <div className="flex flex-col gap-1.5">
-            <label className="text-[10px] uppercase font-bold text-slate-500 tracking-widest ml-1">Emoji</label>
+            <label className="text-[10px] uppercase font-bold text-subtle tracking-widest ml-1">Emoji</label>
             <input
               type="text"
               value={form.emoji}
               onChange={(e) => setForm({ ...form, emoji: e.target.value })}
-              className="bg-[#131b2c] border border-slate-700 text-slate-200 rounded-lg p-2.5 focus:border-blue-500 outline-none transition-colors text-sm text-center"
+              className="bg-page border border-line text-body rounded-lg p-2.5 focus:border-blue-500 outline-none transition-colors text-sm text-center"
               maxLength={2}
             />
           </div>
 
           <div className="flex flex-col gap-1.5 md:col-span-2">
-            <label className="text-[10px] uppercase font-bold text-slate-500 tracking-widest ml-1">Nom</label>
+            <label className="text-[10px] uppercase font-bold text-subtle tracking-widest ml-1">Nom</label>
             <input
               type="text"
               placeholder="Ex: Voyage Europe Été"
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
-              className="bg-[#131b2c] border border-slate-700 text-slate-200 rounded-lg p-2.5 focus:border-blue-500 outline-none transition-colors text-sm"
+              className="bg-page border border-line text-body rounded-lg p-2.5 focus:border-blue-500 outline-none transition-colors text-sm"
               required
             />
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <label className="text-[10px] uppercase font-bold text-slate-500 tracking-widest ml-1">Cible (DH)</label>
+            <label className="text-[10px] uppercase font-bold text-subtle tracking-widest ml-1">Cible (DH)</label>
             <input
               type="number"
               step="any"
               placeholder="0"
               value={form.targetAmount}
               onChange={(e) => setForm({ ...form, targetAmount: e.target.value })}
-              className="bg-[#131b2c] border border-slate-700 text-slate-200 rounded-lg p-2.5 focus:border-blue-500 outline-none transition-colors text-sm"
+              className="bg-page border border-line text-body rounded-lg p-2.5 focus:border-blue-500 outline-none transition-colors text-sm"
               required
             />
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <label className="text-[10px] uppercase font-bold text-slate-500 tracking-widest ml-1">
+            <label className="text-[10px] uppercase font-bold text-subtle tracking-widest ml-1">
               Déjà épargné
             </label>
             <input
@@ -229,12 +229,12 @@ export default function GoalsTable({ goals }: { goals: Goal[] }) {
               placeholder="0"
               value={form.currentAmount}
               onChange={(e) => setForm({ ...form, currentAmount: e.target.value })}
-              className="bg-[#131b2c] border border-slate-700 text-slate-200 rounded-lg p-2.5 focus:border-blue-500 outline-none transition-colors text-sm"
+              className="bg-page border border-line text-body rounded-lg p-2.5 focus:border-blue-500 outline-none transition-colors text-sm"
             />
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <label className="text-[10px] uppercase font-bold text-slate-500 tracking-widest ml-1">
+            <label className="text-[10px] uppercase font-bold text-subtle tracking-widest ml-1">
               Contrib/mois
             </label>
             <input
@@ -243,7 +243,7 @@ export default function GoalsTable({ goals }: { goals: Goal[] }) {
               placeholder="0"
               value={form.monthlyContribution}
               onChange={(e) => setForm({ ...form, monthlyContribution: e.target.value })}
-              className="bg-[#131b2c] border border-slate-700 text-slate-200 rounded-lg p-2.5 focus:border-blue-500 outline-none transition-colors text-sm"
+              className="bg-page border border-line text-body rounded-lg p-2.5 focus:border-blue-500 outline-none transition-colors text-sm"
             />
           </div>
 
@@ -266,7 +266,7 @@ export default function GoalsTable({ goals }: { goals: Goal[] }) {
               <button
                 type="button"
                 onClick={() => setForm(EMPTY_FORM)}
-                className="text-slate-400 hover:text-slate-200 text-sm font-medium px-4"
+                className="text-muted hover:text-body text-sm font-medium px-4"
               >
                 Annuler
               </button>

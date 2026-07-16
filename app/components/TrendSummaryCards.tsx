@@ -63,7 +63,7 @@ export default function TrendSummaryCards({ data }: Props) {
         <div key={c.label} className={`p-4 rounded-xl border ${c.bg}`}>
           <div className="flex items-center gap-2 mb-2">
             <c.icon className={`w-4 h-4 ${c.color}`} />
-            <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">{c.label}</span>
+            <span className="text-[10px] font-bold uppercase tracking-widest text-muted">{c.label}</span>
           </div>
           <p className={`text-lg font-black ${c.color}`}>{c.value}</p>
         </div>

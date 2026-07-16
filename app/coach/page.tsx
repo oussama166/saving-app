@@ -56,16 +56,16 @@ export default function CoachPage() {
   }, []);
 
   return (
-    <main className="min-h-screen bg-[#131b2c] p-8 text-slate-200 font-sans">
+    <main className="min-h-screen bg-page p-4 sm:p-6 lg:p-8 text-body font-sans">
       <div className="max-w-7xl mx-auto space-y-8">
         <header>
-          <h1 className="text-3xl font-bold tracking-tight text-white">Coach IA</h1>
-          <p className="text-slate-500 text-sm mt-1 italic">
+          <h1 className="text-3xl font-bold tracking-tight text-ink">Coach IA</h1>
+          <p className="text-subtle text-sm mt-1 italic">
             Diagnostic, règles d&apos;or, simulations et benchmarks pour progresser financièrement.
           </p>
         </header>
 
-        <div className="flex gap-2 border-b border-slate-800 overflow-x-auto">
+        <div className="flex gap-2 border-b border-line-subtle overflow-x-auto">
           {TABS.map((t) => (
             <button
               key={t.key}
@@ -73,7 +73,7 @@ export default function CoachPage() {
               className={`flex items-center gap-2 px-4 py-3 text-sm font-bold uppercase tracking-wider border-b-2 transition-colors whitespace-nowrap ${
                 tab === t.key
                   ? 'border-blue-500 text-blue-400'
-                  : 'border-transparent text-slate-500 hover:text-slate-300'
+                  : 'border-transparent text-subtle hover:text-body-soft'
               }`}
             >
               <t.icon className="w-4 h-4" />
@@ -97,7 +97,7 @@ export default function CoachPage() {
                   healthScore={data.metrics.healthScore}
                 />
               ) : (
-                <p className="text-sm text-slate-500 italic">Impossible de charger les données du dashboard.</p>
+                <p className="text-sm text-subtle italic">Impossible de charger les données du dashboard.</p>
               ))}
 
             {tab === 'regles' && (

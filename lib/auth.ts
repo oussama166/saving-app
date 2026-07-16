@@ -1,8 +1,8 @@
-import { SignJWT, jwtVerify } from 'jose';
-import { cookies } from 'next/headers';
-import bcrypt from 'bcryptjs';
+import { SignJWT, jwtVerify } from "jose";
+import { cookies } from "next/headers";
+import bcrypt from "bcryptjs";
 
-export const SESSION_COOKIE = 'wealth_os_session';
+export const SESSION_COOKIE = "wealth_os_session";
 const SESSION_TTL_SECONDS = 30 * 24 * 60 * 60; // 30 jours
 
 function getSecretKey() {
@@ -30,16 +30,19 @@ export async function verifyPassword(password: string, hash: string) {
 
 export async function createSessionToken(payload: SessionPayload) {
   return new SignJWT({ ...payload })
-    .setProtectedHeader({ alg: 'HS256' })
+    .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime(`${SESSION_TTL_SECONDS}s`)
     .sign(getSecretKey());
 }
 
-export async function verifySessionToken(token: string): Promise<SessionPayload | null> {
+export async function verifySessionToken(
+  token: string,
+): Promise<SessionPayload | null> {
   try {
     const { payload } = await jwtVerify(token, getSecretKey());
-    if (typeof payload.userId !== 'string' || typeof payload.email !== 'string') return null;
+    if (typeof payload.userId !== "string" || typeof payload.email !== "string")
+      return null;
     return { userId: payload.userId, email: payload.email };
   } catch {
     return null;
@@ -64,14 +67,14 @@ export async function getSession(): Promise<SessionPayload | null> {
  */
 export async function requireSession(): Promise<SessionPayload> {
   const session = await getSession();
-  if (!session) throw new Error('UNAUTHENTICATED');
+  if (!session) throw new Error("UNAUTHENTICATED");
   return session;
 }
 
 export const SESSION_COOKIE_OPTIONS = {
   httpOnly: true,
-  secure: process.env.NODE_ENV === 'production',
-  sameSite: 'lax' as const,
-  path: '/',
+  secure: process.env.NODE_ENV === "production",
+  sameSite: "lax" as const,
+  path: "/",
   maxAge: SESSION_TTL_SECONDS,
 };

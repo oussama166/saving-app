@@ -4,6 +4,8 @@ import { z } from 'zod';
 import { coachModel } from '@/lib/aiProvider';
 import { getCachedAdvice, setCachedAdvice } from '@/lib/aiCache';
 import { requireSession } from '@/lib/auth';
+import { getUserLocale } from '@/lib/getLocale';
+import { aiLanguageInstruction } from '@/lib/i18n';
 
 const CACHE_KEY = 'tanger-advice';
 
@@ -31,6 +33,7 @@ const adviceSchema = z.object({
 export async function POST(req: Request) {
   try {
     const { userId } = await requireSession();
+    const locale = await getUserLocale(userId);
     const { referenceIncome, emergencyFundBalance, portfolioValue, totalGoalsTarget, totalGoalsSaved } =
       await req.json();
 
@@ -48,7 +51,7 @@ export async function POST(req: Request) {
       investissementMaroc: string;
       investissementInternational: string;
       erreursFatales: string;
-    }>(userId, CACHE_KEY);
+    }>(userId, `${CACHE_KEY}:${locale}`);
 
     if (cached) {
       return NextResponse.json({
@@ -60,7 +63,7 @@ export async function POST(req: Request) {
     }
 
     // 2. Cache absent ou périmé (> 7 jours) — on régénère.
-    const systemPrompt = `Tu es un conseiller financier basé à Tanger, Maroc. Style: ultra concis, chiffré quand pertinent, jamais générique. Bonne connaissance de l'écosystème bancaire et boursier marocain (CIH, Attijariwafa, Bank Of Africa, Bourse de Casablanca/MASI, OPCVM, Bons du Trésor) et des règles de l'Office des Changes pour l'investissement à l'international.`;
+    const systemPrompt = `Tu es un conseiller financier basé à Tanger, Maroc. Style: ultra concis, chiffré quand pertinent, jamais générique. Bonne connaissance de l'écosystème bancaire et boursier marocain (CIH, Attijariwafa, Bank Of Africa, Bourse de Casablanca/MASI, OPCVM, Bons du Trésor) et des règles de l'Office des Changes pour l'investissement à l'international. ${aiLanguageInstruction(locale)}`;
 
     const userPrompt = `Situation financière de l'utilisateur :
 - Revenu de référence mensuel : ${Math.round(referenceIncome)} DH
@@ -77,7 +80,7 @@ Rédige 4 blocs de conseils courts et personnalisés à ces chiffres : Banques &
       schema: adviceSchema,
     });
 
-    const generatedAt = await setCachedAdvice(userId, CACHE_KEY, object);
+    const generatedAt = await setCachedAdvice(userId, `${CACHE_KEY}:${locale}`, object);
 
     return NextResponse.json({ success: true, advice: object, cached: false, generatedAt });
   } catch (error) {

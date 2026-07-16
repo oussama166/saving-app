@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react';
 import { Compass, Sparkles } from 'lucide-react';
 import type { MonthlyAnalytics, CategoryTrend } from '@/lib/financials';
+import { useLanguage } from './LanguageProvider';
+import { tParams } from '@/lib/i18n';
 
 interface Props {
   monthly: MonthlyAnalytics[];
@@ -16,6 +18,7 @@ interface Insight {
 }
 
 export default function TrendsInsight({ monthly, topCategories }: Props) {
+  const { t } = useLanguage();
   const [insight, setInsight] = useState<Insight | null>(null);
   const [generatedAt, setGeneratedAt] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -65,51 +68,51 @@ export default function TrendsInsight({ monthly, topCategories }: Props) {
   }, []);
 
   return (
-    <div className="bg-[#1b253b] rounded-xl border border-slate-700 p-6">
+    <div className="bg-surface rounded-xl border border-line p-6">
       <div className="flex items-center gap-3 mb-6">
         <Compass className="w-6 h-6 text-blue-400" />
-        <h3 className="text-lg font-bold text-slate-200">Analyse IA des Tendances</h3>
+        <h3 className="text-lg font-bold text-body">{t('coach.trends.title')}</h3>
         {loading && (
           <span className="ml-auto flex items-center gap-1.5 text-[10px] text-blue-400 font-bold uppercase tracking-widest">
             <Sparkles className="w-3 h-3 animate-pulse" />
-            Analyse IA...
+            {t('coach.analyzing')}
           </span>
         )}
         {!loading && insight && !failed && (
           <span className="ml-auto flex items-center gap-1.5 text-[10px] text-emerald-400 font-bold uppercase tracking-widest">
             <Sparkles className="w-3 h-3" />
-            Coach IA
+            {t('coach.aiCoach')}
           </span>
         )}
       </div>
 
       {loading ? (
         <div className="space-y-3 animate-pulse">
-          <div className="h-3 bg-slate-800 rounded w-full" />
-          <div className="h-3 bg-slate-800 rounded w-5/6" />
-          <div className="h-3 bg-slate-800 rounded w-4/6" />
+          <div className="h-3 bg-surface-alt rounded w-full" />
+          <div className="h-3 bg-surface-alt rounded w-5/6" />
+          <div className="h-3 bg-surface-alt rounded w-4/6" />
         </div>
       ) : insight && !failed ? (
-        <div className="space-y-4 text-[13px] leading-relaxed text-slate-400">
+        <div className="space-y-4 text-[13px] leading-relaxed text-muted">
           <p>
-            <span className="font-bold text-slate-200">Tendance :</span> {insight.synthese}
+            <span className="font-bold text-body">{t('coach.trends.tendance')}</span> {insight.synthese}
           </p>
           <p>
-            <span className="font-bold text-slate-200">Point d&apos;Attention :</span> {insight.pointAttention}
+            <span className="font-bold text-body">{t('coach.trends.pointAttention')}</span> {insight.pointAttention}
           </p>
           <p>
-            <span className="font-bold text-slate-200">Recommandation :</span> {insight.recommandation}
+            <span className="font-bold text-body">{t('coach.trends.recommandation')}</span> {insight.recommandation}
           </p>
           {generatedAt && (
-            <p className="text-[10px] text-slate-600 italic pt-1">
-              Analyse générée le{' '}
+            <p className="text-[10px] text-faint italic pt-1">
+              {t('coach.generatedOn')}{' '}
               {new Date(generatedAt).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })}
-              , actualisée une fois par semaine.
+              , {t('coach.weeklyRefresh')}
             </p>
           )}
         </div>
       ) : (
-        <StaticFallback monthly={monthly} topCategories={topCategories} />
+        <StaticFallback monthly={monthly} topCategories={topCategories} t={t} />
       )}
     </div>
   );
@@ -119,45 +122,49 @@ export default function TrendsInsight({ monthly, topCategories }: Props) {
 // erreur réseau...) : mêmes libellés que l'analyse IA, mais calculés par des
 // règles simples sur les données déjà chargées côté client, plutôt qu'un
 // message générique sans rapport avec les vraies données de l'utilisateur.
-function StaticFallback({ monthly, topCategories }: Props) {
+function StaticFallback({ monthly, topCategories, t }: Props & { t: ReturnType<typeof useLanguage>['t'] }) {
   const withActivity = monthly.filter((m) => m.income > 0 || m.expenses > 0);
   const first = withActivity[0] ?? null;
   const last = withActivity[withActivity.length - 1] ?? null;
 
   const synthese =
     first && last && first.expenses > 0
-      ? `Vos dépenses sont passées de ${first.label} (${Math.round(first.expenses)} DH) à ${last.label} (${Math.round(
-          last.expenses,
-        )} DH), avec un taux d'épargne moyen de ${Math.round(
-          withActivity.reduce((acc, m) => acc + m.savingsRatePct, 0) / withActivity.length,
-        )}% sur la période.`
-      : "Pas encore assez d'historique pour dégager une tendance fiable — continuez à enregistrer vos transactions.";
+      ? tParams(t('coach.trends.staticSyntheseTemplate'), {
+          firstLabel: first.label,
+          firstExpenses: Math.round(first.expenses),
+          lastLabel: last.label,
+          lastExpenses: Math.round(last.expenses),
+          avgRate: Math.round(withActivity.reduce((acc, m) => acc + m.savingsRatePct, 0) / withActivity.length),
+        })
+      : t('coach.trends.noHistory');
 
   const worstCategory = [...topCategories].sort((a, b) => (b.trendPct ?? 0) - (a.trendPct ?? 0))[0] ?? null;
   const pointAttention =
     worstCategory && worstCategory.trendPct !== null && worstCategory.trendPct > 0
-      ? `"${worstCategory.name}" est la catégorie qui a le plus progressé sur la période (+${worstCategory.trendPct}%, ${worstCategory.total} DH cumulés).`
-      : "Aucune catégorie ne se démarque nettement à la hausse sur la période observée.";
+      ? tParams(t('coach.trends.pointAttentionTemplate'), {
+          category: worstCategory.name,
+          trendPct: worstCategory.trendPct,
+          total: worstCategory.total,
+        })
+      : t('coach.trends.noStandoutCategory');
 
   const recommandation =
     last && last.savingsRatePct < 20
-      ? `Votre taux d'épargne du dernier mois (${last.savingsRatePct}%) est sous la cible de 20% — revoyez en priorité la catégorie qui a le plus progressé ce mois-ci.`
-      : "Votre taux d'épargne récent est dans la cible : maintenez ce rythme et surveillez les catégories qui progressent le plus vite.";
+      ? tParams(t('coach.trends.recommandationBelowTarget'), { rate: last.savingsRatePct })
+      : t('coach.trends.recommandationOnTarget');
 
   return (
-    <div className="space-y-4 text-[13px] leading-relaxed text-slate-400">
+    <div className="space-y-4 text-[13px] leading-relaxed text-muted">
       <p>
-        <span className="font-bold text-slate-200">Tendance :</span> {synthese}
-      </p>
-      <p>
-        <span className="font-bold text-slate-200">Point d&apos;Attention :</span> {pointAttention}
+        <span className="font-bold text-body">{t('coach.trends.tendance')}</span> {synthese}
       </p>
       <p>
-        <span className="font-bold text-slate-200">Recommandation :</span> {recommandation}
+        <span className="font-bold text-body">{t('coach.trends.pointAttention')}</span> {pointAttention}
       </p>
-      <p className="text-[10px] text-slate-600 italic pt-1">
-        Coach IA indisponible pour le moment — analyse de repli basée sur des règles simples.
+      <p>
+        <span className="font-bold text-body">{t('coach.trends.recommandation')}</span> {recommandation}
       </p>
+      <p className="text-[10px] text-faint italic pt-1">{t('coach.fallbackNotice')}</p>
     </div>
   );
 }

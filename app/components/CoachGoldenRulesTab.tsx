@@ -65,13 +65,13 @@ export default function CoachGoldenRulesTab({ referenceIncome, avgMonthlyExpense
               <r.icon className="w-5 h-5" />
               <h3 className="text-sm font-bold uppercase tracking-widest">{r.title}</h3>
             </div>
-            <p className="text-[13px] text-slate-300 leading-relaxed">{r.rule}</p>
-            <p className="text-sm font-black text-white pt-1 border-t border-white/10">{r.value}</p>
+            <p className="text-[13px] text-body-soft leading-relaxed">{r.rule}</p>
+            <p className="text-sm font-black text-ink pt-1 border-t border-white/10">{r.value}</p>
           </div>
         ))}
       </div>
 
-      <p className="text-[10px] text-slate-600 italic px-1">
+      <p className="text-[10px] text-faint italic px-1">
         Seuils calculés à partir de votre revenu de référence ({formatCUR(referenceIncome)}/mois, page Profil) et de
         votre moyenne de dépenses glissante ({formatCUR(avgMonthlyExpenses)}/mois). Ce sont des repères généraux, pas
         des conseils personnalisés.

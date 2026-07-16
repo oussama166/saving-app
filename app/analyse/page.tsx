@@ -19,11 +19,11 @@ export default async function AnalysePage() {
   ]);
 
   return (
-    <main className="min-h-screen bg-[#131b2c] p-8 text-slate-200 font-sans">
+    <main className="min-h-screen bg-page p-4 sm:p-6 lg:p-8 text-body font-sans">
       <div className="max-w-7xl mx-auto space-y-10">
         <header>
-          <h1 className="text-3xl font-bold tracking-tight text-white">Analyse & Trends</h1>
-          <p className="text-slate-500 text-sm mt-1 italic">
+          <h1 className="text-3xl font-bold tracking-tight text-ink">Analyse & Trends</h1>
+          <p className="text-subtle text-sm mt-1 italic">
             Comprendre vos tendances financières pour mieux décider demain.
           </p>
         </header>
