@@ -32,6 +32,15 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.example
+
+# base de données SQLite locale — contient de vraies données financières
+# utilisateur en dev, ne doit jamais partir sur un dépôt distant (voir
+# DEPLOYMENT.md : la prod utilise Turso, pas ce fichier).
+*.db
+*.db-journal*
+*.db-shm
+*.db-wal
 
 # vercel
 .vercel
@@ -41,3 +50,11 @@ yarn-error.log*
 next-env.d.ts
 
 /app/generated/prisma
+
+
+# AI instructions files 
+CLAUDE.md
+GEMINI.md
+AGENT.md
+instruction.md
+planing.md
