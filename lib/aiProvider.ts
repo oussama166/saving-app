@@ -15,8 +15,7 @@ const openrouter = createOpenRouter({
 });
 
 export const coachModel = google("gemini-2.5-flash");
-  
 
-/* PROVIDER === "google"
-    ? google("gemini-2.5-flash")
-    : openrouter.chat("openai/gpt-4o");*/
+PROVIDER === "google"
+  ? google("gemini-2.5-flash")
+  : openrouter.chat("openai/gpt-4o");
