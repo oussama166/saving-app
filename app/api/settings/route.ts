@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireSession } from '@/lib/auth';
+import { ensureUserSeeded } from '@/lib/seedDefaults';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,6 +12,12 @@ const SUM_TOLERANCE = 0.5;
 export async function GET() {
   try {
     const { userId } = await requireSession();
+
+    // Filet de sécurité : comptes créés avant le passage à Turso (ou dont le
+    // seed initial a échoué en route, ex: timeout réseau) — voir
+    // lib/seedDefaults.ts. No-op si le compte est déjà correctement seedé.
+    await ensureUserSeeded(prisma, userId);
+
     const [settings, categories] = await Promise.all([
       prisma.userSettings.findUnique({ where: { userId } }),
       prisma.category.findMany({

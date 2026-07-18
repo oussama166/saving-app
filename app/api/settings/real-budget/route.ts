@@ -1,12 +1,20 @@
 import { NextResponse } from 'next/server';
 import { getRealBudgetSummary } from '@/lib/financials';
 import { requireSession } from '@/lib/auth';
+import { prisma } from '@/lib/prisma';
+import { ensureUserSeeded } from '@/lib/seedDefaults';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(req: Request) {
   try {
     const { userId } = await requireSession();
+
+    // Filet de sécurité : comptes créés avant le passage à Turso (ou dont le
+    // seed initial a échoué en route, ex: timeout réseau) — voir
+    // lib/seedDefaults.ts. No-op si le compte est déjà correctement seedé.
+    await ensureUserSeeded(prisma, userId);
+
     const { searchParams } = new URL(req.url);
     const period = searchParams.get('period') === 'all' ? 'all' : 'month';
 
