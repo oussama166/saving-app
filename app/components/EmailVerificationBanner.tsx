@@ -16,7 +16,7 @@ export default function EmailVerificationBanner() {
   const [sent, setSent] = useState(false);
 
   useEffect(() => {
-    if (AUTH_PATHS.includes(pathname)) return;
+    if (AUTH_PATHS.includes(pathname) || pathname.startsWith("/admin")) return;
     fetch("/api/auth/me")
       .then((res) => res.json())
       .then((result) => {
@@ -25,7 +25,7 @@ export default function EmailVerificationBanner() {
       .catch(() => {});
   }, [pathname]);
 
-  if (AUTH_PATHS.includes(pathname)) return null;
+  if (AUTH_PATHS.includes(pathname) || pathname.startsWith("/admin")) return null;
   if (emailVerified !== false || dismissed) return null;
 
   const handleResend = async () => {

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireWebhookAuth } from '@/lib/webhookAuth';
+import { addManualContribution } from '@/lib/goalContributions';
 
 // Accepte soit un token de webhook dédié (header `Authorization: Bearer
 // <token>`, généré depuis la page Profil), soit le cookie de session
@@ -29,19 +30,23 @@ export async function POST(req: Request) {
       where: { userId, autoAllocatePct: { gt: 0 } },
     });
 
-    const updates = savingsGoals.map((goal) => {
+    // Chaque allocation passe par addManualContribution : crée un
+    // GoalContribution (historique, visible dans l'objectif) et, si
+    // l'objectif a un compte/catégorie configurés, une vraie Transaction
+    // (type savings) — plutôt que de faire bouger currentAmount en silence.
+    for (const goal of savingsGoals) {
       const allocation = amount * (goal.autoAllocatePct / 100);
-      return prisma.savingsGoal.update({
-        where: { id: goal.id },
-        data: { currentAmount: { increment: allocation } },
+      if (allocation <= 0) continue;
+      await addManualContribution({
+        userId,
+        goalId: goal.id,
+        amount: allocation,
+        note: `Allocation automatique (${goal.autoAllocatePct}% du salaire reçu)`,
+        isAutomatic: true,
       });
-    });
-
-    if (updates.length > 0) {
-      await prisma.$transaction(updates);
     }
 
-    return NextResponse.json({ success: true, allocated: updates.length });
+    return NextResponse.json({ success: true, allocated: savingsGoals.length });
   } catch (error) {
     if (error instanceof Error && error.message === 'UNAUTHENTICATED') {
       return NextResponse.json({ error: 'Non authentifié' }, { status: 401 });

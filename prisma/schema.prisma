@@ -25,6 +25,13 @@ model User {
   passwordResetToken           String?   @unique
   passwordResetTokenExpiresAt  DateTime?
 
+  // Modération admin (voir app/admin/*) — un compte suspendu ne peut plus se
+  // connecter (bloqué à /api/auth/login) et sa session existante est coupée
+  // au prochain appel de /api/auth/me (utilisé par TopNav sur chaque page).
+  isSuspended      Boolean   @default(false)
+  suspendedAt      DateTime?
+  suspendedReason  String?
+
   settings        UserSettings?
   accounts        Account[]
   categories      Category[]
@@ -33,6 +40,8 @@ model User {
   medicalRecords  MedicalRecord[]
   portfolioAssets PortfolioAsset[]
   aiAdviceCache   AiAdviceCache[]
+  subscriptions   Subscription[]
+  goalContributions GoalContribution[]
 }
 
 model UserSettings {
@@ -55,6 +64,8 @@ model Account {
   balance         Float            @default(0)
   transactions    Transaction[]
   portfolioAssets PortfolioAsset[]
+  subscriptions   Subscription[]
+  savingsGoals    SavingsGoal[]
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
 }
@@ -70,6 +81,8 @@ model Category {
   subCategories   SubCategory[]
   transactions    Transaction[]
   categoryArchive CategoryArchive?
+  subscriptions   Subscription[]
+  savingsGoals    SavingsGoal[]
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
 }
@@ -107,23 +120,92 @@ model Transaction {
   latitude      Float? // coordonnée GPS au moment du paiement, utilisée pour deviner la catégorie (voir lib/placeCategory.ts)
   longitude     Float?
   isRejected    Boolean        @default(false) // true si le webhook a détecté un dépassement du "Safe to Spend" au moment du paiement
+  subscriptionId String?       // renseigné si générée automatiquement par un abonnement (voir lib/subscriptions.ts)
+  subscription  Subscription?  @relation(fields: [subscriptionId], references: [id])
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
   medicalRecord MedicalRecord?
+  goalContribution GoalContribution?
 }
 
+// Abonnements récurrents mensuels (Netflix, Spotify, PSN Plus, etc.). Chaque
+// abonnement génère automatiquement une Transaction dépense le jour de
+// prélèvement (billingDay) de chaque mois — voir lib/subscriptions.ts pour la
+// logique de rattrapage (pas de cron serveur, hébergement gratuit oblige :
+// le rattrapage se déclenche à chaque chargement de la page Abonnements/du
+// dashboard). lastChargedYearMonth ("2026-07") évite les doublons.
+model Subscription {
+  id                   String        @id @default(cuid())
+  userId               String
+  user                 User          @relation(fields: [userId], references: [id])
+  accountId            String
+  account              Account       @relation(fields: [accountId], references: [id])
+  categoryId           String
+  category             Category      @relation(fields: [categoryId], references: [id])
+  name                 String // "Netflix"
+  provider             String? // clé catalogue (voir lib/subscriptionCatalog.ts), null si abonnement personnalisé
+  subCategory          String? // libellé libre ("Streaming Vidéo", "Musique"...), même pattern que Transaction.subCategory
+  price                Float
+  billingDay           Int // jour du mois (1-31) où le prélèvement a lieu ; si le mois est plus court, on prend le dernier jour
+  isActive             Boolean       @default(true)
+  lastChargedYearMonth String? // "2026-07" — dernier mois pour lequel une transaction a été générée
+  transactions         Transaction[]
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+}
+
+// Objectifs d'épargne — personnels ou pour aider un proche (ex: "Frais de
+// scolarité de ma sœur"). accountId/categoryId sont nullable côté SQLite
+// (colonnes ajoutées via ALTER TABLE sur une table existante — SQLite exige
+// un DEFAULT pour une contrainte NOT NULL ajoutée après coup) mais toujours
+// fournis par l'API/le formulaire : chaque versement (manuel ou automatique,
+// voir lib/goalContributions.ts) crée une vraie Transaction (type savings)
+// dans ce compte/cette catégorie, donc visible dans le budget/historique
+// comme n'importe quelle autre dépense/épargne.
 model SavingsGoal {
-  id                  String   @id @default(cuid())
-  userId              String
-  user                User     @relation(fields: [userId], references: [id])
-  name                String
-  targetAmount        Float
-  monthlyContribution Float    @default(0)
-  emoji               String?
-  currentAmount       Float    @default(0)
-  autoAllocatePct     Float    @default(0)
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  id                        String             @id @default(cuid())
+  userId                    String
+  user                      User               @relation(fields: [userId], references: [id])
+  accountId                 String?
+  account                   Account?           @relation(fields: [accountId], references: [id])
+  categoryId                String?
+  category                  Category?          @relation(fields: [categoryId], references: [id])
+  name                      String
+  emoji                     String?
+  goalType                  String             @default("personnel") // personnel, famille, urgence, projet
+  beneficiary               String? // "Ma sœur — Salma"
+  note                      String?
+  targetAmount              Float
+  monthlyContribution       Float              @default(0) // aussi utilisé comme montant du versement auto quand autoContribute=true
+  currentAmount             Float              @default(0)
+  targetDate                DateTime? // échéance fixe (ex: rentrée scolaire) — sert à calculer le versement mensuel suggéré
+  autoContribute            Boolean            @default(false)
+  contributionDay           Int                @default(1) // jour du mois (1-31) du versement automatique
+  lastContributedYearMonth  String? // "2026-07" — dernier mois pour lequel un versement auto a été généré
+  autoAllocatePct           Float              @default(0) // % du salaire auto-alloué à réception (voir app/api/webhook/salary/route.ts)
+  contributions             GoalContribution[]
+  createdAt                 DateTime           @default(now())
+  updatedAt                 DateTime           @updatedAt
+}
+
+// Historique des versements vers un objectif d'épargne — un par contribution
+// (manuelle via le formulaire "Ajouter un versement", ou automatique via le
+// rattrapage mensuel / l'allocation salaire). transactionId lie le versement
+// à la Transaction réelle créée dans le compte (null si pas de compte/
+// catégorie configuré sur l'objectif au moment du versement).
+model GoalContribution {
+  id            String       @id @default(cuid())
+  userId        String
+  user          User         @relation(fields: [userId], references: [id])
+  goalId        String
+  goal          SavingsGoal  @relation(fields: [goalId], references: [id])
+  amount        Float
+  date          DateTime     @default(now())
+  note          String?
+  isAutomatic   Boolean      @default(false)
+  transactionId String?      @unique
+  transaction   Transaction? @relation(fields: [transactionId], references: [id])
+  createdAt     DateTime     @default(now())
 }
 
 model MedicalRecord {
@@ -174,4 +256,41 @@ model AiAdviceCache {
   generatedAt DateTime @default(now())
 
   @@unique([userId, key])
+}
+
+// Compte admin — totalement séparé des comptes User (voir lib/adminAuth.ts).
+// Pas d'endpoint d'inscription public pour le tout premier admin : créé via
+// scripts/create-admin.ts, exécuté localement. Les admins suivants peuvent
+// être créés depuis le panel (/admin/admins) par un admin déjà connecté.
+// Cookie de session dédié, durée de vie plus courte que la session
+// utilisateur normale. isActive remplace la suppression : un admin
+// désactivé ne peut plus se connecter (login bloqué) et sa session active
+// est coupée au prochain appel de /api/admin/me — jamais supprimé en dur
+// pour ne pas casser l'historique d'AdminAuditLog (FK RESTRICT).
+model Admin {
+  id           String          @id @default(cuid())
+  email        String          @unique
+  passwordHash String
+  name         String?
+  isActive     Boolean         @default(true)
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  auditLogs    AdminAuditLog[]
+}
+
+// Journal d'audit des actions admin (suspension/réactivation/suppression
+// d'utilisateur, envoi de reset password, création d'un autre admin, etc.)
+// — traçabilité minimale mais essentielle pour un panel qui peut suspendre/
+// supprimer des comptes. adminEmail est un snapshot au moment de l'action
+// (reste lisible même si l'email de l'admin change plus tard).
+model AdminAuditLog {
+  id         String   @id @default(cuid())
+  adminId    String
+  admin      Admin    @relation(fields: [adminId], references: [id])
+  adminEmail String
+  action     String // ex: "user.suspend", "user.delete", "admin.create"
+  targetType String? // ex: "User", "Admin"
+  targetId   String?
+  details    String? // JSON.stringify() de détails additionnels (raison, etc.)
+  createdAt  DateTime @default(now())
 }

@@ -14,6 +14,7 @@ import {
   LogOut,
   Menu,
   X,
+  Repeat,
 } from "lucide-react";
 import Link from "next/link";
 import ThemeToggle from "./ThemeToggle";
@@ -45,6 +46,11 @@ const navLinks = [
   },
   { key: "nav.sante", icon: <Heart className="w-4 h-4" />, href: "/sante" },
   { key: "nav.coach", icon: <Bot className="w-4 h-4" />, href: "/coach" },
+  {
+    key: "nav.abonnements",
+    icon: <Repeat className="w-4 h-4" />,
+    href: "/abonnements",
+  },
   { key: "nav.profil", icon: <User className="w-4 h-4" />, href: "/profil" },
 ];
 
@@ -58,7 +64,7 @@ export default function TopNav() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
-    if (AUTH_PATHS.includes(pathname)) return;
+    if (AUTH_PATHS.includes(pathname) || pathname.startsWith("/admin")) return;
     fetch("/api/auth/me")
       .then((res) => res.json())
       .then((result) => {
@@ -84,7 +90,10 @@ export default function TopNav() {
     };
   }, [mobileMenuOpen]);
 
-  if (AUTH_PATHS.includes(pathname)) return null;
+  // Le panel admin (/admin) a son propre système d'auth et sa propre nav
+  // (voir app/admin/layout.tsx) — totalement indépendant du compte
+  // utilisateur affiché ici.
+  if (AUTH_PATHS.includes(pathname) || pathname.startsWith("/admin")) return null;
 
   const handleLogout = async () => {
     await fetch("/api/auth/logout", { method: "POST" });

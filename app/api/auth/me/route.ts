@@ -10,6 +10,7 @@ import {
 } from '@/lib/auth';
 import { generateSecureToken } from '@/lib/tokens';
 import { sendVerificationEmail } from '@/lib/email';
+import { deleteUserAccount } from '@/lib/deleteUserData';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const VERIFICATION_TOKEN_TTL_MS = 24 * 60 * 60 * 1000; // 24h
@@ -24,6 +25,24 @@ export async function GET() {
     const user = await prisma.user.findUnique({ where: { id: session.userId } });
     if (!user) {
       return NextResponse.json({ success: false, error: 'Non authentifié' }, { status: 401 });
+    }
+
+    // Compte suspendu par un admin (voir app/api/admin/users/[id]/suspend) :
+    // la session JWT reste valide côté cookie mais on la coupe ici, ce qui a
+    // pour effet de déconnecter l'utilisateur dès le prochain chargement de
+    // page (TopNav appelle GET /api/auth/me sur chaque page).
+    if (user.isSuspended) {
+      const response = NextResponse.json(
+        {
+          success: false,
+          error: user.suspendedReason
+            ? `Ce compte est suspendu : ${user.suspendedReason}`
+            : 'Ce compte est suspendu.',
+        },
+        { status: 403 },
+      );
+      response.cookies.set(SESSION_COOKIE, '', { ...SESSION_COOKIE_OPTIONS, maxAge: 0 });
+      return response;
     }
 
     return NextResponse.json({
@@ -140,24 +159,7 @@ export async function DELETE(req: Request) {
       return NextResponse.json({ success: false, error: 'Mot de passe incorrect' }, { status: 401 });
     }
 
-    await prisma.$transaction(async (tx) => {
-      const categories = await tx.category.findMany({ where: { userId }, select: { id: true } });
-      const categoryIds = categories.map((c) => c.id);
-
-      // Ordre : les tables qui référencent Transaction/Category/Account
-      // d'abord, puis Category/Account, puis User en dernier.
-      await tx.medicalRecord.deleteMany({ where: { userId } });
-      await tx.transaction.deleteMany({ where: { userId } });
-      await tx.portfolioAsset.deleteMany({ where: { userId } });
-      await tx.savingsGoal.deleteMany({ where: { userId } });
-      await tx.subCategory.deleteMany({ where: { categoryId: { in: categoryIds } } });
-      await tx.categoryArchive.deleteMany({ where: { categoryId: { in: categoryIds } } });
-      await tx.category.deleteMany({ where: { userId } });
-      await tx.account.deleteMany({ where: { userId } });
-      await tx.userSettings.deleteMany({ where: { userId } });
-      await tx.aiAdviceCache.deleteMany({ where: { userId } });
-      await tx.user.delete({ where: { id: userId } });
-    });
+    await deleteUserAccount(userId);
 
     const response = NextResponse.json({ success: true });
     response.cookies.set(SESSION_COOKIE, '', { ...SESSION_COOKIE_OPTIONS, maxAge: 0 });

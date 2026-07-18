@@ -39,6 +39,19 @@ export async function POST(req: Request) {
     const validPassword = await verifyPassword(password, user.passwordHash);
     if (!validPassword) return invalidCredentials();
 
+    if (user.isSuspended) {
+      recordFailedAttempt(rateLimitKey);
+      return NextResponse.json(
+        {
+          success: false,
+          error: user.suspendedReason
+            ? `Ce compte est suspendu : ${user.suspendedReason}`
+            : 'Ce compte est suspendu. Contacte le support pour plus d\'informations.',
+        },
+        { status: 403 },
+      );
+    }
+
     clearAttempts(rateLimitKey);
 
     const token = await createSessionToken({ userId: user.id, email: user.email });

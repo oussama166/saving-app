@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { jwtVerify } from "jose";
 import { SESSION_COOKIE } from "@/lib/auth";
+import { ADMIN_SESSION_COOKIE } from "@/lib/adminAuth";
 
 // Pages accessibles sans être connecté, redirigées vers "/" si déjà connecté
 // (pas de raison de revoir un formulaire de connexion/inscription).
@@ -21,9 +22,28 @@ const ALWAYS_PUBLIC_PATHS = ["/forgot-password", "/reset-password"];
 // d'atteindre le handler de la route.
 const PUBLIC_API_PREFIXES = ["/api/auth/", "/api/backup/", "/api/webhook/"];
 
+// Espace admin (voir lib/adminAuth.ts) : session totalement séparée de l'auth
+// utilisateur ci-dessus (cookie et secret dédiés). /admin/login et
+// /api/admin/login restent accessibles sans session admin, tout le reste
+// sous /admin ou /api/admin exige un cookie admin valide.
+const ADMIN_PUBLIC_PATHS = ["/admin/login"];
+const ADMIN_PUBLIC_API_PREFIXES = ["/api/admin/login"];
+
 async function isValidSession(token: string | undefined) {
   if (!token) return false;
   const secret = process.env.AUTH_SECRET;
+  if (!secret) return false;
+  try {
+    await jwtVerify(token, new TextEncoder().encode(secret));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function isValidAdminSession(token: string | undefined) {
+  if (!token) return false;
+  const secret = process.env.ADMIN_AUTH_SECRET;
   if (!secret) return false;
   try {
     await jwtVerify(token, new TextEncoder().encode(secret));
@@ -42,6 +62,32 @@ export async function middleware(req: NextRequest) {
     PUBLIC_API_PREFIXES.some((p) => pathname.startsWith(p)) ||
     ALWAYS_PUBLIC_PATHS.includes(pathname)
   ) {
+    return NextResponse.next();
+  }
+
+  // Espace admin : circuit d'auth entièrement séparé, jamais mélangé avec la
+  // logique utilisateur ci-dessous (voir lib/adminAuth.ts).
+  if (pathname.startsWith("/admin") || pathname.startsWith("/api/admin")) {
+    if (
+      ADMIN_PUBLIC_PATHS.includes(pathname) ||
+      ADMIN_PUBLIC_API_PREFIXES.some((p) => pathname.startsWith(p))
+    ) {
+      return NextResponse.next();
+    }
+
+    const adminToken = req.cookies.get(ADMIN_SESSION_COOKIE)?.value;
+    const adminAuthenticated = await isValidAdminSession(adminToken);
+
+    if (!adminAuthenticated) {
+      if (pathname.startsWith("/api/")) {
+        return NextResponse.json(
+          { success: false, error: "Non authentifié (admin)" },
+          { status: 401 },
+        );
+      }
+      return NextResponse.redirect(new URL("/admin/login", req.url));
+    }
+
     return NextResponse.next();
   }
 

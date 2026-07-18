@@ -11,15 +11,18 @@ export const dynamic = 'force-dynamic';
 
 export default async function ObjectifsPage() {
   const { userId } = await requireSession();
-  const [goals, { referenceIncome }, emergencyFundBalance, portfolio] = await Promise.all([
-    prisma.savingsGoal.findMany({ where: { userId }, orderBy: { createdAt: 'asc' } }),
+  // GoalsTable gère désormais son propre fetch (liste, comptes, catégories,
+  // rattrapage des versements auto) côté client — ici on ne garde qu'un
+  // agrégat léger pour les conseils Tanger ci-dessous.
+  const [goalsAgg, { referenceIncome }, emergencyFundBalance, portfolio] = await Promise.all([
+    prisma.savingsGoal.aggregate({ where: { userId }, _sum: { targetAmount: true, currentAmount: true } }),
     getUserSettings(userId),
     getEmergencyFundBalance(userId),
     getEnrichedPortfolioAssets(userId),
   ]);
 
-  const totalGoalsTarget = goals.reduce((acc, g) => acc + g.targetAmount, 0);
-  const totalGoalsSaved = goals.reduce((acc, g) => acc + g.currentAmount, 0);
+  const totalGoalsTarget = goalsAgg._sum.targetAmount ?? 0;
+  const totalGoalsSaved = goalsAgg._sum.currentAmount ?? 0;
 
   return (
     <main className="min-h-screen bg-page p-4 sm:p-6 lg:p-8 text-body font-sans">
@@ -31,7 +34,7 @@ export default async function ObjectifsPage() {
           </p>
         </header>
 
-        <GoalsTable goals={goals} />
+        <GoalsTable />
 
         <section>
           <div className="flex items-center gap-3 mb-6">
