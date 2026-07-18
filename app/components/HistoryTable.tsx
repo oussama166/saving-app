@@ -14,7 +14,7 @@ interface Transaction {
   category: {
     id?: string;
     name: string;
-    type: 'income' | 'expense' | 'savings';
+    type: string;
   };
   account: {
     name: string;
@@ -252,7 +252,7 @@ export default function HistoryTable({
     }
   };
 
-  const typeBadge = (txType: 'income' | 'expense' | 'savings') => {
+  const typeBadge = (txType: string) => {
     if (txType === 'income') {
       return (
         <span className="text-[9px] bg-emerald-500/10 text-emerald-500 px-1.5 py-0.5 rounded border border-emerald-500/20 font-bold uppercase">

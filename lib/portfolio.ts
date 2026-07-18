@@ -40,7 +40,15 @@ export async function getEnrichedPortfolioAssets(userId: string) {
       }
 
       try {
-        const quote = await yahooFinance.quote(asset.tickerSymbol);
+        // yahoo-finance2 résout `quote()` en un type d'union géant selon les
+        // "modules" demandés, que TS ne parvient pas toujours à réduire
+        // correctement (résultat `never` observé ici) — on caste vers la
+        // forme minimale réellement utilisée plutôt que de se battre contre
+        // les surcharges de la lib.
+        const quote = (await yahooFinance.quote(asset.tickerSymbol)) as {
+          regularMarketPrice?: number;
+          currency?: string;
+        };
         const livePrice = quote.regularMarketPrice || fallbackPrice;
 
         const liveValue = asset.sharesOwned * livePrice;

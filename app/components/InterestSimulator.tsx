@@ -124,7 +124,7 @@ export default function InterestSimulator({ showChart = true }: InterestSimulato
               <Tooltip
                 contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', borderRadius: '12px', fontSize: '12px' }}
                 itemStyle={{ color: '#f1f5f9' }}
-                formatter={(value: number) => formatCUR(value)}
+                formatter={(value) => formatCUR(Number(value))}
               />
               <Area
                 type="monotone"
