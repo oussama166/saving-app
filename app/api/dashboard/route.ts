@@ -118,8 +118,15 @@ export async function GET() {
       else ruleTotals.Wants += amt;
     });
 
-    const totalBudget =
-      income || ruleTotals.Needs + ruleTotals.Wants + ruleTotals.Savings || 1;
+    // Dénominateur du split 50/30/20 : le revenu réel du mois si connu,
+    // sinon le revenu de référence (page Profil) — jamais la somme des
+    // dépenses elles-mêmes. Avant ce correctif, sans transaction de revenu
+    // ce mois-ci, le fallback retombait sur "Needs + Wants + Savings" (donc
+    // sur le total dépensé), ce qui gonflait artificiellement les % dès que
+    // peu de dépenses étaient loguées (ex: une seule dépense "Needs" en
+    // début de mois affichait 100% Needs, alors que ce n'est que 0,45% d'un
+    // revenu de 10 000 MAD).
+    const totalBudget = income > 0 ? income : referenceIncome || 1;
     const rule503020 = {
       needs: {
         amount: ruleTotals.Needs,

@@ -9,7 +9,20 @@ import { addManualContribution } from '@/lib/goalContributions';
 export async function POST(req: Request) {
   try {
     const { userId } = await requireWebhookAuth(req);
-    const { amount } = await req.json();
+    const body = await req.json();
+
+    // Le Shortcut iOS envoie parfois `amount` comme texte plutôt que comme
+    // nombre (dictionnaire JSON avec un champ resté en type "Texte" côté
+    // Shortcuts) — Prisma refuse une string pour un champ Float (increment
+    // notamment), d'où un 500 générique. On force la conversion ici et on
+    // rejette proprement avec un message clair plutôt que de planter.
+    const amount = Number(body?.amount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      return NextResponse.json(
+        { error: `Champ "amount" invalide : "${body?.amount}" n'est pas un nombre positif.` },
+        { status: 400 },
+      );
+    }
 
     let account = await prisma.account.findFirst({
       where: { userId, name: 'Main Checking' },

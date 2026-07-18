@@ -133,14 +133,21 @@ export const PAYMENT_METHODS = [
  * catégories existent déjà pour cet utilisateur (par nom), elles sont mises
  * à jour plutôt que dupliquées — utile si on relance le seed manuellement.
  *
- * Écrit en batch (createMany/createManyAndReturn) dans une seule
- * $transaction plutôt qu'en ~60 allers-retours séquentiels un par un :
- * la version précédente (une create/update par catégorie ET par
+ * Écrit en batch (createMany) plutôt qu'en ~60 allers-retours séquentiels
+ * un par un : la version d'origine (une create/update par catégorie ET par
  * sous-catégorie) faisait ~13 + ~45 requêtes réseau individuelles, ce qui
  * est négligeable contre un fichier SQLite local mais peut dépasser le
- * timeout d'une fonction serverless Vercel contre une base distante Turso
- * (chaque requête a une vraie latence réseau) — un compte pouvait alors se
- * retrouver créé (User déjà commité) mais avec un seed partiel ou vide.
+ * timeout d'une fonction serverless Vercel contre une base distante Turso.
+ *
+ * Volontairement SANS `$transaction(async (tx) => ...)` (transaction
+ * interactive) : l'adapter Prisma pour libSQL/Turso a des soucis de
+ * fiabilité connus avec les transactions interactives à distance (erreurs
+ * "TRANSACTION_CLOSED", voir prisma/prisma#21345) — une première version de
+ * cette fonction utilisait ce mécanisme et échouait silencieusement contre
+ * Turso, laissant les comptes non seedés malgré le correctif. Chaque étape
+ * ci-dessous est idempotente (vérifiée par nom avant insertion), donc un
+ * échec partiel est sans danger : ensureUserSeeded() rattrape le reste au
+ * prochain appel plutôt que de dépendre d'une atomicité tout-ou-rien.
  */
 export async function seedDefaultsForUser(prisma: PrismaClient, userId: string) {
   const total = DEFAULT_CATEGORIES.filter((c) => c.type !== 'income').reduce((acc, c) => acc + c.budgetPct, 0);
@@ -148,81 +155,82 @@ export async function seedDefaultsForUser(prisma: PrismaClient, userId: string) 
     throw new Error(`Les budgetPct des catégories par défaut somment à ${total}%, pas 100%. Seed annulé.`);
   }
 
-  await prisma.$transaction(async (tx) => {
-    const existingCategories = await tx.category.findMany({
-      where: { userId, name: { in: DEFAULT_CATEGORIES.map((c) => c.name) } },
-      select: { id: true, name: true },
+  const existingCategories = await prisma.category.findMany({
+    where: { userId, name: { in: DEFAULT_CATEGORIES.map((c) => c.name) } },
+    select: { id: true, name: true },
+  });
+  const existingByName = new Map(existingCategories.map((c) => [c.name, c]));
+
+  const toCreate = DEFAULT_CATEGORIES.filter((d) => !existingByName.has(d.name));
+  const toUpdate = DEFAULT_CATEGORIES.filter((d) => existingByName.has(d.name));
+
+  if (toUpdate.length > 0) {
+    await Promise.all(
+      toUpdate.map((def) => {
+        const existing = existingByName.get(def.name)!;
+        return prisma.category.update({
+          where: { id: existing.id },
+          data: { type: def.type, order: def.order, budgetPct: def.budgetPct },
+        });
+      }),
+    );
+  }
+
+  if (toCreate.length > 0) {
+    // createMany (pas createManyAndReturn) : la clause RETURNING n'est pas
+    // garantie fiable sur tous les chemins de l'adapter libSQL — on relit
+    // juste après via un findMany classique, universellement supporté.
+    await prisma.category.createMany({
+      data: toCreate.map((def) => ({
+        userId,
+        name: def.name,
+        type: def.type,
+        order: def.order,
+        budgetPct: def.budgetPct,
+      })),
     });
-    const existingByName = new Map(existingCategories.map((c) => [c.name, c]));
+  }
 
-    const toCreate = DEFAULT_CATEGORIES.filter((d) => !existingByName.has(d.name));
-    const toUpdate = DEFAULT_CATEGORIES.filter((d) => existingByName.has(d.name));
+  const allCategories = await prisma.category.findMany({
+    where: { userId, name: { in: DEFAULT_CATEGORIES.map((c) => c.name) } },
+    select: { id: true, name: true },
+  });
+  const categoryIdByName = new Map(allCategories.map((c) => [c.name, c.id]));
 
-    if (toUpdate.length > 0) {
-      await Promise.all(
-        toUpdate.map((def) => {
-          const existing = existingByName.get(def.name)!;
-          return tx.category.update({
-            where: { id: existing.id },
-            data: { type: def.type, order: def.order, budgetPct: def.budgetPct },
-          });
-        }),
-      );
-    }
+  const allCategoryIds = [...categoryIdByName.values()];
+  const existingSubs = allCategoryIds.length
+    ? await prisma.subCategory.findMany({
+        where: { categoryId: { in: allCategoryIds } },
+        select: { categoryId: true, name: true },
+      })
+    : [];
+  const existingSubKeys = new Set(existingSubs.map((s) => `${s.categoryId}::${s.name}`));
 
-    let createdCategories: { id: string; name: string }[] = [];
-    if (toCreate.length > 0) {
-      createdCategories = await tx.category.createManyAndReturn({
-        data: toCreate.map((def) => ({
-          userId,
-          name: def.name,
-          type: def.type,
-          order: def.order,
-          budgetPct: def.budgetPct,
-        })),
-        select: { id: true, name: true },
-      });
-    }
-
-    const categoryIdByName = new Map<string, string>();
-    for (const c of existingCategories) categoryIdByName.set(c.name, c.id);
-    for (const c of createdCategories) categoryIdByName.set(c.name, c.id);
-
-    const allCategoryIds = [...categoryIdByName.values()];
-    const existingSubs = allCategoryIds.length
-      ? await tx.subCategory.findMany({
-          where: { categoryId: { in: allCategoryIds } },
-          select: { categoryId: true, name: true },
-        })
-      : [];
-    const existingSubKeys = new Set(existingSubs.map((s) => `${s.categoryId}::${s.name}`));
-
-    const subsToCreate: { name: string; categoryId: string }[] = [];
-    for (const def of DEFAULT_CATEGORIES) {
-      const categoryId = categoryIdByName.get(def.name);
-      if (!categoryId) continue;
-      for (const subName of def.subCategories) {
-        if (!existingSubKeys.has(`${categoryId}::${subName}`)) {
-          subsToCreate.push({ name: subName, categoryId });
-        }
+  const subsToCreate: { name: string; categoryId: string }[] = [];
+  for (const def of DEFAULT_CATEGORIES) {
+    const categoryId = categoryIdByName.get(def.name);
+    if (!categoryId) continue;
+    for (const subName of def.subCategories) {
+      if (!existingSubKeys.has(`${categoryId}::${subName}`)) {
+        subsToCreate.push({ name: subName, categoryId });
       }
     }
+  }
 
-    if (subsToCreate.length > 0) {
-      await tx.subCategory.createMany({ data: subsToCreate });
-    }
+  if (subsToCreate.length > 0) {
+    await prisma.subCategory.createMany({ data: subsToCreate });
+  }
 
-    await tx.userSettings.upsert({
-      where: { userId },
-      update: {},
-      create: { userId, referenceIncome: 10000, currency: 'MAD', emergencyFundTargetMonths: 3 },
-    });
-
-    const existingAccount = await tx.account.findFirst({ where: { userId, name: 'Main Checking' } });
-    if (!existingAccount) {
-      await tx.account.create({ data: { userId, name: 'Main Checking', type: 'checking', balance: 0 } });
-    }
+  await prisma.userSettings.upsert({
+    where: { userId },
+    update: {},
+    create: { userId, referenceIncome: 10000, currency: 'MAD', emergencyFundTargetMonths: 3 },
   });
+
+  const existingAccount = await prisma.account.findFirst({ where: { userId, name: 'Main Checking' } });
+  if (!existingAccount) {
+    await prisma.account.create({ data: { userId, name: 'Main Checking', type: 'checking', balance: 0 } });
+  }
 }
 
 /**
@@ -232,10 +240,20 @@ export async function seedDefaultsForUser(prisma: PrismaClient, userId: string) 
  * indexé par userId, appelé depuis les routes qui dépendent des catégories
  * (paramètres, budget réel) — coût négligeable, et no-op dès que le compte
  * est correctement seedé.
+ *
+ * N'importe jamais d'exception vers l'appelant : si le seed échoue encore
+ * (panne Turso, etc.), la route continue de répondre normalement (avec 0
+ * catégorie, comme avant) plutôt que de renvoyer un 500 générique qui
+ * masquerait complètement l'erreur côté client. L'erreur reste visible
+ * dans les logs serveur (Vercel → Functions → Logs) pour diagnostic.
  */
 export async function ensureUserSeeded(prisma: PrismaClient, userId: string) {
-  const count = await prisma.category.count({ where: { userId } });
-  if (count === 0) {
-    await seedDefaultsForUser(prisma, userId);
+  try {
+    const count = await prisma.category.count({ where: { userId } });
+    if (count === 0) {
+      await seedDefaultsForUser(prisma, userId);
+    }
+  } catch (error) {
+    console.error(`ensureUserSeeded a échoué pour userId=${userId}:`, error);
   }
 }
