@@ -48,7 +48,7 @@ interface DashboardData {
 }
 
 export default function Dashboard() {
-  const { t } = useLanguage();
+  const { t, locale } = useLanguage();
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [userName, setUserName] = useState<string | null>(null);
@@ -121,13 +121,23 @@ export default function Dashboard() {
             <h1 className="text-3xl font-bold tracking-tight text-ink">
               {t("dashboard.title")}
             </h1>
-            <p className="mt-1 text-sm text-subtle">
-              {t("dashboard.welcome")}{" "}
-              <span className="font-bold text-orange-400">
-                {metrics.healthScore}%
-              </span>
-              .
-            </p>
+
+            {locale != "ar" ? (
+              <p className="mt-1 text-sm text-subtle">
+                {t("dashboard.welcome")}{" "}
+                <span className="font-bold text-orange-400">
+                  {metrics.healthScore}%
+                </span>
+                .
+              </p>
+            ) : (
+              <p className="mt-1 text-sm text-subtle">
+                <span className="font-bold text-orange-400">
+                  . {metrics.healthScore}%
+                </span>{" "}
+                {t("dashboard.welcome")}
+              </p>
+            )}
           </div>
           <div className="flex items-center gap-6 p-3 border bg-surface-alt/40 rounded-2xl border-line/50">
             <div className="text-right">
@@ -135,7 +145,7 @@ export default function Dashboard() {
                 {t("dashboard.globalSafeBalance")}
               </span>
               <p className="font-mono text-xl font-bold text-green-400">
-                {new Intl.NumberFormat("fr-MA", {
+                {new Intl.NumberFormat(`${locale}-MA`, {
                   style: "currency",
                   currency: "MAD",
                 }).format(safeToSpend)}

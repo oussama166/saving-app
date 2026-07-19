@@ -77,6 +77,7 @@ const fr: Dict = {
   "common.records": "enregistrement(s)",
   "common.confirm": "Confirmer",
   "common.close": "Fermer",
+  "common.month": "Mois",
 
   // Auth
   "auth.loginTitle": "Wealth OS",
@@ -134,6 +135,14 @@ const fr: Dict = {
   "dashboard.portfolioAdvice":
     "Conseil : rééquilibrage du portefeuille recommandé.",
   "dashboard.wealthTools": "Outils de Projection Patrimoniale",
+  "dashboard.minicard.cashflow": "Cash Flow",
+  "dashboard.minicard.cashflow.sub": "Solde mensuel",
+  "dashboard.minicard.emergency": "Fonds d'Urgence",
+  "dashboard.minicard.emergency.sub": "Sécurité financière",
+  "dashboard.minicard.portfolio": "Portefeuille",
+  "dashboard.minicard.portfolio.sub": "Actifs investis",
+  "dashboard.minicard.healthScore": "Score de Santé Financière",
+  "dashboard.minicard.healthScore.sub": "Bien-être financier",
 
   // Historique & Audit
   "historique.newEntry": "Nouvel Enregistrement",
@@ -362,6 +371,7 @@ const en: Dict = {
   "common.records": "record(s)",
   "common.confirm": "Confirm",
   "common.close": "Close",
+  "common.month": "Months",
 
   "auth.loginTitle": "Wealth OS",
   "auth.loginSubtitle": "Sign in to access your space.",
@@ -400,8 +410,7 @@ const en: Dict = {
   "auth.resetPasswordSubmit": "Reset password",
 
   // Email verification
-  "emailVerify.notVerified":
-    "Your email isn't verified yet. Check your inbox.",
+  "emailVerify.notVerified": "Your email isn't verified yet. Check your inbox.",
   "emailVerify.sent": "Verification email sent.",
   "emailVerify.resend": "Resend email",
 
@@ -413,6 +422,14 @@ const en: Dict = {
   "dashboard.systemNominal": "System nominal: spending within targets.",
   "dashboard.portfolioAdvice": "Advice: portfolio rebalancing recommended.",
   "dashboard.wealthTools": "Wealth Projection Tools",
+  "dashboard.minicard.cashflow": "Cash Flow",
+  "dashboard.minicard.emergency": "Emergency Fund",
+  "dashboard.minicard.portfolio": "Portfolio",
+  "dashboard.minicard.healthScore": "Health Score",
+  "dashboard.minicard.cashflow.sub": "Monthly balance",
+  "dashboard.minicard.emergency.sub": "Financial safety",
+  "dashboard.minicard.portfolio.sub": "Invested assets",
+  "dashboard.minicard.healthScore.sub": "Financial wellness",
 
   "historique.newEntry": "New Entry",
   "historique.title": "Full History",
@@ -634,6 +651,7 @@ const es: Dict = {
   "common.records": "registro(s)",
   "common.confirm": "Confirmar",
   "common.close": "Cerrar",
+  "common.month": "Meses",
 
   "auth.loginTitle": "Wealth OS",
   "auth.loginSubtitle": "Inicia sesión para acceder a tu espacio.",
@@ -690,6 +708,14 @@ const es: Dict = {
   "dashboard.portfolioAdvice":
     "Consejo: se recomienda reequilibrar la cartera.",
   "dashboard.wealthTools": "Herramientas de Proyección Patrimonial",
+  "dashboard.minicard.cashflow": "Flujo de Caja",
+  "dashboard.minicard.emergency": "Fondo de Emergencia",
+  "dashboard.minicard.portfolio": "Cartera",
+  "dashboard.minicard.healthScore": "Puntuación de Salud",
+  "dashboard.minicard.cashflow.sub": "Balance mensual",
+  "dashboard.minicard.emergency.sub": "Seguridad financiera",
+  "dashboard.minicard.portfolio.sub": "Activos invertidos",
+  "dashboard.minicard.healthScore.sub": "Bienestar financiero",
 
   "historique.newEntry": "Nuevo Registro",
   "historique.title": "Historial Completo",
@@ -912,6 +938,7 @@ const ar: Dict = {
   "common.records": "سجل",
   "common.confirm": "تأكيد",
   "common.close": "إغلاق",
+  "common.month": "شهر",
 
   "auth.loginTitle": "Wealth OS",
   "auth.loginSubtitle": "سجّل الدخول للوصول إلى مساحتك.",
@@ -964,6 +991,14 @@ const ar: Dict = {
   "dashboard.systemNominal": "الوضع طبيعي: الإنفاق ضمن الحدود المحددة.",
   "dashboard.portfolioAdvice": "نصيحة: يُنصح بإعادة توازن المحفظة.",
   "dashboard.wealthTools": "أدوات توقّع الثروة",
+  "dashboard.minicard.cashflow": "التدفق النقدي",
+  "dashboard.minicard.emergency": "صندوق الطوارئ",
+  "dashboard.minicard.portfolio": "المحفظة",
+  "dashboard.minicard.healthScore": "درجة الصحة",
+  "dashboard.minicard.cashflow.sub": "الرصيد الشهري",
+  "dashboard.minicard.emergency.sub": "الأمان المالي",
+  "dashboard.minicard.portfolio.sub": "الأصول المستثمرة",
+  "dashboard.minicard.healthScore.sub": "الرفاهية المالية",
 
   "historique.newEntry": "إدخال جديد",
   "historique.title": "السجل الكامل",

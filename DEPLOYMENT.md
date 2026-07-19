@@ -14,6 +14,7 @@ git push
 ```
 
 **Important** : si ce dépôt a déjà été poussé sur GitHub, `dev.db` reste visible dans l'historique des anciens commits même après ce nettoyage (un `git rm` n'efface pas l'historique). Deux options :
+
 - Si le dépôt est **privé** et que tu es seul(e) à y avoir accès, c'est un risque faible — tu peux laisser l'historique tel quel.
 - Si tu veux vraiment l'effacer de l'historique, il faut réécrire l'historique (`git filter-repo` ou BFG Repo-Cleaner) puis force-push — dis-le-moi si tu veux qu'on le fasse, c'est une opération plus délicate.
 
@@ -80,23 +81,23 @@ npm run create-admin
 2. Vercel détecte Next.js automatiquement — laisse les réglages par défaut (`npm run build` inclut déjà `prisma generate`).
 3. Avant de déployer, ajoute les variables d'environnement (Project Settings → Environment Variables), pour **Production** et **Preview** :
 
-| Variable | Valeur |
-|---|---|
-| `TURSO_DATABASE_URL` | l'URL récupérée à l'étape 1 |
-| `TURSO_AUTH_TOKEN` | le token récupéré à l'étape 1 |
-| `AUTH_SECRET` | génère avec `openssl rand -base64 32` (distinct de ADMIN_AUTH_SECRET) |
-| `ADMIN_AUTH_SECRET` | génère avec `openssl rand -base64 32` (distinct de AUTH_SECRET) |
-| `RESEND_API_KEY` | ta clé Resend existante |
-| `EMAIL_FROM` | optionnel, sinon `onboarding@resend.dev` |
-| `NEXT_PUBLIC_SITE_URL` | mets l'URL Vercel une fois connue (`https://ton-projet.vercel.app`), puis redeploy |
-| `GOOGLE_GENERATIVE_AI_API_KEY` | ta clé existante |
-| `OPENROUTER_API_KEY` | ta clé existante |
-| `GEOAPIFY_API_KEY` | ta clé existante |
-| `BACKUP_SECRET` | ta valeur existante |
-| `BACKUP_ARCHIVE_MONTHS` | `3` |
-| `GOOGLE_SHEETS_CLIENT_EMAIL` | ta valeur existante |
-| `GOOGLE_SHEETS_PRIVATE_KEY` | ta valeur existante (garde les `\n` échappés) |
-| `GOOGLE_SHEETS_SPREADSHEET_ID` | ta valeur existante |
+| Variable                       | Valeur                                                                             |
+| ------------------------------ | ---------------------------------------------------------------------------------- |
+| `TURSO_DATABASE_URL`           | l'URL récupérée à l'étape 1                                                        |
+| `TURSO_AUTH_TOKEN`             | le token récupéré à l'étape 1                                                      |
+| `AUTH_SECRET`                  | génère avec `openssl rand -base64 32` (distinct de ADMIN_AUTH_SECRET)              |
+| `ADMIN_AUTH_SECRET`            | génère avec `openssl rand -base64 32` (distinct de AUTH_SECRET)                    |
+| `RESEND_API_KEY`               | ta clé Resend existante                                                            |
+| `EMAIL_FROM`                   | optionnel, sinon `onboarding@resend.dev`                                           |
+| `NEXT_PUBLIC_SITE_URL`         | mets l'URL Vercel une fois connue (`https://ton-projet.vercel.app`), puis redeploy |
+| `GOOGLE_GENERATIVE_AI_API_KEY` | ta clé existante                                                                   |
+| `OPENROUTER_API_KEY`           | ta clé existante                                                                   |
+| `GEOAPIFY_API_KEY`             | ta clé existante                                                                   |
+| `BACKUP_SECRET`                | ta valeur existante                                                                |
+| `BACKUP_ARCHIVE_MONTHS`        | `3`                                                                                |
+| `GOOGLE_SHEETS_CLIENT_EMAIL`   | ta valeur existante                                                                |
+| `GOOGLE_SHEETS_PRIVATE_KEY`    | ta valeur existante (garde les `\n` échappés)                                      |
+| `GOOGLE_SHEETS_SPREADSHEET_ID` | ta valeur existante                                                                |
 
 **Ne réutilise pas les mêmes valeurs `AUTH_SECRET`/`ADMIN_AUTH_SECRET` que celles de ton `.env` local** si celui-ci a jamais été partagé — génère des valeurs fraîches pour la prod.
 
