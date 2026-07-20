@@ -6,6 +6,9 @@ import { KeyRound, Copy, Check, RefreshCw, Trash2, Loader2, QrCode, ClipboardCop
 
 const APPLE_PAY_ENDPOINT_HINT = '/api/webhook/apple-pay';
 const SALARY_ENDPOINT_HINT = '/api/webhook/salary';
+const SUBSCRIPTION_PAYMENT_ENDPOINT_HINT = '/api/webhook/subscription-payment';
+const SUBSCRIPTIONS_SYNC_ENDPOINT_HINT = '/api/webhook/subscriptions-sync';
+const SUBSCRIPTIONS_IMPORT_ENDPOINT_HINT = '/api/webhook/subscriptions-import';
 
 function bearerValue(token: string) {
   return `Bearer ${token}`;
@@ -227,6 +230,23 @@ export default function WebhookTokenCard() {
               <code className="text-body-soft">longitude</code> (nombres, pas le texte brut de la variable{' '}
               <span className="text-body-soft">Location</span>). Sans ces deux champs, la transaction reste
               simplement dans &quot;Uncategorized&quot; comme avant.
+            </p>
+            <p>
+              Pour les abonnements : <code className="text-body-soft">{SUBSCRIPTION_PAYMENT_ENDPOINT_HINT}</code>{' '}
+              (body : <code className="text-body-soft">{'{ "name": "Netflix" }'}</code>, <code className="text-body-soft">amount</code>{' '}
+              et <code className="text-body-soft">date</code> optionnels) logue un prélèvement dès qu&apos;un Shortcut
+              détecte la notification bancaire correspondante — l&apos;abonnement doit déjà exister sur cette page.{' '}
+              <code className="text-body-soft">{SUBSCRIPTIONS_SYNC_ENDPOINT_HINT}</code> (body vide) rattrape en une
+              fois tous les abonnements actifs pour le mois en cours, sans attendre un chargement de page. Les deux
+              sont sans effet si le mois est déjà marqué comme prélevé — pas de risque de doublon en rejouant.
+            </p>
+            <p>
+              Pour créer plusieurs abonnements d&apos;un coup (ex: un Shortcut qui scanne tes SMS) :{' '}
+              <code className="text-body-soft">{SUBSCRIPTIONS_IMPORT_ENDPOINT_HINT}</code> — body :{' '}
+              <code className="text-body-soft">{'{ "subscriptions": [{ "name": "Netflix", "price": 75 }] }'}</code>.
+              <code className="text-body-soft">billingDay</code> et <code className="text-body-soft">date</code> sont
+              optionnels (le jour du mois est déduit de la date, ou du jour actuel à défaut). N&apos;ajoute rien si un
+              abonnement du même nom existe déjà — rejouer le même Shortcut plusieurs fois ne duplique rien.
             </p>
           </div>
         </div>

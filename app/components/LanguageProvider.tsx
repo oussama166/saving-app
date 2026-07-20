@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { t as translate, type Locale, DEFAULT_LOCALE, isLocale } from '@/lib/i18n';
+import { t as translate, type Locale, DEFAULT_LOCALE, isLocale, dirFor } from '@/lib/i18n';
 
 const LOCALE_STORAGE_KEY = 'wealth-os-locale';
 
@@ -45,6 +45,18 @@ export function LanguageProvider({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authenticated]);
 
+  // Applique dir="rtl"/lang="ar" (ou l'inverse) directement sur <html> dès
+  // que la locale change côté client — nécessaire dans deux cas que le
+  // rendu serveur seul ne couvre pas : (1) les pages non authentifiées
+  // (login/signup), où la préférence vient de localStorage sans jamais
+  // repasser par le serveur ; (2) le changement instantané pour un compte
+  // connecté, en attendant que router.refresh() (déclenché dans setLocale
+  // ci-dessous) recalcule le rendu serveur avec la nouvelle langue.
+  useEffect(() => {
+    document.documentElement.dir = dirFor(locale);
+    document.documentElement.lang = locale;
+  }, [locale]);
+
   const setLocale = useCallback(
     (next: Locale) => {
       setLocaleState(next);
@@ -85,6 +97,20 @@ export function useLanguage() {
   const ctx = useContext(LanguageContext);
   if (!ctx) throw new Error('useLanguage must be used within a LanguageProvider');
   return ctx;
+}
+
+// Variante non-bloquante pour les composants partagés entre l'app
+// multilingue (TopNav, sous LanguageProvider) et le panel admin
+// (AdminNav, volontairement sans LanguageProvider — voir app/admin/layout.tsx).
+// Retombe sur DEFAULT_LOCALE plutôt que de planter quand le contexte est absent.
+export function useOptionalLanguage(): LanguageContextValue {
+  const ctx = useContext(LanguageContext);
+  if (ctx) return ctx;
+  return {
+    locale: DEFAULT_LOCALE,
+    setLocale: () => {},
+    t: (key: string, fallback?: string) => translate(DEFAULT_LOCALE, key, fallback),
+  };
 }
 
 export { DEFAULT_LOCALE };

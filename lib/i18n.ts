@@ -44,6 +44,15 @@ const fr: Dict = {
   "nav.logout": "Déconnexion",
   "nav.openMenu": "Ouvrir le menu",
   "nav.closeMenu": "Fermer le menu",
+  "nav.group.suivi": "Suivi",
+  "nav.group.patrimoine": "Patrimoine",
+  "nav.group.assistant": "Assistant",
+
+  // Thème
+  "theme.label": "Thème",
+  "theme.light": "Clair",
+  "theme.dark": "Sombre",
+  "theme.system": "Système",
 
   // Commun
   "common.save": "Enregistrer",
@@ -143,6 +152,13 @@ const fr: Dict = {
   "dashboard.minicard.portfolio.sub": "Actifs investis",
   "dashboard.minicard.healthScore": "Score de Santé Financière",
   "dashboard.minicard.healthScore.sub": "Bien-être financier",
+  "dashboard.card1.title": "Detailed Budget",
+  "dashboard.card1.table.colCategory": "CATÉGORIE",
+  "dashboard.card1.table.colAllocation": "ALLOC. %",
+  "dashboard.card1.table.colBudget": "BUDGET (DH)",
+  "dashboard.card1.table.colDepense": "DÉPENSÉ (DH)",
+  "dashboard.card1.table.colRemaining": "RESTE (DH)",
+  "dashboard.card1.table.usedPer": "% UTILISÉ",
 
   // Historique & Audit
   "historique.newEntry": "Nouvel Enregistrement",
@@ -339,6 +355,14 @@ const en: Dict = {
   "nav.logout": "Log out",
   "nav.openMenu": "Open menu",
   "nav.closeMenu": "Close menu",
+  "nav.group.suivi": "Tracking",
+  "nav.group.patrimoine": "Wealth",
+  "nav.group.assistant": "Assistant",
+
+  "theme.label": "Theme",
+  "theme.light": "Light",
+  "theme.dark": "Dark",
+  "theme.system": "System",
 
   "common.save": "Save",
   "common.cancel": "Cancel",
@@ -430,6 +454,13 @@ const en: Dict = {
   "dashboard.minicard.emergency.sub": "Financial safety",
   "dashboard.minicard.portfolio.sub": "Invested assets",
   "dashboard.minicard.healthScore.sub": "Financial wellness",
+  "dashboard.card1.title": "Detailed Budget",
+  "dashboard.card1.table.colCategory": "CATEGORY",
+  "dashboard.card1.table.colAllocation": "ALLOC. %",
+  "dashboard.card1.table.colBudget": "BUDGET (DH)",
+  "dashboard.card1.table.colDepense": "SPENT (DH)",
+  "dashboard.card1.table.colRemaining": "REMAINING (DH)",
+  "dashboard.card1.table.usedPer": "% USED",
 
   "historique.newEntry": "New Entry",
   "historique.title": "Full History",
@@ -619,6 +650,14 @@ const es: Dict = {
   "nav.logout": "Cerrar sesión",
   "nav.openMenu": "Abrir menú",
   "nav.closeMenu": "Cerrar menú",
+  "nav.group.suivi": "Seguimiento",
+  "nav.group.patrimoine": "Patrimonio",
+  "nav.group.assistant": "Asistente",
+
+  "theme.label": "Tema",
+  "theme.light": "Claro",
+  "theme.dark": "Oscuro",
+  "theme.system": "Sistema",
 
   "common.save": "Guardar",
   "common.cancel": "Cancelar",
@@ -716,6 +755,13 @@ const es: Dict = {
   "dashboard.minicard.emergency.sub": "Seguridad financiera",
   "dashboard.minicard.portfolio.sub": "Activos invertidos",
   "dashboard.minicard.healthScore.sub": "Bienestar financiero",
+  "dashboard.card1.title": "Presupuesto Detallado",
+  "dashboard.card1.table.colCategory": "CATEGORÍA",
+  "dashboard.card1.table.colAllocation": "% ASIGNADO",
+  "dashboard.card1.table.colBudget": "PRESUPUESTO (DH)",
+  "dashboard.card1.table.colDepense": "GASTADO (DH)",
+  "dashboard.card1.table.colRemaining": "RESTANTE (DH)",
+  "dashboard.card1.table.usedPer": "% USADO",
 
   "historique.newEntry": "Nuevo Registro",
   "historique.title": "Historial Completo",
@@ -906,6 +952,14 @@ const ar: Dict = {
   "nav.logout": "تسجيل الخروج",
   "nav.openMenu": "فتح القائمة",
   "nav.closeMenu": "إغلاق القائمة",
+  "nav.group.suivi": "المتابعة",
+  "nav.group.patrimoine": "الثروة",
+  "nav.group.assistant": "المساعد",
+
+  "theme.label": "المظهر",
+  "theme.light": "فاتح",
+  "theme.dark": "داكن",
+  "theme.system": "النظام",
 
   "common.save": "حفظ",
   "common.cancel": "إلغاء",
@@ -999,6 +1053,13 @@ const ar: Dict = {
   "dashboard.minicard.emergency.sub": "الأمان المالي",
   "dashboard.minicard.portfolio.sub": "الأصول المستثمرة",
   "dashboard.minicard.healthScore.sub": "الرفاهية المالية",
+  "dashboard.card1.title": "الميزانية التفصيلية",
+  "dashboard.card1.table.colCategory": "الفئة",
+  "dashboard.card1.table.colAllocation": "% المخصص",
+  "dashboard.card1.table.colBudget": "الميزانية (درهم)",
+  "dashboard.card1.table.colDepense": "المصروف (درهم)",
+  "dashboard.card1.table.colRemaining": "المتبقي (درهم)",
+  "dashboard.card1.table.usedPer": "% المستخدم",
 
   "historique.newEntry": "إدخال جديد",
   "historique.title": "السجل الكامل",
@@ -1187,6 +1248,20 @@ export function t(locale: Locale, key: string, fallback?: string): string {
 
 export function isLocale(value: unknown): value is Locale {
   return typeof value === "string" && (LOCALES as string[]).includes(value);
+}
+
+/**
+ * Seul l'arabe est RTL parmi les locales supportées (fr/en/es sont LTR).
+ * Centralisé ici plutôt que de comparer `locale === 'ar'` un peu partout,
+ * pour qu'ajouter une future locale RTL (ex: he, fa) reste un seul endroit
+ * à toucher.
+ */
+export function isRtlLocale(locale: Locale): boolean {
+  return locale === "ar";
+}
+
+export function dirFor(locale: Locale): "rtl" | "ltr" {
+  return isRtlLocale(locale) ? "rtl" : "ltr";
 }
 
 /** Instruction de langue à ajouter aux system prompts des routes Coach IA. */

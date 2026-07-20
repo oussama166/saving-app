@@ -7,7 +7,7 @@ import { ThemeProvider, THEME_INIT_SCRIPT } from "./components/ThemeProvider";
 import { LanguageProvider } from "./components/LanguageProvider";
 import { getSession } from "@/lib/auth";
 import { getUserLocale } from "@/lib/getLocale";
-import { DEFAULT_LOCALE } from "@/lib/i18n";
+import { DEFAULT_LOCALE, dirFor } from "@/lib/i18n";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -37,8 +37,9 @@ export default async function RootLayout({
 
   return (
     <html
-      lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased direction-rtl`}
+      lang={initialLocale}
+      dir={dirFor(initialLocale)}
+      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
       suppressHydrationWarning
     >
       <head>
