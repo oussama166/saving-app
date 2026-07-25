@@ -16,6 +16,7 @@ import ProfileAllocationEditor, {
 import RealBudgetOptimizer from "../components/RealBudgetOptimizer";
 import WebhookTokenCard from "../components/WebhookTokenCard";
 import AccountSecurityCard from "../components/AccountSecurityCard";
+import TwoFactorCard from "../components/TwoFactorCard";
 
 export default function ProfilPage() {
   const [referenceIncome, setReferenceIncome] = useState(10000);
@@ -273,6 +274,8 @@ export default function ProfilPage() {
         </div>
 
         <AccountSecurityCard />
+
+        <TwoFactorCard />
 
         {emailVerified ? (
           <WebhookTokenCard />

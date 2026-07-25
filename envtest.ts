@@ -1,1 +1,3 @@
-console.log("TURSO_DATABASE_URL =", process.env.TURSO_DATABASE_URL);
+// Fichier temporaire de test créé par erreur pendant une vérification — le
+// sandbox n'a pas pu le supprimer (limitation de permissions du montage).
+// Sans danger, safe à supprimer : `rm envtest.ts`

@@ -78,3 +78,36 @@ export const SESSION_COOKIE_OPTIONS = {
   path: "/",
   maxAge: SESSION_TTL_SECONDS,
 };
+
+// Jeton temporaire émis après un mot de passe correct sur un compte avec la
+// 2FA activée (voir app/api/auth/login, app/api/auth/2fa/verify) — PAS un
+// cookie de session, juste une preuve "étape 1 (mot de passe) réussie" à
+// présenter avec le code TOTP/de récupération pour obtenir le vrai cookie de
+// session. `purpose: "2fa-pending"` empêche qu'un jeton de ce type soit
+// confondu avec/accepté comme un vrai SessionPayload par verifySessionToken
+// (types de payload différents), et une TTL courte limite la fenêtre
+// d'exploitation s'il fuit (ex: log, historique navigateur).
+const TWO_FACTOR_CHALLENGE_TTL_SECONDS = 5 * 60; // 5 minutes
+
+export interface TwoFactorChallengePayload {
+  userId: string;
+  purpose: "2fa-pending";
+}
+
+export async function createTwoFactorChallengeToken(userId: string) {
+  return new SignJWT({ userId, purpose: "2fa-pending" })
+    .setProtectedHeader({ alg: "HS256" })
+    .setIssuedAt()
+    .setExpirationTime(`${TWO_FACTOR_CHALLENGE_TTL_SECONDS}s`)
+    .sign(getSecretKey());
+}
+
+export async function verifyTwoFactorChallengeToken(token: string): Promise<string | null> {
+  try {
+    const { payload } = await jwtVerify(token, getSecretKey());
+    if (payload.purpose !== "2fa-pending" || typeof payload.userId !== "string") return null;
+    return payload.userId;
+  } catch {
+    return null;
+  }
+}

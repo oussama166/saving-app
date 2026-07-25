@@ -1,3 +1,3 @@
-import { prisma } from './lib/prisma';
-console.log("resolved TURSO_DATABASE_URL env var:", process.env.TURSO_DATABASE_URL);
-console.log("prisma client constructed:", !!prisma);
+// Fichier temporaire de test créé par erreur pendant une vérification — le
+// sandbox n'a pas pu le supprimer (limitation de permissions du montage).
+// Sans danger, safe à supprimer : `rm envtest2.ts`
