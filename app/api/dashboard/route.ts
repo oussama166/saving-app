@@ -3,12 +3,14 @@ import { prisma } from "@/lib/prisma";
 import { getEnrichedPortfolioAssets } from "@/lib/portfolio";
 import { NEEDS_CATEGORIES } from "@/lib/financials";
 import { requireSession } from "@/lib/auth";
+import { getHouseholdContext } from "@/lib/household";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
     const { userId } = await requireSession();
+    const ctx = await getHouseholdContext(userId);
 
     const now = new Date();
     const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -23,23 +25,23 @@ export async function GET() {
       last3MonthsExpenses,
       portfolio,
     ] = await Promise.all([
-      prisma.account.findMany({ where: { userId, type: "checking" } }),
-      prisma.savingsGoal.findMany({ where: { userId } }),
+      prisma.account.findMany({ where: { userId: { in: ctx.memberIds }, type: "checking" } }),
+      prisma.savingsGoal.findMany({ where: { userId: { in: ctx.memberIds } } }),
       prisma.transaction.findMany({
-        where: { userId, date: { gte: firstDayOfMonth } },
+        where: { userId: { in: ctx.memberIds }, date: { gte: firstDayOfMonth } },
         include: { category: true },
       }),
-      prisma.category.findMany({ where: { userId } }),
-      prisma.userSettings.findUnique({ where: { userId } }),
+      prisma.category.findMany({ where: { userId: ctx.budgetOwnerId } }),
+      prisma.userSettings.findUnique({ where: { userId: ctx.budgetOwnerId } }),
       prisma.transaction.findMany({
-        where: { userId, date: { gte: threeMonthsAgo }, amount: { lt: 0 } },
+        where: { userId: { in: ctx.memberIds }, date: { gte: threeMonthsAgo }, amount: { lt: 0 } },
       }),
-      getEnrichedPortfolioAssets(userId),
+      getEnrichedPortfolioAssets(ctx),
     ]);
 
     // Dettes actives — pour le patrimoine net (actifs - dettes), voir carte
     // Dettes du dashboard et /debts pour le détail.
-    const activeDebts = await prisma.debt.findMany({ where: { userId, isActive: true } });
+    const activeDebts = await prisma.debt.findMany({ where: { userId: { in: ctx.memberIds }, isActive: true } });
     const totalDebts = activeDebts.reduce((acc, d) => acc + d.currentBalance, 0);
 
     // Revenu de référence (page Profil) — fallback si UserSettings n'existe pas encore
@@ -160,7 +162,7 @@ export async function GET() {
     };
 
     const recentTransactions = await prisma.transaction.findMany({
-      where: { userId },
+      where: { userId: { in: ctx.memberIds } },
       take: 10,
       orderBy: { date: "desc" },
       include: {

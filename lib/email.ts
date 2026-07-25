@@ -196,6 +196,35 @@ export async function sendWeeklyDigestEmail(
   });
 }
 
+export async function sendHouseholdInviteEmail(
+  to: string,
+  params: { inviterName: string; token: string },
+): Promise<boolean> {
+  const link = `${getSiteUrl()}/household/accept?token=${encodeURIComponent(params.token)}`;
+  return sendEmail({
+    to,
+    subject: `${params.inviterName} t'invite à partager son budget sur Wealth OS`,
+    html: wrapEmailHtml(
+      'Invitation à un foyer partagé',
+      `
+        <p style="font-size: 14px; line-height: 1.6;">
+          <strong>${params.inviterName}</strong> t'invite à rejoindre son foyer sur Wealth OS : une fois accepté,
+          vous partagez le même budget, les mêmes comptes, transactions, objectifs et abonnements.
+        </p>
+        <p style="margin: 24px 0;">
+          <a href="${link}" style="background: #2563eb; color: white; text-decoration: none; padding: 12px 20px; border-radius: 10px; font-size: 14px; font-weight: 700; display: inline-block;">
+            Rejoindre le foyer
+          </a>
+        </p>
+        <p style="font-size: 12px; color: #64748b;">
+          Ce lien expire dans 7 jours. Si tu n'as pas de compte Wealth OS, crée-en un avec cette adresse email
+          d'abord, puis reviens sur ce lien. Si tu ne connais pas cette personne, ignore simplement cet email.
+        </p>
+      `,
+    ),
+  });
+}
+
 export async function sendPasswordResetEmail(to: string, token: string): Promise<boolean> {
   const link = `${getSiteUrl()}/reset-password?token=${encodeURIComponent(token)}`;
   return sendEmail({

@@ -10,7 +10,13 @@ const PUBLIC_PATHS = ["/login", "/signup"];
 // Pages accessibles sans être connecté, mais PAS redirigées si déjà connecté
 // (un lien de réinitialisation de mot de passe reçu par email doit rester
 // utilisable même si une session est active sur l'appareil).
-const ALWAYS_PUBLIC_PATHS = ["/forgot-password", "/reset-password"];
+// /household/accept doit rester atteignable même sans session (un lien
+// d'invitation par email peut arriver sur un appareil pas encore connecté) —
+// la page elle-même détecte l'état de connexion et affiche "se connecter" /
+// "créer un compte" avec le token préservé dans le lien, plutôt que de
+// dépendre de la redirection ?next= du middleware (qui ne garde pas la
+// query string, voir plus bas).
+const ALWAYS_PUBLIC_PATHS = ["/forgot-password", "/reset-password", "/household/accept"];
 // Préfixes d'API accessibles sans session cookie : l'inscription/connexion
 // elles-mêmes, l'archivage planifié (protégé par son propre header
 // `x-backup-secret` — voir app/api/backup/archive/route.ts), et les webhooks
@@ -23,7 +29,16 @@ const ALWAYS_PUBLIC_PATHS = ["/forgot-password", "/reset-password"];
 // "/api/cron/" suit le même principe que "/api/backup/" (protégé par son
 // propre header `x-cron-secret`, appelé par un job planifié externe —
 // cron-job.org, GitHub Actions... — voir app/api/cron/weekly-digest/route.ts).
-const PUBLIC_API_PREFIXES = ["/api/auth/", "/api/backup/", "/api/webhook/", "/api/cron/"];
+// /api/household/invite-info : lecture seule, aucune donnée sensible
+// (nom de l'invitant + email invité), nécessaire pour afficher la page
+// /household/accept AVANT que le visiteur soit connecté.
+const PUBLIC_API_PREFIXES = [
+  "/api/auth/",
+  "/api/backup/",
+  "/api/webhook/",
+  "/api/cron/",
+  "/api/household/invite-info",
+];
 
 // Espace admin (voir lib/adminAuth.ts) : session totalement séparée de l'auth
 // utilisateur ci-dessus (cookie et secret dédiés). /admin/login et

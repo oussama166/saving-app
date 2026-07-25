@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireSession } from "@/lib/auth";
+import { getHouseholdMemberIds } from "@/lib/household";
 
 // Historique des changements de plan/prix détectés automatiquement par
 // /api/webhook/subscription-payment pour un abonnement donné (voir
@@ -11,7 +12,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     const { userId } = await requireSession();
     const { id } = await params;
 
-    const subscription = await prisma.subscription.findFirst({ where: { id, userId } });
+    const memberIds = await getHouseholdMemberIds(userId);
+    const subscription = await prisma.subscription.findFirst({ where: { id, userId: { in: memberIds } } });
     if (!subscription) {
       return NextResponse.json({ success: false, error: "Abonnement introuvable" }, { status: 404 });
     }

@@ -5,6 +5,7 @@ import { requireSession } from "@/lib/auth";
 import { getUserSettings, getEmergencyFundBalance } from "@/lib/financials";
 import { getEnrichedPortfolioAssets } from "@/lib/portfolio";
 import { computeZakatableWealth } from "@/lib/zakat";
+import { getHouseholdContext } from "@/lib/household";
 
 // Runtime Node explicite : pdfkit utilise des API Node (Buffer, streams,
 // fs pour ses fichiers de polices) incompatibles avec le runtime Edge.
@@ -27,18 +28,22 @@ export async function GET() {
       return NextResponse.json({ success: false, error: "Utilisateur introuvable" }, { status: 404 });
     }
 
-    const { referenceIncome } = await getUserSettings(userId);
+    const ctx = await getHouseholdContext(userId);
+    const { referenceIncome } = await getUserSettings(ctx);
     const now = new Date();
     const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
     const [categories, monthTransactions, savingsGoals, portfolio, emergencyFundBalance, accounts, zakat] =
       await Promise.all([
-        prisma.category.findMany({ where: { userId }, orderBy: { order: "asc" } }),
-        prisma.transaction.findMany({ where: { userId, date: { gte: firstDayOfMonth } }, include: { category: true } }),
-        prisma.savingsGoal.findMany({ where: { userId } }),
-        getEnrichedPortfolioAssets(userId),
-        getEmergencyFundBalance(userId),
-        prisma.account.findMany({ where: { userId } }),
+        prisma.category.findMany({ where: { userId: ctx.budgetOwnerId }, orderBy: { order: "asc" } }),
+        prisma.transaction.findMany({
+          where: { userId: { in: ctx.memberIds }, date: { gte: firstDayOfMonth } },
+          include: { category: true },
+        }),
+        prisma.savingsGoal.findMany({ where: { userId: { in: ctx.memberIds } } }),
+        getEnrichedPortfolioAssets(ctx),
+        getEmergencyFundBalance(ctx),
+        prisma.account.findMany({ where: { userId: { in: ctx.memberIds } } }),
         computeZakatableWealth(userId),
       ]);
 

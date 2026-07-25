@@ -216,7 +216,10 @@ function LoginForm() {
 
           <p className="text-center text-[13px] text-subtle">
             {t('auth.noAccount')}{' '}
-            <Link href="/signup" className="text-blue-400 font-semibold hover:text-blue-300">
+            <Link
+              href={searchParams.get('next') ? `/signup?next=${encodeURIComponent(searchParams.get('next')!)}` : '/signup'}
+              className="text-blue-400 font-semibold hover:text-blue-300"
+            >
               {t('auth.createAccount')}
             </Link>
           </p>

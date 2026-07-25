@@ -5,6 +5,7 @@ import { requireSession } from '@/lib/auth';
 import { notifyRefresh } from '@/lib/sse';
 import { parseBankCsv } from '@/lib/csvImport';
 import { guessCategoryFromMerchantName } from '@/lib/placeCategory';
+import { getHouseholdContext } from '@/lib/household';
 
 const UNCATEGORIZED_NAME = 'Uncategorized';
 const CHUNK_SIZE = 25; // évite un $transaction([...]) trop long sur un gros relevé
@@ -27,11 +28,13 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: false, error: 'Champ "csv" requis (contenu du fichier).' }, { status: 400 });
     }
 
+    const ctx = await getHouseholdContext(userId);
+
     let account = accountId
-      ? await prisma.account.findFirst({ where: { id: accountId, userId } })
-      : await prisma.account.findFirst({ where: { userId, name: 'Main Checking' } });
+      ? await prisma.account.findFirst({ where: { id: accountId, userId: { in: ctx.memberIds } } })
+      : await prisma.account.findFirst({ where: { userId: { in: ctx.memberIds }, name: 'Main Checking' } });
     if (!account) {
-      account = await prisma.account.findFirst({ where: { userId }, orderBy: { createdAt: 'asc' } });
+      account = await prisma.account.findFirst({ where: { userId: { in: ctx.memberIds } }, orderBy: { createdAt: 'asc' } });
     }
     if (!account) {
       account = await prisma.account.create({
@@ -58,7 +61,7 @@ export async function POST(req: Request) {
     const maxDate = new Date(Math.max(...rows.map((r) => r.date.getTime())));
     maxDate.setHours(23, 59, 59, 999);
     const existing = await prisma.transaction.findMany({
-      where: { userId, accountId: account.id, date: { gte: minDate, lte: maxDate } },
+      where: { userId: { in: ctx.memberIds }, accountId: account.id, date: { gte: minDate, lte: maxDate } },
       select: { date: true, amount: true, merchant: true },
     });
     const existingKeys = new Set(existing.map((t) => `${dayKey(t.date)}|${t.amount}|${t.merchant.toLowerCase()}`));
@@ -70,9 +73,9 @@ export async function POST(req: Request) {
     async function resolveCategoryId(categoryName: string): Promise<string> {
       const cached = categoryCache.get(categoryName);
       if (cached) return cached;
-      let category = await prisma.category.findFirst({ where: { userId, name: categoryName } });
+      let category = await prisma.category.findFirst({ where: { userId: ctx.budgetOwnerId, name: categoryName } });
       if (!category) {
-        category = await prisma.category.create({ data: { userId, name: categoryName, type: 'expense' } });
+        category = await prisma.category.create({ data: { userId: ctx.budgetOwnerId, name: categoryName, type: 'expense' } });
       }
       categoryCache.set(categoryName, category.id);
       return category.id;

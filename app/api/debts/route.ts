@@ -1,20 +1,22 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireSession } from '@/lib/auth';
+import { getHouseholdContext } from '@/lib/household';
 
 const DEBT_TYPES = ['credit', 'pret_immo', 'pret_perso', 'autre'];
 
 export async function GET() {
   try {
     const { userId } = await requireSession();
+    const ctx = await getHouseholdContext(userId);
 
     const [debts, accounts] = await Promise.all([
       prisma.debt.findMany({
-        where: { userId },
+        where: { userId: { in: ctx.memberIds } },
         orderBy: [{ isActive: 'desc' }, { createdAt: 'asc' }],
         include: { _count: { select: { payments: true } } },
       }),
-      prisma.account.findMany({ where: { userId }, orderBy: { createdAt: 'asc' } }),
+      prisma.account.findMany({ where: { userId: { in: ctx.memberIds } }, orderBy: { createdAt: 'asc' } }),
     ]);
 
     const totalRemaining = debts.filter((d) => d.isActive).reduce((acc, d) => acc + d.currentBalance, 0);

@@ -2,28 +2,30 @@ import { google } from "@ai-sdk/google";
 import { streamText, convertToModelMessages } from "ai";
 import { prisma } from "@/lib/prisma";
 import { requireSession } from "@/lib/auth";
+import { getHouseholdContext } from "@/lib/household";
 
 export const maxDuration = 30;
 
 export async function POST(req: Request) {
   const { userId } = await requireSession();
   const { messages } = await req.json();
+  const ctx = await getHouseholdContext(userId);
 
   // 1. Gather the user's complete financial state from the database
   const [checkingAccount, savingsGoals, portfolioAssets, recentTransactions] =
     await Promise.all([
       prisma.account.findFirst({
-        where: { userId, name: "Main Checking" },
+        where: { userId: { in: ctx.memberIds }, name: "Main Checking" },
       }),
-      prisma.savingsGoal.findMany({ where: { userId } }),
+      prisma.savingsGoal.findMany({ where: { userId: { in: ctx.memberIds } } }),
       prisma.portfolioAsset.findMany({
-        where: { userId },
+        where: { userId: { in: ctx.memberIds } },
         include: {
           account: { select: { name: true } },
         },
       }),
       prisma.transaction.findMany({
-        where: { userId },
+        where: { userId: { in: ctx.memberIds } },
         take: 10,
         orderBy: { date: "desc" },
         include: {

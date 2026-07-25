@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireSession } from '@/lib/auth';
 import { catchUpSubscriptionCharges, getNextBillingDate } from '@/lib/subscriptions';
+import { getHouseholdContext } from '@/lib/household';
 
 export async function GET() {
   try {
@@ -10,15 +11,16 @@ export async function GET() {
     // Rattrapage des prélèvements manqués avant de renvoyer la liste — voir
     // lib/subscriptions.ts (pas de cron serveur, contrainte hébergement gratuit).
     await catchUpSubscriptionCharges(userId);
+    const ctx = await getHouseholdContext(userId);
 
     const [subscriptions, accounts, categories] = await Promise.all([
       prisma.subscription.findMany({
-        where: { userId },
+        where: { userId: { in: ctx.memberIds } },
         include: { category: true, account: true, _count: { select: { planChanges: true } } },
         orderBy: { billingDay: 'asc' },
       }),
-      prisma.account.findMany({ where: { userId }, orderBy: { createdAt: 'asc' } }),
-      prisma.category.findMany({ where: { userId, type: 'expense' }, orderBy: { order: 'asc' } }),
+      prisma.account.findMany({ where: { userId: { in: ctx.memberIds } }, orderBy: { createdAt: 'asc' } }),
+      prisma.category.findMany({ where: { userId: ctx.budgetOwnerId, type: 'expense' }, orderBy: { order: 'asc' } }),
     ]);
 
     const data = subscriptions.map((sub) => ({
@@ -87,14 +89,18 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: false, error: 'Catégorie requise' }, { status: 400 });
     }
 
-    const category = await prisma.category.findFirst({ where: { id: categoryId, userId } });
+    const ctx = await getHouseholdContext(userId);
+
+    const category = await prisma.category.findFirst({ where: { id: categoryId, userId: ctx.budgetOwnerId } });
     if (!category) {
       return NextResponse.json({ success: false, error: 'Catégorie invalide' }, { status: 400 });
     }
 
-    let account = accountId ? await prisma.account.findFirst({ where: { id: accountId, userId } }) : null;
+    let account = accountId
+      ? await prisma.account.findFirst({ where: { id: accountId, userId: { in: ctx.memberIds } } })
+      : null;
     if (!account) {
-      account = await prisma.account.findFirst({ where: { userId }, orderBy: { createdAt: 'asc' } });
+      account = await prisma.account.findFirst({ where: { userId: { in: ctx.memberIds } }, orderBy: { createdAt: 'asc' } });
     }
     if (!account) {
       return NextResponse.json({ success: false, error: 'Aucun compte disponible' }, { status: 400 });

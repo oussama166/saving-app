@@ -1,18 +1,21 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { UserPlus } from 'lucide-react';
 import Logo from '../components/Logo';
 import PasswordInput from '../components/PasswordInput';
 import { useLanguage } from '../components/LanguageProvider';
 
-export default function SignupPage() {
+function SignupForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { t } = useLanguage();
   const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
+  // Préremplie depuis ?email= (ex: lien "Créer un compte" depuis
+  // /household/accept — l'invitation cible une adresse précise).
+  const [email, setEmail] = useState(searchParams.get('email') ?? '');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -43,7 +46,8 @@ export default function SignupPage() {
         setError(result.error || t('auth.errorSignupFailed'));
         return;
       }
-      router.push('/');
+      const next = searchParams.get('next') || '/';
+      router.push(next);
       router.refresh();
     } catch {
       setError(t('auth.errorNetwork'));
@@ -136,12 +140,23 @@ export default function SignupPage() {
 
           <p className="text-center text-[13px] text-subtle">
             {t('auth.hasAccount')}{' '}
-            <Link href="/login" className="text-blue-400 font-semibold hover:text-blue-300">
+            <Link
+              href={searchParams.get('next') ? `/login?next=${encodeURIComponent(searchParams.get('next')!)}` : '/login'}
+              className="text-blue-400 font-semibold hover:text-blue-300"
+            >
               {t('auth.loginLink')}
             </Link>
           </p>
         </form>
       </div>
     </main>
+  );
+}
+
+export default function SignupPage() {
+  return (
+    <Suspense fallback={null}>
+      <SignupForm />
+    </Suspense>
   );
 }

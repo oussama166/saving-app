@@ -6,19 +6,24 @@ import GoalsTable from '../components/GoalsTable';
 import InterestSimulator from '../components/InterestSimulator';
 import TangerFinancialAdvice from '../components/TangerFinancialAdvice';
 import { requireSession } from '@/lib/auth';
+import { getHouseholdContext } from '@/lib/household';
 
 export const dynamic = 'force-dynamic';
 
 export default async function ObjectifsPage() {
   const { userId } = await requireSession();
+  const ctx = await getHouseholdContext(userId);
   // GoalsTable gère désormais son propre fetch (liste, comptes, catégories,
   // rattrapage des versements auto) côté client — ici on ne garde qu'un
   // agrégat léger pour les conseils Tanger ci-dessous.
   const [goalsAgg, { referenceIncome }, emergencyFundBalance, portfolio] = await Promise.all([
-    prisma.savingsGoal.aggregate({ where: { userId }, _sum: { targetAmount: true, currentAmount: true } }),
-    getUserSettings(userId),
-    getEmergencyFundBalance(userId),
-    getEnrichedPortfolioAssets(userId),
+    prisma.savingsGoal.aggregate({
+      where: { userId: { in: ctx.memberIds } },
+      _sum: { targetAmount: true, currentAmount: true },
+    }),
+    getUserSettings(ctx),
+    getEmergencyFundBalance(ctx),
+    getEnrichedPortfolioAssets(ctx),
   ]);
 
   const totalGoalsTarget = goalsAgg._sum.targetAmount ?? 0;

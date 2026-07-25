@@ -7,22 +7,28 @@ import { requireSession } from '@/lib/auth';
 import { getTransactionsPage } from '@/lib/transactions';
 import { getUserLocale } from '@/lib/getLocale';
 import { t } from '@/lib/i18n';
+import { getHouseholdContext } from '@/lib/household';
 
 export const dynamic = 'force-dynamic';
 
 export default async function SaisiePage() {
   const { userId } = await requireSession();
   const locale = await getUserLocale(userId);
+  const ctx = await getHouseholdContext(userId);
   const [categories, accounts, { transactions, total, summary }] = await Promise.all([
     prisma.category.findMany({
-      where: { userId },
+      where: { userId: ctx.budgetOwnerId },
       orderBy: { name: 'asc' },
       include: {
         subCategories: { orderBy: { name: 'asc' } },
       },
     }),
-    prisma.account.findMany({ where: { userId }, orderBy: { createdAt: 'asc' }, select: { id: true, name: true } }),
-    getTransactionsPage(userId, { limit: 50 }),
+    prisma.account.findMany({
+      where: { userId: { in: ctx.memberIds } },
+      orderBy: { createdAt: 'asc' },
+      select: { id: true, name: true },
+    }),
+    getTransactionsPage(ctx.memberIds, { limit: 50 }),
   ]);
 
   return (

@@ -56,6 +56,11 @@ model User {
   budgetAlertsSent        BudgetAlertSent[]
   debts                   Debt[]
   debtPayments            DebtPayment[]
+
+  // Foyer partagé (voir lib/household.ts) — un utilisateur appartient à au
+  // plus un foyer à la fois (@unique sur userId côté HouseholdMember).
+  householdMembership   HouseholdMember?
+  sentHouseholdInvites  HouseholdInvite[] @relation("HouseholdInvitesSent")
 }
 
 model UserSettings {
@@ -394,4 +399,50 @@ model DebtPayment {
   transactionId String?      @unique
   transaction   Transaction? @relation(fields: [transactionId], references: [id])
   createdAt     DateTime     @default(now())
+}
+
+// Foyer partagé (couple/famille, max 2 membres) — voir lib/household.ts pour
+// toute la logique de résolution. Principe : AUCUNE des tables existantes
+// (Account, Transaction, SavingsGoal, Subscription, Debt...) n'est modifiée —
+// leurs lignes restent attribuées (userId) à qui les a créées, mais les
+// requêtes de lecture s'élargissent à tous les membres du foyer
+// (getHouseholdMemberIds). Seules Category/UserSettings (le "budget") sont
+// redirigées vers un unique propriétaire canonique (isBudgetOwner) plutôt que
+// fusionnées, pour éviter d'avoir deux configurations de budget concurrentes.
+model Household {
+  id        String   @id @default(cuid())
+  name      String?
+  createdAt DateTime @default(now())
+  members   HouseholdMember[]
+  invites   HouseholdInvite[]
+}
+
+model HouseholdMember {
+  id            String    @id @default(cuid())
+  householdId   String
+  household     Household @relation(fields: [householdId], references: [id])
+  userId        String    @unique // un utilisateur n'appartient qu'à un seul foyer à la fois
+  user          User      @relation(fields: [userId], references: [id])
+  // true pour celui qui a créé le foyer — PAS un niveau de droits supérieur
+  // (les deux membres ont des droits strictement égaux sur tout), seulement
+  // le marqueur technique de qui est le "propriétaire budget" canonique dont
+  // les Category/UserSettings sont utilisées par le foyer entier.
+  isBudgetOwner Boolean   @default(false)
+  joinedAt      DateTime  @default(now())
+}
+
+// Invitation par email (voir lib/email.ts) avec token à usage unique. Un
+// foyer complet (2 membres) ne peut plus émettre de nouvelle invitation tant
+// qu'une place ne se libère pas (départ d'un membre).
+model HouseholdInvite {
+  id              String    @id @default(cuid())
+  householdId     String
+  household       Household @relation(fields: [householdId], references: [id])
+  invitedByUserId String
+  invitedBy       User      @relation("HouseholdInvitesSent", fields: [invitedByUserId], references: [id])
+  email           String
+  token           String    @unique
+  status          String    @default("pending") // pending, accepted, cancelled, expired
+  expiresAt       DateTime
+  createdAt       DateTime  @default(now())
 }

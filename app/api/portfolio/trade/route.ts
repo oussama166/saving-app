@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireSession } from '@/lib/auth';
+import { getHouseholdMemberIds } from '@/lib/household';
 
 export async function POST(req: Request) {
   try {
@@ -11,17 +12,18 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
+    const memberIds = await getHouseholdMemberIds(userId);
     const totalValue = shares * pricePerShare;
 
     const result = await prisma.$transaction(async (tx) => {
       const account = await tx.account.findFirst({
-        where: { id: accountId, userId },
+        where: { id: accountId, userId: { in: memberIds } },
       });
 
       if (!account) throw new Error('Account not found');
 
       const existingAsset = await tx.portfolioAsset.findFirst({
-        where: { accountId, tickerSymbol, userId },
+        where: { accountId, tickerSymbol, userId: { in: memberIds } },
       });
 
       if (action === 'BUY') {

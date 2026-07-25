@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { sendWeeklyDigestEmail } from "@/lib/email";
+import { getHouseholdContext } from "@/lib/household";
 
 export interface WeeklyDigestData {
   weekIncome: number;
@@ -19,6 +20,7 @@ export interface WeeklyDigestData {
  * l'avancement des objectifs d'épargne actifs.
  */
 export async function buildWeeklyDigest(userId: string): Promise<WeeklyDigestData | null> {
+  const ctx = await getHouseholdContext(userId);
   const now = new Date();
   const weekAgo = new Date(now);
   weekAgo.setDate(weekAgo.getDate() - 7);
@@ -27,16 +29,16 @@ export async function buildWeeklyDigest(userId: string): Promise<WeeklyDigestDat
   const [weekTransactions, monthExpenseTransactions, categories, userSettings, goals] =
     await Promise.all([
       prisma.transaction.findMany({
-        where: { userId, date: { gte: weekAgo } },
+        where: { userId: { in: ctx.memberIds }, date: { gte: weekAgo } },
         include: { category: true },
       }),
       prisma.transaction.findMany({
-        where: { userId, date: { gte: firstDayOfMonth }, amount: { lt: 0 } },
+        where: { userId: { in: ctx.memberIds }, date: { gte: firstDayOfMonth }, amount: { lt: 0 } },
         include: { category: true },
       }),
-      prisma.category.findMany({ where: { userId, type: "expense" } }),
-      prisma.userSettings.findUnique({ where: { userId } }),
-      prisma.savingsGoal.findMany({ where: { userId } }),
+      prisma.category.findMany({ where: { userId: ctx.budgetOwnerId, type: "expense" } }),
+      prisma.userSettings.findUnique({ where: { userId: ctx.budgetOwnerId } }),
+      prisma.savingsGoal.findMany({ where: { userId: { in: ctx.memberIds } } }),
     ]);
 
   if (weekTransactions.length === 0 && monthExpenseTransactions.length === 0 && goals.length === 0) {
@@ -81,7 +83,7 @@ export async function buildWeeklyDigest(userId: string): Promise<WeeklyDigestDat
   const totalSaved = goals.reduce((acc, g) => acc + g.currentAmount, 0);
   const goalsProgressPct = totalTarget > 0 ? Math.round((totalSaved / totalTarget) * 100) : 0;
   const weekGoalContributions = await prisma.goalContribution.aggregate({
-    where: { userId, date: { gte: weekAgo } },
+    where: { userId: { in: ctx.memberIds }, date: { gte: weekAgo } },
     _sum: { amount: true },
   });
 

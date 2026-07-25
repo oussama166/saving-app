@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireSession } from '@/lib/auth';
 import { catchUpGoalContributions } from '@/lib/goalContributions';
+import { getHouseholdContext } from '@/lib/household';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,11 +15,12 @@ export async function GET() {
     // Rattrapage des versements automatiques manqués avant de renvoyer la
     // liste — voir lib/goalContributions.ts (pas de cron serveur).
     await catchUpGoalContributions(userId);
+    const ctx = await getHouseholdContext(userId);
 
     const [goals, accounts, categories] = await Promise.all([
-      prisma.savingsGoal.findMany({ where: { userId }, orderBy: { createdAt: 'asc' } }),
-      prisma.account.findMany({ where: { userId }, orderBy: { createdAt: 'asc' } }),
-      prisma.category.findMany({ where: { userId, type: { not: 'income' } }, orderBy: { order: 'asc' } }),
+      prisma.savingsGoal.findMany({ where: { userId: { in: ctx.memberIds } }, orderBy: { createdAt: 'asc' } }),
+      prisma.account.findMany({ where: { userId: { in: ctx.memberIds } }, orderBy: { createdAt: 'asc' } }),
+      prisma.category.findMany({ where: { userId: ctx.budgetOwnerId, type: { not: 'income' } }, orderBy: { order: 'asc' } }),
     ]);
 
     return NextResponse.json({
@@ -65,21 +67,23 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: false, error: 'Type d\'objectif invalide' }, { status: 400 });
     }
 
+    const ctx = await getHouseholdContext(userId);
+
     let resolvedAccountId: string | null = null;
     if (accountId) {
-      const account = await prisma.account.findFirst({ where: { id: accountId, userId } });
+      const account = await prisma.account.findFirst({ where: { id: accountId, userId: { in: ctx.memberIds } } });
       if (!account) {
         return NextResponse.json({ success: false, error: 'Compte invalide' }, { status: 400 });
       }
       resolvedAccountId = account.id;
     } else {
-      const firstAccount = await prisma.account.findFirst({ where: { userId }, orderBy: { createdAt: 'asc' } });
+      const firstAccount = await prisma.account.findFirst({ where: { userId: { in: ctx.memberIds } }, orderBy: { createdAt: 'asc' } });
       resolvedAccountId = firstAccount?.id ?? null;
     }
 
     let resolvedCategoryId: string | null = null;
     if (categoryId) {
-      const category = await prisma.category.findFirst({ where: { id: categoryId, userId } });
+      const category = await prisma.category.findFirst({ where: { id: categoryId, userId: ctx.budgetOwnerId } });
       if (!category) {
         return NextResponse.json({ success: false, error: 'Catégorie invalide' }, { status: 400 });
       }

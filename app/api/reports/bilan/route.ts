@@ -8,6 +8,7 @@ import {
   getEmergencyFundBalance,
 } from "@/lib/financials";
 import { getEnrichedPortfolioAssets } from "@/lib/portfolio";
+import { getHouseholdContext } from "@/lib/household";
 
 export const dynamic = "force-dynamic";
 
@@ -43,7 +44,8 @@ export async function GET() {
       );
     }
 
-    const { referenceIncome } = await getUserSettings(userId);
+    const ctx = await getHouseholdContext(userId);
+    const { referenceIncome } = await getUserSettings(ctx);
 
     const now = new Date();
     const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -59,26 +61,26 @@ export async function GET() {
       accounts,
     ] = await Promise.all([
       prisma.category.findMany({
-        where: { userId },
+        where: { userId: ctx.budgetOwnerId },
         orderBy: { order: "asc" },
       }),
       prisma.transaction.findMany({
-        where: { userId, date: { gte: firstDayOfMonth } },
+        where: { userId: { in: ctx.memberIds }, date: { gte: firstDayOfMonth } },
         include: { category: true },
       }),
       prisma.transaction.findMany({
-        where: { userId },
+        where: { userId: { in: ctx.memberIds } },
         include: { category: true, account: true },
         orderBy: { date: "desc" },
       }),
       prisma.savingsGoal.findMany({
-        where: { userId },
+        where: { userId: { in: ctx.memberIds } },
         orderBy: { createdAt: "asc" },
       }),
-      getEnrichedPortfolioAssets(userId),
-      getEmergencyFundBalance(userId),
-      getMonthlyAnalytics(userId, 12),
-      prisma.account.findMany({ where: { userId }, orderBy: { name: "asc" } }),
+      getEnrichedPortfolioAssets(ctx),
+      getEmergencyFundBalance(ctx),
+      getMonthlyAnalytics(ctx, 12),
+      prisma.account.findMany({ where: { userId: { in: ctx.memberIds } }, orderBy: { name: "asc" } }),
     ]);
 
     // ---- Calculs résumé mensuel ----

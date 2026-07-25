@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireWebhookAuth } from "@/lib/webhookAuth";
 import { addManualContribution } from "@/lib/goalContributions";
+import { getHouseholdContext } from "@/lib/household";
 
 // Accepte soit un token de webhook dédié (header `Authorization: Bearer
 // <token>`, généré depuis la page Profil), soit le cookie de session
@@ -26,8 +27,10 @@ export async function POST(req: Request) {
       );
     }
 
+    const ctx = await getHouseholdContext(userId);
+
     let account = await prisma.account.findFirst({
-      where: { userId, name: "Main Checking" },
+      where: { userId: { in: ctx.memberIds }, name: "Main Checking" },
     });
 
     if (!account) {
@@ -47,7 +50,7 @@ export async function POST(req: Request) {
     }
 
     const savingsGoals = await prisma.savingsGoal.findMany({
-      where: { userId, autoAllocatePct: { gt: 0 } },
+      where: { userId: { in: ctx.memberIds }, autoAllocatePct: { gt: 0 } },
     });
 
     // Chaque allocation passe par addManualContribution : crée un

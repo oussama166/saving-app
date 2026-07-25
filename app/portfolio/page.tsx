@@ -4,20 +4,22 @@ import { prisma } from '@/lib/prisma';
 import { getEnrichedPortfolioAssets } from '@/lib/portfolio';
 import { getAverageMonthlyExpenses, getEmergencyFundBalance, getUserSettings } from '@/lib/financials';
 import { requireSession } from '@/lib/auth';
+import { getHouseholdContext } from '@/lib/household';
 
 export const dynamic = 'force-dynamic';
 
 export default async function PortfolioPage() {
   const { userId } = await requireSession();
+  const ctx = await getHouseholdContext(userId);
   const [accounts, portfolio, { referenceIncome, emergencyFundTargetMonths }, emergencyFundBalance] =
     await Promise.all([
-      prisma.account.findMany({ where: { userId }, orderBy: { name: 'asc' } }),
-      getEnrichedPortfolioAssets(userId),
-      getUserSettings(userId),
-      getEmergencyFundBalance(userId),
+      prisma.account.findMany({ where: { userId: { in: ctx.memberIds } }, orderBy: { name: 'asc' } }),
+      getEnrichedPortfolioAssets(ctx),
+      getUserSettings(ctx),
+      getEmergencyFundBalance(ctx),
     ]);
 
-  const avgMonthlyExpenses = await getAverageMonthlyExpenses(userId, referenceIncome);
+  const avgMonthlyExpenses = await getAverageMonthlyExpenses(ctx, referenceIncome);
   const emergencyFundTarget = emergencyFundTargetMonths * avgMonthlyExpenses;
   const emergencyFundMonthsCovered = avgMonthlyExpenses > 0 ? emergencyFundBalance / avgMonthlyExpenses : 0;
 

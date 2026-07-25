@@ -4,6 +4,7 @@ import { notifyRefresh } from "@/lib/sse";
 import { requireWebhookAuth } from "@/lib/webhookAuth";
 import { guessTransactionCategory } from "@/lib/placeCategory";
 import { checkAndSendBudgetAlert } from "@/lib/budgetAlerts";
+import { getHouseholdContext } from "@/lib/household";
 
 // Accepte soit un token de webhook dédié (header `Authorization: Bearer
 // <token>`, généré depuis la page Profil — utilisé par l'iOS Shortcut),
@@ -53,9 +54,11 @@ export async function POST(req: Request) {
       );
     }
 
+    const ctx = await getHouseholdContext(userId);
+
     const result = await prisma.$transaction(async (tx) => {
       let account = await tx.account.findFirst({
-        where: { userId, name: "Main Checking" },
+        where: { userId: { in: ctx.memberIds }, name: "Main Checking" },
       });
 
       if (!account) {
@@ -66,23 +69,23 @@ export async function POST(req: Request) {
 
       let category = placeGuess
         ? await tx.category.findFirst({
-            where: { userId, name: placeGuess.categoryName },
+            where: { userId: ctx.budgetOwnerId, name: placeGuess.categoryName },
           })
         : null;
 
       if (!category) {
         category = await tx.category.findFirst({
-          where: { userId, name: "Uncategorized" },
+          where: { userId: ctx.budgetOwnerId, name: "Uncategorized" },
         });
       }
 
       if (!category) {
         category = await tx.category.create({
-          data: { userId, name: "Uncategorized", type: "expense" },
+          data: { userId: ctx.budgetOwnerId, name: "Uncategorized", type: "expense" },
         });
       }
 
-      const savingsGoals = await tx.savingsGoal.findMany({ where: { userId } });
+      const savingsGoals = await tx.savingsGoal.findMany({ where: { userId: { in: ctx.memberIds } } });
       const totalSavingsLocked = savingsGoals.reduce(
         (acc, goal) => acc + goal.currentAmount,
         0,

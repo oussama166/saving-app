@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireSession } from '@/lib/auth';
+import { getHouseholdContext, getHouseholdMemberIds } from '@/lib/household';
 
 const GOAL_TYPES = ['personnel', 'famille', 'urgence', 'projet'];
 
@@ -26,7 +27,9 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       contributionDay,
     } = body;
 
-    const existing = await prisma.savingsGoal.findFirst({ where: { id, userId } });
+    const ctx = await getHouseholdContext(userId);
+
+    const existing = await prisma.savingsGoal.findFirst({ where: { id, userId: { in: ctx.memberIds } } });
     if (!existing) {
       return NextResponse.json({ success: false, error: 'Objectif introuvable' }, { status: 404 });
     }
@@ -39,7 +42,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     // pour le vider depuis l'UI) — seule une valeur non-null est acceptée ici.
     let resolvedAccountId: string | undefined;
     if (accountId) {
-      const account = await prisma.account.findFirst({ where: { id: accountId, userId } });
+      const account = await prisma.account.findFirst({ where: { id: accountId, userId: { in: ctx.memberIds } } });
       if (!account) {
         return NextResponse.json({ success: false, error: 'Compte invalide' }, { status: 400 });
       }
@@ -51,7 +54,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       if (categoryId === null) {
         resolvedCategoryId = null;
       } else {
-        const category = await prisma.category.findFirst({ where: { id: categoryId, userId } });
+        const category = await prisma.category.findFirst({ where: { id: categoryId, userId: ctx.budgetOwnerId } });
         if (!category) {
           return NextResponse.json({ success: false, error: 'Catégorie invalide' }, { status: 400 });
         }
@@ -123,8 +126,9 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
   try {
     const { userId } = await requireSession();
     const { id } = await params;
+    const memberIds = await getHouseholdMemberIds(userId);
 
-    const existing = await prisma.savingsGoal.findFirst({ where: { id, userId } });
+    const existing = await prisma.savingsGoal.findFirst({ where: { id, userId: { in: memberIds } } });
     if (!existing) {
       return NextResponse.json({ success: false, error: 'Objectif introuvable' }, { status: 404 });
     }

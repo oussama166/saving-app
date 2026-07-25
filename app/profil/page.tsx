@@ -17,6 +17,7 @@ import RealBudgetOptimizer from "../components/RealBudgetOptimizer";
 import WebhookTokenCard from "../components/WebhookTokenCard";
 import AccountSecurityCard from "../components/AccountSecurityCard";
 import TwoFactorCard from "../components/TwoFactorCard";
+import HouseholdCard from "../components/HouseholdCard";
 
 export default function ProfilPage() {
   const [referenceIncome, setReferenceIncome] = useState(10000);
@@ -276,6 +277,8 @@ export default function ProfilPage() {
         <AccountSecurityCard />
 
         <TwoFactorCard />
+
+        <HouseholdCard />
 
         {emailVerified ? (
           <WebhookTokenCard />

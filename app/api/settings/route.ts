@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireSession } from '@/lib/auth';
 import { ensureUserSeeded } from '@/lib/seedDefaults';
+import { getBudgetOwnerUserId } from '@/lib/household';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,11 +18,12 @@ export async function GET() {
     // seed initial a échoué en route, ex: timeout réseau) — voir
     // lib/seedDefaults.ts. No-op si le compte est déjà correctement seedé.
     await ensureUserSeeded(prisma, userId);
+    const budgetOwnerId = await getBudgetOwnerUserId(userId);
 
     const [settings, categories] = await Promise.all([
-      prisma.userSettings.findUnique({ where: { userId } }),
+      prisma.userSettings.findUnique({ where: { userId: budgetOwnerId } }),
       prisma.category.findMany({
-        where: { userId, type: { in: ['expense', 'savings'] } },
+        where: { userId: budgetOwnerId, type: { in: ['expense', 'savings'] } },
         orderBy: { order: 'asc' },
       }),
     ]);
@@ -70,10 +72,12 @@ export async function PUT(req: Request) {
       );
     }
 
-    // Vérifie que toutes les catégories fournies appartiennent bien à
-    // l'utilisateur connecté avant de les mettre à jour.
+    const budgetOwnerId = await getBudgetOwnerUserId(userId);
+
+    // Vérifie que toutes les catégories fournies appartiennent bien au foyer
+    // (propriétaire budget) avant de les mettre à jour.
     const owned = await prisma.category.findMany({
-      where: { userId, id: { in: allocations.map((a) => a.id) } },
+      where: { userId: budgetOwnerId, id: { in: allocations.map((a) => a.id) } },
       select: { id: true },
     });
     if (owned.length !== allocations.length) {
@@ -82,9 +86,9 @@ export async function PUT(req: Request) {
 
     await prisma.$transaction([
       prisma.userSettings.upsert({
-        where: { userId },
+        where: { userId: budgetOwnerId },
         update: { referenceIncome },
-        create: { userId, referenceIncome },
+        create: { userId: budgetOwnerId, referenceIncome },
       }),
       ...allocations.map((a) =>
         prisma.category.update({

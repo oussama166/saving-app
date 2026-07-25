@@ -7,6 +7,7 @@ import { formatYearMonth } from "@/lib/subscriptions";
 import { normalizeMerchantName } from "@/lib/merchantName";
 import { detectPlanChange } from "@/lib/subscriptionPlanChange";
 import { checkAndSendBudgetAlert } from "@/lib/budgetAlerts";
+import { getHouseholdMemberIds } from "@/lib/household";
 
 // Version "temps réel" du rattrapage d'abonnements (voir aussi
 // /api/webhook/subscriptions-sync pour la version "tout le mois d'un
@@ -75,8 +76,9 @@ export async function POST(req: Request) {
     // lib/merchantName.ts), puis on compare en minuscules sur le nom ET le
     // provider (clé catalogue), avec un repli sur une correspondance
     // partielle (inclusion dans un sens ou l'autre).
+    const memberIds = await getHouseholdMemberIds(userId);
     const activeSubs = await prisma.subscription.findMany({
-      where: { userId, isActive: true },
+      where: { userId: { in: memberIds }, isActive: true },
     });
     const cleanedSearchName = normalizeMerchantName(searchName);
     const needle = cleanedSearchName.toLowerCase();
@@ -138,7 +140,7 @@ export async function POST(req: Request) {
     const transactionOps: Prisma.PrismaPromise<unknown>[] = [
       prisma.transaction.create({
         data: {
-          userId,
+          userId: subscription.userId,
           accountId: subscription.accountId,
           categoryId: subscription.categoryId,
           subCategory: subscription.subCategory,
@@ -176,7 +178,7 @@ export async function POST(req: Request) {
         prisma.subscriptionPlanChange.create({
           data: {
             subscriptionId: subscription.id,
-            userId,
+            userId: subscription.userId,
             previousName: detectedPlanChange.previousName,
             newName: detectedPlanChange.newName,
             previousPrice: detectedPlanChange.previousPrice,

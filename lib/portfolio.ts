@@ -1,15 +1,19 @@
 import { prisma } from "@/lib/prisma";
 import yahooFinance from "yahoo-finance2";
+import type { HouseholdContext } from "@/lib/household";
 
 /**
  * Fetches all portfolio assets and enriches them with live market data
  * (falls back to the average buy price if no quote is found — e.g. for
  * tickers not covered by Yahoo Finance). Shared between /api/portfolio/live
  * and /api/dashboard so both compute the portfolio value the same way.
+ *
+ * Actifs attribués (comme les comptes/transactions) : visibles pour tous les
+ * membres du foyer, voir lib/household.ts.
  */
-export async function getEnrichedPortfolioAssets(userId: string) {
+export async function getEnrichedPortfolioAssets(ctx: HouseholdContext) {
   const assets = await prisma.portfolioAsset.findMany({
-    where: { userId },
+    where: { userId: { in: ctx.memberIds } },
     include: {
       account: { select: { name: true } },
     },

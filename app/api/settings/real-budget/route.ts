@@ -3,6 +3,7 @@ import { getRealBudgetSummary } from '@/lib/financials';
 import { requireSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { ensureUserSeeded } from '@/lib/seedDefaults';
+import { getHouseholdContext } from '@/lib/household';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,7 +19,8 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
     const period = searchParams.get('period') === 'all' ? 'all' : 'month';
 
-    const data = await getRealBudgetSummary(userId, period);
+    const ctx = await getHouseholdContext(userId);
+    const data = await getRealBudgetSummary(ctx, period);
     return NextResponse.json({ success: true, data });
   } catch (error) {
     if (error instanceof Error && error.message === 'UNAUTHENTICATED') {
