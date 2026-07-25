@@ -1,5 +1,7 @@
 "use client";
 
+import { useLanguage } from "./LanguageProvider";
+
 interface BudgetDetail {
   categoryName: string;
   allocationPct: number;
@@ -14,8 +16,9 @@ export default function DetailedBudgetTable({
 }: {
   details: BudgetDetail[];
 }) {
+  const { t, locale } = useLanguage();
   const formatMAD = (amt: number) =>
-    new Intl.NumberFormat("fr-MA", {
+    new Intl.NumberFormat(`${locale}-MA`, {
       style: "currency",
       currency: "MAD",
     }).format(amt);
@@ -24,27 +27,40 @@ export default function DetailedBudgetTable({
     <div className="bg-surface-alt/50 border border-line rounded-2xl overflow-hidden">
       <div className="p-4 border-b border-line">
         <h3 className="text-sm font-bold uppercase tracking-widest text-muted">
-          Detailed Budget
+          {t("dashboard.card1.title")}
         </h3>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-left text-xs">
           <thead>
             <tr className="text-subtle border-b border-line/50">
-              <th className="p-4 font-semibold">CATÉGORIE</th>
-              <th className="p-4 font-semibold text-center">ALLOC. %</th>
-              <th className="p-4 font-semibold">BUDGET (DH)</th>
-              <th className="p-4 font-semibold">DÉPENSÉ (DH)</th>
-              <th className="p-4 font-semibold">RESTE (DH)</th>
-              <th className="p-4 font-semibold w-32">% UTILISÉ</th>
+              <th className="p-4 font-semibold truncate rtl:text-right">
+                {t("dashboard.card1.table.colCategory")}
+              </th>
+              <th className="p-4 font-semibold text-center truncate">
+                {t("dashboard.card1.table.colAllocation")}
+              </th>
+              <th className="p-4 font-semibold truncate rtl:text-right">
+                {t("dashboard.card1.table.colBudget")}
+              </th>
+              <th className="p-4 font-semibold truncate rtl:text-right">
+                {t("dashboard.card1.table.colDepense")}
+              </th>
+              <th className="p-4 font-semibold truncate rtl:text-right">
+                {t("dashboard.card1.table.colRemaining")}
+              </th>
+              <th className="p-4 font-semibold w-32 truncate rtl:text-right">
+                {t("dashboard.card1.table.usedPer")}
+              </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-line/30">
             {details.map((row, i) => (
-              <tr key={i} className="hover:bg-surface-strong/20 transition-colors">
-                <td className="p-4 font-bold text-body">
-                  {row.categoryName}
-                </td>
+              <tr
+                key={i}
+                className="hover:bg-surface-strong/20 transition-colors"
+              >
+                <td className="p-4 font-bold text-body">{row.categoryName}</td>
                 <td className="p-4 text-center text-muted">
                   {row.allocationPct}%
                 </td>

@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { notifyRefresh } from '@/lib/sse';
+import { checkAndSendBudgetAlert } from '@/lib/budgetAlerts';
 
 // Pas de cron serveur (contrainte hébergement gratuit) : le "prélèvement"
 // mensuel d'un abonnement est simulé par un rattrapage (catch-up) déclenché
@@ -12,7 +13,7 @@ import { notifyRefresh } from '@/lib/sse';
 
 const MAX_CATCHUP_MONTHS = 36; // garde-fou anti-boucle pour un abonnement oublié très longtemps
 
-function formatYearMonth(year: number, month1to12: number): string {
+export function formatYearMonth(year: number, month1to12: number): string {
   return `${year}-${String(month1to12).padStart(2, '0')}`;
 }
 
@@ -105,8 +106,16 @@ export async function catchUpSubscriptionCharges(userId: string): Promise<number
       const yearMonthKey = formatYearMonth(year, month);
       const amount = -Math.abs(sub.price);
 
-      await prisma.$transaction(async (tx) => {
-        await tx.transaction.create({
+      // $transaction([...]) (forme "batch", pas la forme interactive
+      // `async (tx) => {...}`) : les 3 écritures ne dépendent pas du
+      // résultat les unes des autres, donc pas besoin de callback. La forme
+      // interactive a des soucis de fiabilité connus contre l'adapter
+      // libSQL/Turso à distance (erreurs "TRANSACTION_CLOSED", voir
+      // prisma/prisma#21345) — la forme batch envoie les requêtes groupées
+      // sans dépendre d'une connexion tenue ouverte entre elles, donc plus
+      // robuste ici tout en gardant l'atomicité (les 3 ou aucune).
+      await prisma.$transaction([
+        prisma.transaction.create({
           data: {
             userId: sub.userId,
             accountId: sub.accountId,
@@ -118,16 +127,18 @@ export async function catchUpSubscriptionCharges(userId: string): Promise<number
             date: chargeDate,
             subscriptionId: sub.id,
           },
-        });
-        await tx.account.update({
+        }),
+        prisma.account.update({
           where: { id: sub.accountId },
           data: { balance: { increment: amount } },
-        });
-        await tx.subscription.update({
+        }),
+        prisma.subscription.update({
           where: { id: sub.id },
           data: { lastChargedYearMonth: yearMonthKey },
-        });
-      });
+        }),
+      ]);
+
+      await checkAndSendBudgetAlert(sub.userId, sub.categoryId, chargeDate);
 
       createdCount += 1;
       const next = nextYearMonth(year, month);

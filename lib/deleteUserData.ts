@@ -19,14 +19,21 @@ export async function deleteUserDataInTx(tx: Prisma.TransactionClient, userId: s
   // Ordre : les tables qui référencent Transaction/Category/Account d'abord,
   // puis Category/Account, puis User en dernier. Subscription est supprimée
   // après Transaction (qui peut la référencer via subscriptionId) mais avant
-  // Category/Account (qu'elle référence). GoalContribution référence à la
-  // fois Transaction et SavingsGoal, donc doit partir avant les deux.
+  // Category/Account (qu'elle référence). GoalContribution et DebtPayment
+  // référencent Transaction, donc doivent partir avant elle (DebtPayment
+  // référence aussi Debt, donc avant lui aussi). SubscriptionPlanChange
+  // référence Subscription (RESTRICT), donc doit partir avant elle.
+  // BudgetAlertSent référence Category (RESTRICT), donc avant elle aussi.
   await tx.goalContribution.deleteMany({ where: { userId } });
+  await tx.debtPayment.deleteMany({ where: { userId } });
   await tx.medicalRecord.deleteMany({ where: { userId } });
   await tx.transaction.deleteMany({ where: { userId } });
+  await tx.subscriptionPlanChange.deleteMany({ where: { userId } });
   await tx.subscription.deleteMany({ where: { userId } });
+  await tx.debt.deleteMany({ where: { userId } });
   await tx.portfolioAsset.deleteMany({ where: { userId } });
   await tx.savingsGoal.deleteMany({ where: { userId } });
+  await tx.budgetAlertSent.deleteMany({ where: { userId } });
   await tx.subCategory.deleteMany({ where: { categoryId: { in: categoryIds } } });
   await tx.categoryArchive.deleteMany({ where: { categoryId: { in: categoryIds } } });
   await tx.category.deleteMany({ where: { userId } });

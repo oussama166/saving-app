@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard,
@@ -15,6 +15,9 @@ import {
   Menu,
   X,
   Repeat,
+  ChevronDown,
+  CreditCard,
+  Gem,
 } from "lucide-react";
 import Link from "next/link";
 import ThemeToggle from "./ThemeToggle";
@@ -46,15 +49,159 @@ const navLinks = [
   },
   { key: "nav.sante", icon: <Heart className="w-4 h-4" />, href: "/sante" },
   { key: "nav.coach", icon: <Bot className="w-4 h-4" />, href: "/coach" },
+  { key: "nav.zakat", icon: <Gem className="w-4 h-4" />, href: "/zakat" },
   {
     key: "nav.abonnements",
     icon: <Repeat className="w-4 h-4" />,
     href: "/abonnements",
   },
+  {
+    key: "nav.dettes",
+    icon: <CreditCard className="w-4 h-4" />,
+    href: "/dettes",
+  },
   { key: "nav.profil", icon: <User className="w-4 h-4" />, href: "/profil" },
 ];
 
+// Regroupement de la nav desktop en grandes catégories (menu déroulant au
+// survol/clic) — la liste plate ci-dessus (`navLinks`) reste utilisée telle
+// quelle pour le tiroir mobile, où le survol n'a pas de sens et où l'espace
+// vertical défile déjà librement. But : réduire le nombre d'items visibles
+// d'un coup sur la barre desktop (9 liens à plat -> 2 liens + 3 catégories).
+type DesktopNavItem = { key: string; icon: React.ReactNode; href: string };
+type DesktopNavEntry =
+  | { type: "link"; key: string; icon: React.ReactNode; href: string }
+  | { type: "group"; key: string; icon: React.ReactNode; items: DesktopNavItem[] };
+
+const desktopNav: DesktopNavEntry[] = [
+  { type: "link", key: "nav.dashboard", icon: <LayoutDashboard className="w-4 h-4" />, href: "/" },
+  {
+    type: "group",
+    key: "nav.group.suivi",
+    icon: <ListEnd className="w-4 h-4" />,
+    items: [
+      { key: "nav.saisie", icon: <ListEnd className="w-4 h-4" />, href: "/saisie" },
+      { key: "nav.analyse", icon: <LineChart className="w-4 h-4" />, href: "/analyse" },
+    ],
+  },
+  {
+    type: "group",
+    key: "nav.group.patrimoine",
+    icon: <Briefcase className="w-4 h-4" />,
+    items: [
+      { key: "nav.portfolio", icon: <Briefcase className="w-4 h-4" />, href: "/portfolio" },
+      { key: "nav.objectifs", icon: <Target className="w-4 h-4" />, href: "/objectifs" },
+      { key: "nav.abonnements", icon: <Repeat className="w-4 h-4" />, href: "/abonnements" },
+      { key: "nav.dettes", icon: <CreditCard className="w-4 h-4" />, href: "/dettes" },
+    ],
+  },
+  {
+    type: "group",
+    key: "nav.group.assistant",
+    icon: <Bot className="w-4 h-4" />,
+    items: [
+      { key: "nav.coach", icon: <Bot className="w-4 h-4" />, href: "/coach" },
+      { key: "nav.sante", icon: <Heart className="w-4 h-4" />, href: "/sante" },
+      { key: "nav.zakat", icon: <Gem className="w-4 h-4" />, href: "/zakat" },
+    ],
+  },
+  { type: "link", key: "nav.profil", icon: <User className="w-4 h-4" />, href: "/profil" },
+];
+
 const AUTH_PATHS = ["/login", "/signup", "/forgot-password", "/reset-password"];
+
+function NavGroupDropdown({
+  labelKey,
+  icon,
+  items,
+  pathname,
+  t,
+}: {
+  labelKey: string;
+  icon: React.ReactNode;
+  items: DesktopNavItem[];
+  pathname: string;
+  t: (key: string) => string;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isGroupActive = items.some((item) => pathname === item.href);
+
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (closeTimer.current) clearTimeout(closeTimer.current);
+    };
+  }, []);
+
+  const openNow = () => {
+    if (closeTimer.current) {
+      clearTimeout(closeTimer.current);
+      closeTimer.current = null;
+    }
+    setOpen(true);
+  };
+
+  // Petit délai avant fermeture au survol : laisse le temps au curseur de
+  // passer du bouton déclencheur au panneau du menu sans que ça se referme
+  // entre les deux (sinon impossible d'atteindre les items en diagonale).
+  const closeSoon = () => {
+    closeTimer.current = setTimeout(() => setOpen(false), 150);
+  };
+
+  return (
+    <div className="relative" ref={ref} onMouseEnter={openNow} onMouseLeave={closeSoon}>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        aria-haspopup="true"
+        className={`relative flex items-center gap-2 px-3 py-2 rounded-md transition-all text-[13px] font-medium ${
+          isGroupActive
+            ? "text-blue-400 bg-blue-500/10"
+            : "text-body-soft hover:text-blue-400 hover:bg-surface-alt"
+        }`}
+      >
+        {icon}
+        {t(labelKey)}
+        <ChevronDown className={`w-3.5 h-3.5 transition-transform ${open ? "rotate-180" : ""}`} />
+        {isGroupActive && (
+          <span className="absolute left-2 right-2 -bottom-[1px] h-0.5 rounded-full bg-blue-500" />
+        )}
+      </button>
+
+      {open && (
+        <div className="absolute left-0 mt-1.5 w-56 bg-surface border border-line rounded-xl shadow-2xl overflow-hidden z-50 py-1">
+          {items.map((item) => {
+            const isActive = pathname === item.href;
+            return (
+              <Link
+                key={item.key}
+                href={item.href}
+                onClick={() => setOpen(false)}
+                aria-current={isActive ? "page" : undefined}
+                className={`flex items-center gap-2.5 px-3 py-2.5 text-[13px] font-medium transition-colors ${
+                  isActive ? "text-blue-400 bg-blue-500/10" : "text-body-soft hover:bg-surface-alt"
+                }`}
+              >
+                {item.icon}
+                {t(item.key)}
+              </Link>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function TopNav() {
   const pathname = usePathname();
@@ -115,12 +262,24 @@ export default function TopNav() {
         </Link>
 
         <div className="items-center hidden gap-1 lg:flex">
-          {navLinks.map((link) => {
-            const isActive = pathname === link.href;
+          {desktopNav.map((entry) => {
+            if (entry.type === "group") {
+              return (
+                <NavGroupDropdown
+                  key={entry.key}
+                  labelKey={entry.key}
+                  icon={entry.icon}
+                  items={entry.items}
+                  pathname={pathname}
+                  t={t}
+                />
+              );
+            }
+            const isActive = pathname === entry.href;
             return (
               <Link
-                key={link.key}
-                href={link.href}
+                key={entry.key}
+                href={entry.href}
                 aria-current={isActive ? "page" : undefined}
                 className={`relative flex items-center gap-2 px-3 py-2 rounded-md transition-all text-[13px] font-medium ${
                   isActive
@@ -128,8 +287,8 @@ export default function TopNav() {
                     : "text-body-soft hover:text-blue-400 hover:bg-surface-alt"
                 }`}
               >
-                {link.icon}
-                {t(link.key)}
+                {entry.icon}
+                {t(entry.key)}
                 {isActive && (
                   <span className="absolute left-2 right-2 -bottom-[1px] h-0.5 rounded-full bg-blue-500" />
                 )}

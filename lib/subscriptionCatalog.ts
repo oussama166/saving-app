@@ -190,6 +190,43 @@ export function findCatalogEntry(key: string | null | undefined): SubscriptionCa
   return SUBSCRIPTION_CATALOG.find((e) => e.key === key);
 }
 
+/**
+ * Retrouve une entrée catalogue à partir d'un nom brut (ex: extrait d'un SMS
+ * bancaire) plutôt que de la clé exacte — même logique tolérante que le
+ * matching d'abonnement dans /api/webhook/subscription-payment : exact
+ * d'abord (nom ou clé), puis repli sur une inclusion partielle dans un sens
+ * ou l'autre. `rawName` est comparé déjà nettoyé (voir lib/merchantName.ts)
+ * par l'appelant.
+ */
+export function findCatalogEntryByName(cleanedName: string): SubscriptionCatalogEntry | undefined {
+  const needle = cleanedName.toLowerCase();
+  if (!needle) return undefined;
+  return (
+    SUBSCRIPTION_CATALOG.find((e) => e.name.toLowerCase() === needle || e.key === needle) ??
+    SUBSCRIPTION_CATALOG.find(
+      (e) =>
+        e.name.toLowerCase().includes(needle) ||
+        needle.includes(e.name.toLowerCase()) ||
+        e.key.includes(needle) ||
+        needle.includes(e.key),
+    )
+  );
+}
+
+/**
+ * Trouve, parmi les plans catalogue d'un service, celui dont le prix est le
+ * plus proche d'un montant observé (ex: prélèvement réel reçu par webhook) —
+ * permet de détecter un changement de formule (upgrade/downgrade, ex: Netflix
+ * Standard -> Premium) uniquement à partir du montant, sans que
+ * l'utilisateur ait à préciser le plan. Retourne toujours un plan (celui du
+ * tableau, jamais undefined, puisque `plans` a toujours au moins une entrée).
+ */
+export function findClosestPlan(entry: SubscriptionCatalogEntry, amount: number): SubscriptionPlan {
+  return entry.plans.reduce((closest, plan) =>
+    Math.abs(plan.price - amount) < Math.abs(closest.price - amount) ? plan : closest,
+  entry.plans[0]);
+}
+
 // Classes Tailwind par couleur — regroupées ici plutôt qu'en template string
 // dynamique (`bg-${color}-600/20`) pour que Tailwind détecte statiquement
 // les classes utilisées (le JIT ne scanne pas les templates interpolés).

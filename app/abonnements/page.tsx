@@ -16,6 +16,7 @@ import {
   Sparkles,
   CalendarClock,
   Wallet,
+  History,
 } from "lucide-react";
 import {
   SUBSCRIPTION_CATALOG,
@@ -37,11 +38,21 @@ interface SubscriptionItem {
   accountId: string;
   accountName: string;
   nextBillingDate: string | null;
+  planChangeCount: number;
 }
 
 interface OptionItem {
   id: string;
   name: string;
+}
+
+interface PlanChangeItem {
+  id: string;
+  previousName: string;
+  newName: string;
+  previousPrice: number;
+  newPrice: number;
+  changedAt: string;
 }
 
 const ICONS: Record<SubscriptionCatalogEntry["icon"], typeof Tv> = {
@@ -115,6 +126,9 @@ export default function AbonnementsPage() {
   const [formError, setFormError] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [expandedHistoryId, setExpandedHistoryId] = useState<string | null>(null);
+  const [planHistoryCache, setPlanHistoryCache] = useState<Record<string, PlanChangeItem[]>>({});
+  const [historyLoadingId, setHistoryLoadingId] = useState<string | null>(null);
 
   const load = () => {
     fetch("/api/subscriptions")
@@ -134,6 +148,29 @@ export default function AbonnementsPage() {
   useEffect(() => {
     load();
   }, []);
+
+  // Historique des changements de plan (Standard -> Premium, etc.) détectés
+  // automatiquement par /api/webhook/subscription-payment — chargé à la
+  // demande (pas dans le GET principal) et mis en cache par abonnement pour
+  // éviter de refetch à chaque ouverture/fermeture du panneau.
+  const toggleHistory = (sub: SubscriptionItem) => {
+    if (expandedHistoryId === sub.id) {
+      setExpandedHistoryId(null);
+      return;
+    }
+    setExpandedHistoryId(sub.id);
+    if (planHistoryCache[sub.id]) return;
+    setHistoryLoadingId(sub.id);
+    fetch(`/api/subscriptions/${sub.id}/plan-history`)
+      .then((res) => res.json())
+      .then((result) => {
+        if (result.success) {
+          setPlanHistoryCache((prev) => ({ ...prev, [sub.id]: result.data }));
+        }
+      })
+      .catch((err) => console.error("Plan history fetch error:", err))
+      .finally(() => setHistoryLoadingId(null));
+  };
 
   const openAddForm = () => {
     const defaultCategory = categories.find((c) => c.name === "Tech & Abonnements") ?? categories[0];
@@ -531,83 +568,118 @@ export default function AbonnementsPage() {
             {subscriptions.map((sub) => (
               <div
                 key={sub.id}
-                className={`flex flex-col sm:flex-row sm:items-center gap-4 p-4 border bg-surface rounded-2xl border-line ${
-                  !sub.isActive ? "opacity-50" : ""
-                }`}
+                className={`p-4 border bg-surface rounded-2xl border-line ${!sub.isActive ? "opacity-50" : ""}`}
               >
-                <SubscriptionIcon provider={sub.provider} />
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <p className="font-bold text-ink text-sm">{sub.name}</p>
-                    {!sub.isActive && (
-                      <span className="text-[10px] font-bold uppercase tracking-wide text-muted bg-surface-alt px-1.5 py-0.5 rounded">
-                        Suspendu
-                      </span>
+                <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                  <SubscriptionIcon provider={sub.provider} />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="font-bold text-ink text-sm">{sub.name}</p>
+                      {!sub.isActive && (
+                        <span className="text-[10px] font-bold uppercase tracking-wide text-muted bg-surface-alt px-1.5 py-0.5 rounded">
+                          Suspendu
+                        </span>
+                      )}
+                      {sub.planChangeCount > 0 && (
+                        <button
+                          onClick={() => toggleHistory(sub)}
+                          className={`flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded border transition-colors ${
+                            expandedHistoryId === sub.id
+                              ? "text-blue-400 bg-blue-500/20 border-blue-500/30"
+                              : "text-blue-400 bg-blue-500/10 border-blue-500/20 hover:bg-blue-500/20"
+                          }`}
+                        >
+                          <History className="w-3 h-3" />
+                          Historique ({sub.planChangeCount})
+                        </button>
+                      )}
+                    </div>
+                    <p className="text-xs text-subtle mt-0.5">
+                      {sub.categoryName}
+                      {sub.subCategory ? ` · ${sub.subCategory}` : ""}
+                    </p>
+                    {sub.isActive && sub.nextBillingDate && (
+                      <p className="text-[11px] text-faint mt-1 flex items-center gap-1">
+                        <CalendarClock className="w-3 h-3" />
+                        Prochain prélèvement : {formatDate(sub.nextBillingDate)}
+                      </p>
                     )}
                   </div>
-                  <p className="text-xs text-subtle mt-0.5">
-                    {sub.categoryName}
-                    {sub.subCategory ? ` · ${sub.subCategory}` : ""}
-                  </p>
-                  {sub.isActive && sub.nextBillingDate && (
-                    <p className="text-[11px] text-faint mt-1 flex items-center gap-1">
-                      <CalendarClock className="w-3 h-3" />
-                      Prochain prélèvement : {formatDate(sub.nextBillingDate)}
-                    </p>
-                  )}
-                </div>
-                <div className="flex items-center gap-3 sm:gap-4">
-                  <p className="font-black text-ink text-sm whitespace-nowrap">{sub.price.toFixed(2)} DH</p>
-                  <button
-                    onClick={() => handleToggleActive(sub)}
-                    disabled={busyId === sub.id}
-                    className={`px-2.5 py-1.5 text-[11px] font-bold rounded-lg border transition-colors whitespace-nowrap disabled:opacity-50 ${
-                      sub.isActive
-                        ? "border-line text-body-soft hover:bg-surface-alt"
-                        : "border-emerald-500/20 text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20"
-                    }`}
-                  >
-                    {sub.isActive ? "Suspendre" : "Réactiver"}
-                  </button>
-                  <button
-                    onClick={() => openEditForm(sub)}
-                    className="p-2 border rounded-lg border-line text-body-soft hover:bg-surface-alt transition-colors"
-                    aria-label="Modifier"
-                  >
-                    <Pencil className="w-3.5 h-3.5" />
-                  </button>
-                  {confirmDeleteId === sub.id ? (
-                    <div className="flex items-center gap-1.5">
-                      <button
-                        onClick={() => handleDelete(sub.id)}
-                        disabled={busyId === sub.id}
-                        className="p-2 border rounded-lg border-red-500/20 bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors disabled:opacity-50"
-                        aria-label="Confirmer la suppression"
-                      >
-                        {busyId === sub.id ? (
-                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        ) : (
-                          <Check className="w-3.5 h-3.5" />
-                        )}
-                      </button>
-                      <button
-                        onClick={() => setConfirmDeleteId(null)}
-                        className="p-2 border rounded-lg border-line text-body-soft hover:bg-surface-alt transition-colors"
-                        aria-label="Annuler"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  ) : (
+                  <div className="flex items-center gap-3 sm:gap-4">
+                    <p className="font-black text-ink text-sm whitespace-nowrap">{sub.price.toFixed(2)} DH</p>
                     <button
-                      onClick={() => setConfirmDeleteId(sub.id)}
-                      className="p-2 border rounded-lg border-line text-body-soft hover:bg-red-500/10 hover:text-red-400 hover:border-red-500/20 transition-colors"
-                      aria-label="Supprimer"
+                      onClick={() => handleToggleActive(sub)}
+                      disabled={busyId === sub.id}
+                      className={`px-2.5 py-1.5 text-[11px] font-bold rounded-lg border transition-colors whitespace-nowrap disabled:opacity-50 ${
+                        sub.isActive
+                          ? "border-line text-body-soft hover:bg-surface-alt"
+                          : "border-emerald-500/20 text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20"
+                      }`}
                     >
-                      <Trash2 className="w-3.5 h-3.5" />
+                      {sub.isActive ? "Suspendre" : "Réactiver"}
                     </button>
-                  )}
+                    <button
+                      onClick={() => openEditForm(sub)}
+                      className="p-2 border rounded-lg border-line text-body-soft hover:bg-surface-alt transition-colors"
+                      aria-label="Modifier"
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
+                    </button>
+                    {confirmDeleteId === sub.id ? (
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={() => handleDelete(sub.id)}
+                          disabled={busyId === sub.id}
+                          className="p-2 border rounded-lg border-red-500/20 bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors disabled:opacity-50"
+                          aria-label="Confirmer la suppression"
+                        >
+                          {busyId === sub.id ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          ) : (
+                            <Check className="w-3.5 h-3.5" />
+                          )}
+                        </button>
+                        <button
+                          onClick={() => setConfirmDeleteId(null)}
+                          className="p-2 border rounded-lg border-line text-body-soft hover:bg-surface-alt transition-colors"
+                          aria-label="Annuler"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => setConfirmDeleteId(sub.id)}
+                        className="p-2 border rounded-lg border-line text-body-soft hover:bg-red-500/10 hover:text-red-400 hover:border-red-500/20 transition-colors"
+                        aria-label="Supprimer"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
                 </div>
+
+                {expandedHistoryId === sub.id && (
+                  <div className="mt-3 pt-3 border-t border-line-subtle space-y-1.5">
+                    {historyLoadingId === sub.id && !planHistoryCache[sub.id] ? (
+                      <p className="text-[11px] text-faint flex items-center gap-1.5">
+                        <Loader2 className="w-3 h-3 animate-spin" /> Chargement...
+                      </p>
+                    ) : (planHistoryCache[sub.id]?.length ?? 0) === 0 ? (
+                      <p className="text-[11px] text-faint">Aucun changement enregistré.</p>
+                    ) : (
+                      planHistoryCache[sub.id].map((change) => (
+                        <p key={change.id} className="text-[11px] text-subtle flex items-center gap-1.5 flex-wrap">
+                          <span className="text-faint">{formatDate(change.changedAt)}</span>
+                          <span>
+                            {change.previousName} ({change.previousPrice.toFixed(2)} DH) → {change.newName} (
+                            {change.newPrice.toFixed(2)} DH)
+                          </span>
+                        </p>
+                      ))
+                    )}
+                  </div>
+                )}
               </div>
             ))}
           </div>

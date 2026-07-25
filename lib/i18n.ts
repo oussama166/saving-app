@@ -8,22 +8,22 @@
  * explicite : texte traduit, mise en page inchangée).
  */
 
-export type Locale = "fr" | "ar" | "en" | "es";
+export type Locale = "en" | "es" | "fr" | "ar";
 
-export const LOCALES: Locale[] = ["fr", "ar", "en", "es"];
+export const LOCALES: Locale[] = ["en", "es", "fr", "ar"];
 
 export const LOCALE_LABELS: Record<Locale, string> = {
-  fr: "Français",
-  ar: "العربية",
   en: "English",
   es: "Español",
+  fr: "Français",
+  ar: "العربية",
 };
 
 export const LOCALE_FLAGS: Record<Locale, string> = {
-  fr: "FR",
-  ar: "AR",
   en: "EN",
   es: "ES",
+  fr: "FR",
+  ar: "AR",
 };
 
 export const DEFAULT_LOCALE: Locale = "fr";
@@ -39,11 +39,22 @@ const fr: Dict = {
   "nav.analyse": "Analyse & Trends",
   "nav.sante": "Santé",
   "nav.coach": "Coach IA",
+  "nav.zakat": "Zakat",
   "nav.abonnements": "Abonnements",
+  "nav.dettes": "Dettes & Prêts",
   "nav.profil": "Profil",
   "nav.logout": "Déconnexion",
   "nav.openMenu": "Ouvrir le menu",
   "nav.closeMenu": "Fermer le menu",
+  "nav.group.suivi": "Suivi",
+  "nav.group.patrimoine": "Patrimoine",
+  "nav.group.assistant": "Assistant",
+
+  // Thème
+  "theme.label": "Thème",
+  "theme.light": "Clair",
+  "theme.dark": "Sombre",
+  "theme.system": "Système",
 
   // Commun
   "common.save": "Enregistrer",
@@ -77,6 +88,7 @@ const fr: Dict = {
   "common.records": "enregistrement(s)",
   "common.confirm": "Confirmer",
   "common.close": "Fermer",
+  "common.month": "Mois",
 
   // Auth
   "auth.loginTitle": "Wealth OS",
@@ -134,6 +146,35 @@ const fr: Dict = {
   "dashboard.portfolioAdvice":
     "Conseil : rééquilibrage du portefeuille recommandé.",
   "dashboard.wealthTools": "Outils de Projection Patrimoniale",
+  "dashboard.minicard.cashflow": "Cash Flow",
+  "dashboard.minicard.cashflow.sub": "Solde mensuel",
+  "dashboard.minicard.emergency": "Fonds d'Urgence",
+  "dashboard.minicard.emergency.sub": "Sécurité financière",
+  "dashboard.minicard.portfolio": "Portefeuille",
+  "dashboard.minicard.portfolio.sub": "Actifs investis",
+  "dashboard.minicard.healthScore": "Score de Santé Financière",
+  "dashboard.minicard.healthScore.sub": "Bien-être financier",
+  "dashboard.card1.title": "Detailed Budget",
+  "dashboard.card1.table.colCategory": "CATÉGORIE",
+  "dashboard.card1.table.colAllocation": "ALLOC. %",
+  "dashboard.card1.table.colBudget": "BUDGET (DH)",
+  "dashboard.card1.table.colDepense": "DÉPENSÉ (DH)",
+  "dashboard.card1.table.colRemaining": "RESTE (DH)",
+  "dashboard.card1.table.usedPer": "% UTILISÉ",
+  "dashboard.card2.title": "RULE 50/30/20",
+  "dashboard.card2.sub": "Répartition actuelle",
+  "dashboard.card2.needs": "Besoins (50%)",
+  "dashboard.card2.wants": "Envies (30%)",
+  "dashboard.card2.savings": "Épargne (20%)",
+  "dashboard.card2.target": "Cible : ",
+  "dashboard.card2.idealSplit":
+    "Répartition idéale : 50% Besoins, 30% Style de vie, 20% Objectifs financiers.",
+  "dashboard.card3.capital": "CAPITAL INVESTI",
+  "dashboard.card3.interest": "INTÉRÊTS COMPOSÉS",
+  "dashboard.card3.finalCapital": "CAPITAL FINAL",
+  "dashboard.card4.dca": "DCA Mensuel",
+  "dashboard.card4.horizone": "HORIZON (ANNÉES)",
+  "dashnoard.card4.annualReturn": "RENDEMENT ANNUEL",
 
   // Historique & Audit
   "historique.newEntry": "Nouvel Enregistrement",
@@ -325,11 +366,21 @@ const en: Dict = {
   "nav.analyse": "Analytics & Trends",
   "nav.sante": "Health",
   "nav.coach": "AI Coach",
+  "nav.zakat": "Zakat",
   "nav.abonnements": "Subscriptions",
+  "nav.dettes": "Debts & Loans",
   "nav.profil": "Profile",
   "nav.logout": "Log out",
   "nav.openMenu": "Open menu",
   "nav.closeMenu": "Close menu",
+  "nav.group.suivi": "Tracking",
+  "nav.group.patrimoine": "Wealth",
+  "nav.group.assistant": "Assistant",
+
+  "theme.label": "Theme",
+  "theme.light": "Light",
+  "theme.dark": "Dark",
+  "theme.system": "System",
 
   "common.save": "Save",
   "common.cancel": "Cancel",
@@ -362,6 +413,7 @@ const en: Dict = {
   "common.records": "record(s)",
   "common.confirm": "Confirm",
   "common.close": "Close",
+  "common.month": "Months",
 
   "auth.loginTitle": "Wealth OS",
   "auth.loginSubtitle": "Sign in to access your space.",
@@ -400,8 +452,7 @@ const en: Dict = {
   "auth.resetPasswordSubmit": "Reset password",
 
   // Email verification
-  "emailVerify.notVerified":
-    "Your email isn't verified yet. Check your inbox.",
+  "emailVerify.notVerified": "Your email isn't verified yet. Check your inbox.",
   "emailVerify.sent": "Verification email sent.",
   "emailVerify.resend": "Resend email",
 
@@ -413,6 +464,35 @@ const en: Dict = {
   "dashboard.systemNominal": "System nominal: spending within targets.",
   "dashboard.portfolioAdvice": "Advice: portfolio rebalancing recommended.",
   "dashboard.wealthTools": "Wealth Projection Tools",
+  "dashboard.minicard.cashflow": "Cash Flow",
+  "dashboard.minicard.emergency": "Emergency Fund",
+  "dashboard.minicard.portfolio": "Portfolio",
+  "dashboard.minicard.healthScore": "Health Score",
+  "dashboard.minicard.cashflow.sub": "Monthly balance",
+  "dashboard.minicard.emergency.sub": "Financial safety",
+  "dashboard.minicard.portfolio.sub": "Invested assets",
+  "dashboard.minicard.healthScore.sub": "Financial wellness",
+  "dashboard.card1.title": "Detailed Budget",
+  "dashboard.card1.table.colCategory": "CATEGORY",
+  "dashboard.card1.table.colAllocation": "ALLOC. %",
+  "dashboard.card1.table.colBudget": "BUDGET (DH)",
+  "dashboard.card1.table.colDepense": "SPENT (DH)",
+  "dashboard.card1.table.colRemaining": "REMAINING (DH)",
+  "dashboard.card1.table.usedPer": "% USED",
+  "dashboard.card2.title": "RULE 50/30/20",
+  "dashboard.card2.needs": "Needs (50%)",
+  "dashboard.card2.wants": "Wants (30%)",
+  "dashboard.card2.savings": "Savings (20%)",
+  "dashboard.card2.sub": "Current split",
+  "dashboard.card2.target": "Target: ",
+  "dashboard.card2.idealSplit":
+    "Ideal split: 50% Needs, 30% Lifestyle, 20% Financial Goals.",
+  "dashboard.card3.capital": "INVESTED CAPITAL",
+  "dashboard.card3.interest": "COMPOUND INTEREST",
+  "dashboard.card3.finalCapital": "FINAL CAPITAL",
+  "dashboard.card4.dca": "Monthly DCA",
+  "dashboard.card4.horizone": "HORIZON (YEARS)",
+  "dashboard.card4.annualReturn": "ANNUAL RETURN",
 
   "historique.newEntry": "New Entry",
   "historique.title": "Full History",
@@ -597,11 +677,21 @@ const es: Dict = {
   "nav.analyse": "Análisis y Tendencias",
   "nav.sante": "Salud",
   "nav.coach": "Coach IA",
+  "nav.zakat": "Zakat",
   "nav.abonnements": "Suscripciones",
+  "nav.dettes": "Deudas y Préstamos",
   "nav.profil": "Perfil",
   "nav.logout": "Cerrar sesión",
   "nav.openMenu": "Abrir menú",
   "nav.closeMenu": "Cerrar menú",
+  "nav.group.suivi": "Seguimiento",
+  "nav.group.patrimoine": "Patrimonio",
+  "nav.group.assistant": "Asistente",
+
+  "theme.label": "Tema",
+  "theme.light": "Claro",
+  "theme.dark": "Oscuro",
+  "theme.system": "Sistema",
 
   "common.save": "Guardar",
   "common.cancel": "Cancelar",
@@ -634,6 +724,7 @@ const es: Dict = {
   "common.records": "registro(s)",
   "common.confirm": "Confirmar",
   "common.close": "Cerrar",
+  "common.month": "Meses",
 
   "auth.loginTitle": "Wealth OS",
   "auth.loginSubtitle": "Inicia sesión para acceder a tu espacio.",
@@ -690,6 +781,35 @@ const es: Dict = {
   "dashboard.portfolioAdvice":
     "Consejo: se recomienda reequilibrar la cartera.",
   "dashboard.wealthTools": "Herramientas de Proyección Patrimonial",
+  "dashboard.minicard.cashflow": "Flujo de Caja",
+  "dashboard.minicard.emergency": "Fondo de Emergencia",
+  "dashboard.minicard.portfolio": "Cartera",
+  "dashboard.minicard.healthScore": "Puntuación de Salud",
+  "dashboard.minicard.cashflow.sub": "Balance mensual",
+  "dashboard.minicard.emergency.sub": "Seguridad financiera",
+  "dashboard.minicard.portfolio.sub": "Activos invertidos",
+  "dashboard.minicard.healthScore.sub": "Bienestar financiero",
+  "dashboard.card1.title": "Presupuesto Detallado",
+  "dashboard.card1.table.colCategory": "CATEGORÍA",
+  "dashboard.card1.table.colAllocation": "% ASIGNADO",
+  "dashboard.card1.table.colBudget": "PRESUPUESTO (DH)",
+  "dashboard.card1.table.colDepense": "GASTADO (DH)",
+  "dashboard.card1.table.colRemaining": "RESTANTE (DH)",
+  "dashboard.card1.table.usedPer": "% USADO",
+  "dashboard.card2.title": "REGLA 50/30/20",
+  "dashboard.card2.needs": "Necesidades (50%)",
+  "dashboard.card2.wants": "Deseos (30%)",
+  "dashboard.card2.savings": "Ahorros (20%)",
+  "dashboard.card2.sub": "Distribución actual",
+  "dashboard.card2.target": "Objetivo: ",
+  "dashboard.card2.idealSplit":
+    "Distribución ideal: 50% Necesidades, 30% Estilo de vida, 20% Objetivos Financieros.",
+  "dashboard.card3.capital": "CAPITAL INVERTIDO",
+  "dashboard.card3.interest": "INTERÉS COMPUESTO",
+  "dashboard.card3.finalCapital": "CAPITAL FINAL",
+  "dashboard.card4.dca": "Promedio DCA Mensual",
+  "dashboard.card4.horizone": "HORIZONTE (AÑOS)",
+  "dashboard.card4.annualReturn": "RENDIMIENTO ANUAL",
 
   "historique.newEntry": "Nuevo Registro",
   "historique.title": "Historial Completo",
@@ -875,11 +995,21 @@ const ar: Dict = {
   "nav.analyse": "التحليلات والاتجاهات",
   "nav.sante": "الصحة",
   "nav.coach": "المدرب الذكي",
+  "nav.zakat": "الزكاة",
   "nav.abonnements": "الاشتراكات",
+  "nav.dettes": "الديون والقروض",
   "nav.profil": "الملف الشخصي",
   "nav.logout": "تسجيل الخروج",
   "nav.openMenu": "فتح القائمة",
   "nav.closeMenu": "إغلاق القائمة",
+  "nav.group.suivi": "المتابعة",
+  "nav.group.patrimoine": "الثروة",
+  "nav.group.assistant": "المساعد",
+
+  "theme.label": "المظهر",
+  "theme.light": "فاتح",
+  "theme.dark": "داكن",
+  "theme.system": "النظام",
 
   "common.save": "حفظ",
   "common.cancel": "إلغاء",
@@ -912,6 +1042,7 @@ const ar: Dict = {
   "common.records": "سجل",
   "common.confirm": "تأكيد",
   "common.close": "إغلاق",
+  "common.month": "شهر",
 
   "auth.loginTitle": "Wealth OS",
   "auth.loginSubtitle": "سجّل الدخول للوصول إلى مساحتك.",
@@ -964,6 +1095,35 @@ const ar: Dict = {
   "dashboard.systemNominal": "الوضع طبيعي: الإنفاق ضمن الحدود المحددة.",
   "dashboard.portfolioAdvice": "نصيحة: يُنصح بإعادة توازن المحفظة.",
   "dashboard.wealthTools": "أدوات توقّع الثروة",
+  "dashboard.minicard.cashflow": "التدفق النقدي",
+  "dashboard.minicard.emergency": "صندوق الطوارئ",
+  "dashboard.minicard.portfolio": "المحفظة",
+  "dashboard.minicard.healthScore": "درجة الصحة",
+  "dashboard.minicard.cashflow.sub": "الرصيد الشهري",
+  "dashboard.minicard.emergency.sub": "الأمان المالي",
+  "dashboard.minicard.portfolio.sub": "الأصول المستثمرة",
+  "dashboard.minicard.healthScore.sub": "الرفاهية المالية",
+  "dashboard.card1.title": "الميزانية التفصيلية",
+  "dashboard.card1.table.colCategory": "الفئة",
+  "dashboard.card1.table.colAllocation": "% المخصص",
+  "dashboard.card1.table.colBudget": "الميزانية (درهم)",
+  "dashboard.card1.table.colDepense": "المصروف (درهم)",
+  "dashboard.card1.table.colRemaining": "المتبقي (درهم)",
+  "dashboard.card1.table.usedPer": "% المستخدم",
+  "dashboard.card2.title": "قاعدة 50/30/20",
+  "dashboard.card2.needs": "الاحتياجات (50%)",
+  "dashboard.card2.wants": "الرغبات (30%)",
+  "dashboard.card2.savings": "الادخار (20%)",
+  "dashboard.card2.sub": "التوزيع الحالي",
+  "dashboard.card2.target": "الهدف: ",
+  "dashboard.card2.idealSplit":
+    "التوزيع المثالي: 50% احتياجات، 30% أسلوب حياة، 20% أهداف مالية.",
+  "dashboard.card3.capital": "رأس المال المستثمر",
+  "dashboard.card3.interest": "الفائدة المركبة",
+  "dashboard.card3.finalCapital": "الرأس المال النهائي",
+  "dashboard.card4.dca": "DCA الشهري",
+  "dashboard.card4.horizone": "الأفق (سنوات)",
+  "dashboard.card4.annualReturn": "العائد السنوي",
 
   "historique.newEntry": "إدخال جديد",
   "historique.title": "السجل الكامل",
@@ -1152,6 +1312,20 @@ export function t(locale: Locale, key: string, fallback?: string): string {
 
 export function isLocale(value: unknown): value is Locale {
   return typeof value === "string" && (LOCALES as string[]).includes(value);
+}
+
+/**
+ * Seul l'arabe est RTL parmi les locales supportées (fr/en/es sont LTR).
+ * Centralisé ici plutôt que de comparer `locale === 'ar'` un peu partout,
+ * pour qu'ajouter une future locale RTL (ex: he, fa) reste un seul endroit
+ * à toucher.
+ */
+export function isRtlLocale(locale: Locale): boolean {
+  return locale === "ar";
+}
+
+export function dirFor(locale: Locale): "rtl" | "ltr" {
+  return isRtlLocale(locale) ? "rtl" : "ltr";
 }
 
 /** Instruction de langue à ajouter aux system prompts des routes Coach IA. */

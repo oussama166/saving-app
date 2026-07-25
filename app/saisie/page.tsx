@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import TransactionForm from '@/app/components/TransactionForm';
 import HistoryTable from '@/app/components/HistoryTable';
+import CsvImportPanel from '@/app/components/CsvImportPanel';
 import { Database } from 'lucide-react';
 import { requireSession } from '@/lib/auth';
 import { getTransactionsPage } from '@/lib/transactions';
@@ -12,7 +13,7 @@ export const dynamic = 'force-dynamic';
 export default async function SaisiePage() {
   const { userId } = await requireSession();
   const locale = await getUserLocale(userId);
-  const [categories, { transactions, total, summary }] = await Promise.all([
+  const [categories, accounts, { transactions, total, summary }] = await Promise.all([
     prisma.category.findMany({
       where: { userId },
       orderBy: { name: 'asc' },
@@ -20,6 +21,7 @@ export default async function SaisiePage() {
         subCategories: { orderBy: { name: 'asc' } },
       },
     }),
+    prisma.account.findMany({ where: { userId }, orderBy: { createdAt: 'asc' }, select: { id: true, name: true } }),
     getTransactionsPage(userId, { limit: 50 }),
   ]);
 
@@ -43,6 +45,9 @@ export default async function SaisiePage() {
 
         {/* Manual Entry Form */}
         <TransactionForm categories={categories} />
+
+        {/* Import CSV — alternative aux webhooks iOS pour Android / banques sans notif exploitable */}
+        <CsvImportPanel accounts={accounts} />
 
         {/* History Table */}
         <div className="space-y-4">

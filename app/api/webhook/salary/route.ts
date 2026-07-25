@@ -1,7 +1,7 @@
-import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
-import { requireWebhookAuth } from '@/lib/webhookAuth';
-import { addManualContribution } from '@/lib/goalContributions';
+import { NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
+import { requireWebhookAuth } from "@/lib/webhookAuth";
+import { addManualContribution } from "@/lib/goalContributions";
 
 // Accepte soit un token de webhook dédié (header `Authorization: Bearer
 // <token>`, généré depuis la page Profil), soit le cookie de session
@@ -19,18 +19,25 @@ export async function POST(req: Request) {
     const amount = Number(body?.amount);
     if (!Number.isFinite(amount) || amount <= 0) {
       return NextResponse.json(
-        { error: `Champ "amount" invalide : "${body?.amount}" n'est pas un nombre positif.` },
+        {
+          error: `Champ "amount" invalide : "${body?.amount}" n'est pas un nombre positif.`,
+        },
         { status: 400 },
       );
     }
 
     let account = await prisma.account.findFirst({
-      where: { userId, name: 'Main Checking' },
+      where: { userId, name: "Main Checking" },
     });
 
     if (!account) {
       account = await prisma.account.create({
-        data: { userId, name: 'Main Checking', type: 'checking', balance: amount },
+        data: {
+          userId,
+          name: "Main Checking",
+          type: "checking",
+          balance: amount,
+        },
       });
     } else {
       await prisma.account.update({
@@ -61,10 +68,13 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ success: true, allocated: savingsGoals.length });
   } catch (error) {
-    if (error instanceof Error && error.message === 'UNAUTHENTICATED') {
-      return NextResponse.json({ error: 'Non authentifié' }, { status: 401 });
+    if (error instanceof Error && error.message === "UNAUTHENTICATED") {
+      return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
     }
-    console.error('Salary Webhook Error:', error);
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    console.error("Salary Webhook Error:", error);
+    return NextResponse.json(
+      { error: "Internal Server Error" },
+      { status: 500 },
+    );
   }
 }

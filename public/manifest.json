@@ -1,0 +1,37 @@
+{
+  "name": "Wealth OS - Gestion de patrimoine personnelle",
+  "short_name": "Wealth OS",
+  "description": "Suivi de budget, patrimoine, abonnements, dettes et objectifs d'épargne — application de gestion de patrimoine personnelle.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#131b2c",
+  "theme_color": "#3b82f6",
+  "icons": [
+    {
+      "src": "/logo-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/logo-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/logo-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/logo-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

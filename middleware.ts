@@ -20,7 +20,10 @@ const ALWAYS_PUBLIC_PATHS = ["/forgot-password", "/reset-password"];
 // cookie de session en plus, sinon un appel externe (iOS Shortcut, service
 // tiers) sans navigateur se fait toujours rejeter en 401 avant même
 // d'atteindre le handler de la route.
-const PUBLIC_API_PREFIXES = ["/api/auth/", "/api/backup/", "/api/webhook/"];
+// "/api/cron/" suit le même principe que "/api/backup/" (protégé par son
+// propre header `x-cron-secret`, appelé par un job planifié externe —
+// cron-job.org, GitHub Actions... — voir app/api/cron/weekly-digest/route.ts).
+const PUBLIC_API_PREFIXES = ["/api/auth/", "/api/backup/", "/api/webhook/", "/api/cron/"];
 
 // Espace admin (voir lib/adminAuth.ts) : session totalement séparée de l'auth
 // utilisateur ci-dessus (cookie et secret dédiés). /admin/login et

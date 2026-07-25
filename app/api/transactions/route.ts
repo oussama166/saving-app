@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { notifyRefresh } from '@/lib/sse';
 import { requireSession } from '@/lib/auth';
 import { getTransactionsPage } from '@/lib/transactions';
+import { checkAndSendBudgetAlert } from '@/lib/budgetAlerts';
 
 export async function POST(req: Request) {
   try {
@@ -53,6 +54,12 @@ export async function POST(req: Request) {
     });
 
     notifyRefresh();
+
+    // Après coup, jamais bloquant (voir lib/budgetAlerts.ts) — ne concerne
+    // que les dépenses, une entrée revenu/épargne n'a pas de budget associé.
+    if (type === 'expense') {
+      await checkAndSendBudgetAlert(userId, categoryId, new Date(date));
+    }
 
     return NextResponse.json({ success: true, data: result });
   } catch (error) {
