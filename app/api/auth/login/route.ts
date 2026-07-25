@@ -1,6 +1,12 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { verifyPassword, createSessionToken, SESSION_COOKIE, SESSION_COOKIE_OPTIONS } from '@/lib/auth';
+import {
+  verifyPassword,
+  createSessionToken,
+  createTwoFactorChallengeToken,
+  SESSION_COOKIE,
+  SESSION_COOKIE_OPTIONS,
+} from '@/lib/auth';
 import { getRateLimitKey, isRateLimited, recordFailedAttempt, clearAttempts } from '@/lib/rateLimit';
 
 export async function POST(req: Request) {
@@ -53,6 +59,15 @@ export async function POST(req: Request) {
     }
 
     clearAttempts(rateLimitKey);
+
+    // Mot de passe correct mais 2FA activée : pas de cookie de session tout
+    // de suite — juste un jeton temporaire (5 min) à présenter avec le code
+    // TOTP/de récupération sur /api/auth/2fa/verify pour obtenir la vraie
+    // session. Voir lib/auth.ts (createTwoFactorChallengeToken) pour le détail.
+    if (user.twoFactorEnabled) {
+      const challengeToken = await createTwoFactorChallengeToken(user.id);
+      return NextResponse.json({ success: true, twoFactorRequired: true, challengeToken });
+    }
 
     const token = await createSessionToken({ userId: user.id, email: user.email });
 

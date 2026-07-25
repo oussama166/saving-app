@@ -47,7 +47,13 @@ export async function GET() {
 
     return NextResponse.json({
       success: true,
-      user: { id: user.id, email: user.email, name: user.name, emailVerified: user.emailVerified },
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        emailVerified: user.emailVerified,
+        twoFactorEnabled: user.twoFactorEnabled,
+      },
     });
   } catch (error) {
     console.error('Me Error:', error);

@@ -32,6 +32,16 @@ model User {
   suspendedAt      DateTime?
   suspendedReason  String?
 
+  // Authentification à deux facteurs (TOTP, voir lib/twoFactor.ts) — secret
+  // stocké dès la génération du QR code (setup), mais twoFactorEnabled reste
+  // false tant que l'utilisateur n'a pas confirmé un code valide (évite
+  // qu'un setup abandonné en cours de route verrouille le compte). Les
+  // codes de récupération sont stockés hashés (JSON.stringify d'un tableau
+  // de hash bcrypt), jamais en clair après leur affichage unique à l'écran.
+  twoFactorSecret          String?
+  twoFactorEnabled         Boolean   @default(false)
+  twoFactorRecoveryCodes   String?
+
   settings        UserSettings?
   accounts        Account[]
   categories      Category[]
