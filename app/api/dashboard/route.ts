@@ -37,6 +37,11 @@ export async function GET() {
       getEnrichedPortfolioAssets(userId),
     ]);
 
+    // Dettes actives — pour le patrimoine net (actifs - dettes), voir carte
+    // Dettes du dashboard et /debts pour le détail.
+    const activeDebts = await prisma.debt.findMany({ where: { userId, isActive: true } });
+    const totalDebts = activeDebts.reduce((acc, d) => acc + d.currentBalance, 0);
+
     // Revenu de référence (page Profil) — fallback si UserSettings n'existe pas encore
     const referenceIncome = userSettings?.referenceIncome ?? 10000;
 
@@ -172,6 +177,14 @@ export async function GET() {
           emergencyFundMonths: Number(emergencyFundMonths.toFixed(1)),
           portfolioValue: Math.round(portfolio.globalLiveValue * 100) / 100,
           healthScore,
+        },
+        netWorth: {
+          totalDebts: Math.round(totalDebts * 100) / 100,
+          // Actifs = liquidités (comptes courants) + placements (portfolio) + épargne verrouillée (objectifs) — moins les dettes actives.
+          netWorth:
+            Math.round(
+              (totalCheckingBalance + portfolio.globalLiveValue + totalSavingsLocked - totalDebts) * 100,
+            ) / 100,
         },
         budgetDetails,
         rule503020,

@@ -1,26 +1,26 @@
-'use client';
+"use client";
 
-import { useChat } from '@ai-sdk/react';
-import { useState, useRef, useEffect } from 'react';
-import ReactMarkdown from 'react-markdown';
+import { useChat } from "@ai-sdk/react";
+import { useState, useRef, useEffect } from "react";
+import ReactMarkdown from "react-markdown";
 
 export default function FinanceAgent() {
   const { messages, sendMessage, status, error } = useChat();
-  
-  const [input, setInput] = useState('');
+
+  const [input, setInput] = useState("");
   const [isOpen, setIsOpen] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const isLoading = status === 'submitted' || status === 'streaming';
+  const isLoading = status === "submitted" || status === "streaming";
 
   // Listen for real-time webhook events
   useEffect(() => {
-    const eventSource = new EventSource('/api/events');
-    
+    const eventSource = new EventSource("/api/events");
+
     eventSource.onmessage = (event) => {
-      if (event.data === 'refresh') {
-        console.log('[SSE] Webhook detected in FinanceAgent');
+      if (event.data === "refresh") {
+        console.log("[SSE] Webhook detected in FinanceAgent");
         // Optional: Trigger a refresh or show a toast
       }
     };
@@ -35,9 +35,9 @@ export default function FinanceAgent() {
       const { scrollTop, scrollHeight, clientHeight } = container;
       // If user is within 100px of the bottom, snap to bottom
       const isNearBottom = scrollHeight - scrollTop - clientHeight < 100;
-      
+
       if (isNearBottom) {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
       }
     }
   }, [messages, isOpen]);
@@ -51,13 +51,13 @@ export default function FinanceAgent() {
     if (!input.trim() || isLoading) return;
 
     const messageToSend = input;
-    setInput('');
-    
+    setInput("");
+
     try {
       await sendMessage({ text: messageToSend });
     } catch (err) {
-      console.error('Failed to send message:', err);
-      setInput(messageToSend); 
+      console.error("Failed to send message:", err);
+      setInput(messageToSend);
     }
   };
 
@@ -69,18 +69,40 @@ export default function FinanceAgent() {
         className="bg-blue-600 text-white p-4 rounded-full shadow-lg transition-all transform hover:scale-105 flex items-center justify-center min-w-[60px]"
       >
         {isOpen ? (
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            className="h-6 w-6"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M6 18L18 6M6 6l12 12"
+            />
           </svg>
         ) : (
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            className="h-6 w-6"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"
+            />
           </svg>
         )}
       </button>
 
       {isOpen && (
-        <div className="fixed sm:absolute inset-x-4 bottom-20 sm:inset-x-auto sm:right-0 w-auto sm:w-80 md:w-96 max-w-full bg-white rounded-2xl shadow-2xl border border-gray-100 flex flex-col overflow-hidden animate-in slide-in-from-bottom-4 duration-300">
+        <div className="fixed sm:absolute inset-x-4 bottom-20 sm:inset-x-auto sm:right-0 w-4xl sm:w-80 md:w-96  bg-white rounded-2xl shadow-2xl border border-gray-100 flex flex-col overflow-hidden animate-in slide-in-from-bottom-4 duration-300">
           <div className="bg-blue-600 p-4 text-white">
             <h3 className="font-bold">Pro Finance Agent</h3>
             <p className="text-xs opacity-80">AI-Powered Financial Insights</p>
@@ -90,26 +112,38 @@ export default function FinanceAgent() {
           <div className="flex-1 max-h-[60vh] sm:max-h-[600px] overflow-y-scroll p-4 space-y-4 bg-gray-50">
             {messages.length === 0 && (
               <div className="text-center py-8">
-                <p className="text-sm text-gray-500">Ask me anything about your finances!</p>
+                <p className="text-sm text-gray-500">
+                  Ask me anything about your finances!
+                </p>
               </div>
             )}
             {messages.map((m) => (
-              <div key={m.id} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+              <div
+                key={m.id}
+                className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}
+              >
                 <div
                   className={`max-w-[90%] p-3 rounded-2xl text-sm shadow-sm ${
-                    m.role === 'user'
-                      ? 'bg-blue-600 text-white rounded-tr-none'
-                      : 'bg-white text-gray-800 border border-gray-100 rounded-tl-none'
+                    m.role === "user"
+                      ? "bg-blue-600 text-white rounded-tr-none"
+                      : "bg-white text-gray-800 border border-gray-100 rounded-tl-none"
                   }`}
                 >
-                  <div className={`prose prose-sm max-w-none ${m.role === 'user' ? 'prose-invert' : ''}`}>
+                  <div
+                    className={`prose prose-sm max-w-none ${m.role === "user" ? "prose-invert" : ""}`}
+                  >
                     {m.parts.map((part, i) => {
                       switch (part.type) {
-                        case 'text':
-                          return <ReactMarkdown key={i}>{part.text}</ReactMarkdown>;
-                        case 'reasoning':
+                        case "text":
                           return (
-                            <div key={i} className="text-xs opacity-60 italic mb-2 border-l-2 border-gray-200 pl-2">
+                            <ReactMarkdown key={i}>{part.text}</ReactMarkdown>
+                          );
+                        case "reasoning":
+                          return (
+                            <div
+                              key={i}
+                              className="text-xs opacity-60 italic mb-2 border-l-2 border-gray-200 pl-2"
+                            >
                               {part.text}
                             </div>
                           );
@@ -140,8 +174,8 @@ export default function FinanceAgent() {
             <div ref={messagesEndRef} />
           </div>
 
-          <form 
-            onSubmit={handleSubmit} 
+          <form
+            onSubmit={handleSubmit}
             className="p-4 bg-white border-t border-gray-100"
           >
             <div className="flex gap-2">

@@ -8,22 +8,22 @@
  * explicite : texte traduit, mise en page inchangée).
  */
 
-export type Locale = "fr" | "ar" | "en" | "es";
+export type Locale = "en" | "es" | "fr" | "ar";
 
-export const LOCALES: Locale[] = ["fr", "ar", "en", "es"];
+export const LOCALES: Locale[] = ["en", "es", "fr", "ar"];
 
 export const LOCALE_LABELS: Record<Locale, string> = {
-  fr: "Français",
-  ar: "العربية",
   en: "English",
   es: "Español",
+  fr: "Français",
+  ar: "العربية",
 };
 
 export const LOCALE_FLAGS: Record<Locale, string> = {
-  fr: "FR",
-  ar: "AR",
   en: "EN",
   es: "ES",
+  fr: "FR",
+  ar: "AR",
 };
 
 export const DEFAULT_LOCALE: Locale = "fr";
@@ -39,7 +39,9 @@ const fr: Dict = {
   "nav.analyse": "Analyse & Trends",
   "nav.sante": "Santé",
   "nav.coach": "Coach IA",
+  "nav.zakat": "Zakat",
   "nav.abonnements": "Abonnements",
+  "nav.dettes": "Dettes & Prêts",
   "nav.profil": "Profil",
   "nav.logout": "Déconnexion",
   "nav.openMenu": "Ouvrir le menu",
@@ -159,6 +161,20 @@ const fr: Dict = {
   "dashboard.card1.table.colDepense": "DÉPENSÉ (DH)",
   "dashboard.card1.table.colRemaining": "RESTE (DH)",
   "dashboard.card1.table.usedPer": "% UTILISÉ",
+  "dashboard.card2.title": "RULE 50/30/20",
+  "dashboard.card2.sub": "Répartition actuelle",
+  "dashboard.card2.needs": "Besoins (50%)",
+  "dashboard.card2.wants": "Envies (30%)",
+  "dashboard.card2.savings": "Épargne (20%)",
+  "dashboard.card2.target": "Cible : ",
+  "dashboard.card2.idealSplit":
+    "Répartition idéale : 50% Besoins, 30% Style de vie, 20% Objectifs financiers.",
+  "dashboard.card3.capital": "CAPITAL INVESTI",
+  "dashboard.card3.interest": "INTÉRÊTS COMPOSÉS",
+  "dashboard.card3.finalCapital": "CAPITAL FINAL",
+  "dashboard.card4.dca": "DCA Mensuel",
+  "dashboard.card4.horizone": "HORIZON (ANNÉES)",
+  "dashnoard.card4.annualReturn": "RENDEMENT ANNUEL",
 
   // Historique & Audit
   "historique.newEntry": "Nouvel Enregistrement",
@@ -350,7 +366,9 @@ const en: Dict = {
   "nav.analyse": "Analytics & Trends",
   "nav.sante": "Health",
   "nav.coach": "AI Coach",
+  "nav.zakat": "Zakat",
   "nav.abonnements": "Subscriptions",
+  "nav.dettes": "Debts & Loans",
   "nav.profil": "Profile",
   "nav.logout": "Log out",
   "nav.openMenu": "Open menu",
@@ -461,6 +479,20 @@ const en: Dict = {
   "dashboard.card1.table.colDepense": "SPENT (DH)",
   "dashboard.card1.table.colRemaining": "REMAINING (DH)",
   "dashboard.card1.table.usedPer": "% USED",
+  "dashboard.card2.title": "RULE 50/30/20",
+  "dashboard.card2.needs": "Needs (50%)",
+  "dashboard.card2.wants": "Wants (30%)",
+  "dashboard.card2.savings": "Savings (20%)",
+  "dashboard.card2.sub": "Current split",
+  "dashboard.card2.target": "Target: ",
+  "dashboard.card2.idealSplit":
+    "Ideal split: 50% Needs, 30% Lifestyle, 20% Financial Goals.",
+  "dashboard.card3.capital": "INVESTED CAPITAL",
+  "dashboard.card3.interest": "COMPOUND INTEREST",
+  "dashboard.card3.finalCapital": "FINAL CAPITAL",
+  "dashboard.card4.dca": "Monthly DCA",
+  "dashboard.card4.horizone": "HORIZON (YEARS)",
+  "dashboard.card4.annualReturn": "ANNUAL RETURN",
 
   "historique.newEntry": "New Entry",
   "historique.title": "Full History",
@@ -645,7 +677,9 @@ const es: Dict = {
   "nav.analyse": "Análisis y Tendencias",
   "nav.sante": "Salud",
   "nav.coach": "Coach IA",
+  "nav.zakat": "Zakat",
   "nav.abonnements": "Suscripciones",
+  "nav.dettes": "Deudas y Préstamos",
   "nav.profil": "Perfil",
   "nav.logout": "Cerrar sesión",
   "nav.openMenu": "Abrir menú",
@@ -762,6 +796,20 @@ const es: Dict = {
   "dashboard.card1.table.colDepense": "GASTADO (DH)",
   "dashboard.card1.table.colRemaining": "RESTANTE (DH)",
   "dashboard.card1.table.usedPer": "% USADO",
+  "dashboard.card2.title": "REGLA 50/30/20",
+  "dashboard.card2.needs": "Necesidades (50%)",
+  "dashboard.card2.wants": "Deseos (30%)",
+  "dashboard.card2.savings": "Ahorros (20%)",
+  "dashboard.card2.sub": "Distribución actual",
+  "dashboard.card2.target": "Objetivo: ",
+  "dashboard.card2.idealSplit":
+    "Distribución ideal: 50% Necesidades, 30% Estilo de vida, 20% Objetivos Financieros.",
+  "dashboard.card3.capital": "CAPITAL INVERTIDO",
+  "dashboard.card3.interest": "INTERÉS COMPUESTO",
+  "dashboard.card3.finalCapital": "CAPITAL FINAL",
+  "dashboard.card4.dca": "Promedio DCA Mensual",
+  "dashboard.card4.horizone": "HORIZONTE (AÑOS)",
+  "dashboard.card4.annualReturn": "RENDIMIENTO ANUAL",
 
   "historique.newEntry": "Nuevo Registro",
   "historique.title": "Historial Completo",
@@ -947,7 +995,9 @@ const ar: Dict = {
   "nav.analyse": "التحليلات والاتجاهات",
   "nav.sante": "الصحة",
   "nav.coach": "المدرب الذكي",
+  "nav.zakat": "الزكاة",
   "nav.abonnements": "الاشتراكات",
+  "nav.dettes": "الديون والقروض",
   "nav.profil": "الملف الشخصي",
   "nav.logout": "تسجيل الخروج",
   "nav.openMenu": "فتح القائمة",
@@ -1060,6 +1110,20 @@ const ar: Dict = {
   "dashboard.card1.table.colDepense": "المصروف (درهم)",
   "dashboard.card1.table.colRemaining": "المتبقي (درهم)",
   "dashboard.card1.table.usedPer": "% المستخدم",
+  "dashboard.card2.title": "قاعدة 50/30/20",
+  "dashboard.card2.needs": "الاحتياجات (50%)",
+  "dashboard.card2.wants": "الرغبات (30%)",
+  "dashboard.card2.savings": "الادخار (20%)",
+  "dashboard.card2.sub": "التوزيع الحالي",
+  "dashboard.card2.target": "الهدف: ",
+  "dashboard.card2.idealSplit":
+    "التوزيع المثالي: 50% احتياجات، 30% أسلوب حياة، 20% أهداف مالية.",
+  "dashboard.card3.capital": "رأس المال المستثمر",
+  "dashboard.card3.interest": "الفائدة المركبة",
+  "dashboard.card3.finalCapital": "الرأس المال النهائي",
+  "dashboard.card4.dca": "DCA الشهري",
+  "dashboard.card4.horizone": "الأفق (سنوات)",
+  "dashboard.card4.annualReturn": "العائد السنوي",
 
   "historique.newEntry": "إدخال جديد",
   "historique.title": "السجل الكامل",

@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { notifyRefresh } from '@/lib/sse';
+import { checkAndSendBudgetAlert } from '@/lib/budgetAlerts';
 
 // Pas de cron serveur (contrainte hébergement gratuit) : le "prélèvement"
 // mensuel d'un abonnement est simulé par un rattrapage (catch-up) déclenché
@@ -136,6 +137,8 @@ export async function catchUpSubscriptionCharges(userId: string): Promise<number
           data: { lastChargedYearMonth: yearMonthKey },
         }),
       ]);
+
+      await checkAndSendBudgetAlert(sub.userId, sub.categoryId, chargeDate);
 
       createdCount += 1;
       const next = nextYearMonth(year, month);

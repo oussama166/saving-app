@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { notifyRefresh } from "@/lib/sse";
 import { requireWebhookAuth } from "@/lib/webhookAuth";
 import { guessTransactionCategory } from "@/lib/placeCategory";
+import { checkAndSendBudgetAlert } from "@/lib/budgetAlerts";
 
 // Accepte soit un token de webhook dédié (header `Authorization: Bearer
 // <token>`, généré depuis la page Profil — utilisé par l'iOS Shortcut),
@@ -124,6 +125,12 @@ export async function POST(req: Request) {
 
       return { transaction, isRejected };
     });
+
+    // Après coup, jamais bloquant — voir lib/budgetAlerts.ts. Compte même si
+    // isRejected=true : la transaction est réellement créée dans les deux
+    // cas (seul le solde du compte n'est pas débité si rejetée), donc elle
+    // pèse bien sur le budget de la catégorie.
+    await checkAndSendBudgetAlert(userId, result.transaction.categoryId, result.transaction.date);
 
     if (result.isRejected) {
       notifyRefresh();

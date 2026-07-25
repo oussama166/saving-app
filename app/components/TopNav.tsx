@@ -16,6 +16,8 @@ import {
   X,
   Repeat,
   ChevronDown,
+  CreditCard,
+  Gem,
 } from "lucide-react";
 import Link from "next/link";
 import ThemeToggle from "./ThemeToggle";
@@ -47,10 +49,16 @@ const navLinks = [
   },
   { key: "nav.sante", icon: <Heart className="w-4 h-4" />, href: "/sante" },
   { key: "nav.coach", icon: <Bot className="w-4 h-4" />, href: "/coach" },
+  { key: "nav.zakat", icon: <Gem className="w-4 h-4" />, href: "/zakat" },
   {
     key: "nav.abonnements",
     icon: <Repeat className="w-4 h-4" />,
     href: "/abonnements",
+  },
+  {
+    key: "nav.dettes",
+    icon: <CreditCard className="w-4 h-4" />,
+    href: "/dettes",
   },
   { key: "nav.profil", icon: <User className="w-4 h-4" />, href: "/profil" },
 ];
@@ -84,6 +92,7 @@ const desktopNav: DesktopNavEntry[] = [
       { key: "nav.portfolio", icon: <Briefcase className="w-4 h-4" />, href: "/portfolio" },
       { key: "nav.objectifs", icon: <Target className="w-4 h-4" />, href: "/objectifs" },
       { key: "nav.abonnements", icon: <Repeat className="w-4 h-4" />, href: "/abonnements" },
+      { key: "nav.dettes", icon: <CreditCard className="w-4 h-4" />, href: "/dettes" },
     ],
   },
   {
@@ -93,6 +102,7 @@ const desktopNav: DesktopNavEntry[] = [
     items: [
       { key: "nav.coach", icon: <Bot className="w-4 h-4" />, href: "/coach" },
       { key: "nav.sante", icon: <Heart className="w-4 h-4" />, href: "/sante" },
+      { key: "nav.zakat", icon: <Gem className="w-4 h-4" />, href: "/zakat" },
     ],
   },
   { type: "link", key: "nav.profil", icon: <User className="w-4 h-4" />, href: "/profil" },

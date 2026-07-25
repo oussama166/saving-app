@@ -42,6 +42,10 @@ model User {
   aiAdviceCache   AiAdviceCache[]
   subscriptions   Subscription[]
   goalContributions GoalContribution[]
+  subscriptionPlanChanges SubscriptionPlanChange[]
+  budgetAlertsSent        BudgetAlertSent[]
+  debts                   Debt[]
+  debtPayments            DebtPayment[]
 }
 
 model UserSettings {
@@ -83,6 +87,7 @@ model Category {
   categoryArchive CategoryArchive?
   subscriptions   Subscription[]
   savingsGoals    SavingsGoal[]
+  budgetAlertsSent BudgetAlertSent[]
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
 }
@@ -126,6 +131,7 @@ model Transaction {
   updatedAt     DateTime       @updatedAt
   medicalRecord MedicalRecord?
   goalContribution GoalContribution?
+  debtPayment   DebtPayment?
 }
 
 // Abonnements récurrents mensuels (Netflix, Spotify, PSN Plus, etc.). Chaque
@@ -150,8 +156,28 @@ model Subscription {
   isActive             Boolean       @default(true)
   lastChargedYearMonth String? // "2026-07" — dernier mois pour lequel une transaction a été générée
   transactions         Transaction[]
+  planChanges          SubscriptionPlanChange[]
   createdAt            DateTime      @default(now())
   updatedAt            DateTime      @updatedAt
+}
+
+// Historique des changements de plan/prix détectés automatiquement par
+// /api/webhook/subscription-payment (ex: Netflix Standard 45 DH -> Premium
+// 95 DH) — voir lib/subscriptionCatalog.ts pour la logique de détection.
+// Une entrée par changement réellement appliqué (pas à chaque appel du
+// webhook, seulement quand le plan détecté diffère de celui déjà enregistré
+// au-delà de la tolérance d'arrondi).
+model SubscriptionPlanChange {
+  id             String       @id @default(cuid())
+  subscriptionId String
+  subscription   Subscription @relation(fields: [subscriptionId], references: [id])
+  userId         String
+  user           User         @relation(fields: [userId], references: [id])
+  previousName   String
+  newName        String
+  previousPrice  Float
+  newPrice       Float
+  changedAt      DateTime     @default(now())
 }
 
 // Objectifs d'épargne — personnels ou pour aider un proche (ex: "Frais de
@@ -293,4 +319,69 @@ model AdminAuditLog {
   targetId   String?
   details    String? // JSON.stringify() de détails additionnels (raison, etc.)
   createdAt  DateTime @default(now())
+}
+
+// Trace des emails d'alerte budget déjà envoyés (voir lib/budgetAlerts.ts,
+// déclenché après chaque nouvelle transaction dépense — POST
+// /api/transactions et /api/webhook/apple-pay). Une entrée par (catégorie,
+// mois, palier) empêche de renvoyer le même email à chaque transaction
+// suivante une fois le palier déjà franchi et notifié.
+model BudgetAlertSent {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id])
+  yearMonth  String // "2026-07"
+  threshold  Int // 80 (proche limite) ou 100 (dépassement)
+  sentAt     DateTime @default(now())
+
+  @@unique([categoryId, yearMonth, threshold])
+}
+
+// Suivi des dettes/prêts (crédit conso, prêt immobilier, dette personnelle
+// entre proches...) — utilisé pour calculer le patrimoine net (dashboard,
+// calculateur de Zakat) comme actifs (comptes + portfolio) moins
+// currentBalance de toutes les dettes actives. Pas de génération
+// automatique de transaction mensuelle (contrairement aux abonnements) : le
+// remboursement est loggé manuellement via DebtPayment, qui décrémente
+// currentBalance et peut optionnellement créer une vraie Transaction dans un
+// compte (transactionId), comme GoalContribution pour les objectifs.
+model Debt {
+  id             String        @id @default(cuid())
+  userId         String
+  user           User          @relation(fields: [userId], references: [id])
+  name           String // "Prêt immobilier", "Carte Visa Attijari"
+  type           String        @default("autre") // credit, pret_immo, pret_perso, autre
+  lender         String? // "Attijariwafa Bank"
+  principal      Float // montant initial emprunté
+  currentBalance Float // solde restant dû, mis à jour à chaque DebtPayment
+  interestRate   Float         @default(0) // taux annuel %, 0 pour une dette perso sans intérêt
+  monthlyPayment Float         @default(0) // mensualité indicative, purement informative
+  dueDay         Int? // jour du mois de l'échéance (1-31), optionnel
+  startDate      DateTime?
+  endDate        DateTime? // date de fin prévue, optionnel
+  isActive       Boolean       @default(true) // false = soldée/remboursée intégralement
+  payments       DebtPayment[]
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+}
+
+// Historique des remboursements d'une dette — un par versement (manuel via
+// le formulaire, décrémente Debt.currentBalance). transactionId lie
+// optionnellement le versement à une vraie Transaction (compte/catégorie
+// "Remboursement de dettes"), null si l'utilisateur logue juste le
+// remboursement sans vouloir l'imputer à un compte suivi.
+model DebtPayment {
+  id            String       @id @default(cuid())
+  debtId        String
+  debt          Debt         @relation(fields: [debtId], references: [id])
+  userId        String
+  user          User         @relation(fields: [userId], references: [id])
+  amount        Float
+  date          DateTime     @default(now())
+  note          String?
+  transactionId String?      @unique
+  transaction   Transaction? @relation(fields: [transactionId], references: [id])
+  createdAt     DateTime     @default(now())
 }

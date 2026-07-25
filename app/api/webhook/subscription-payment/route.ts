@@ -1,15 +1,12 @@
 import { NextResponse } from "next/server";
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireWebhookAuth } from "@/lib/webhookAuth";
 import { notifyRefresh } from "@/lib/sse";
 import { formatYearMonth } from "@/lib/subscriptions";
-import { findCatalogEntry, findClosestPlan } from "@/lib/subscriptionCatalog";
 import { normalizeMerchantName } from "@/lib/merchantName";
-
-// Tolérance (MAD) en dessous de laquelle on considère que le montant reçu
-// correspond au plan déjà enregistré — évite de renommer l'abonnement pour
-// de simples arrondis/frais bancaires plutôt qu'un vrai changement de plan.
-const PLAN_CHANGE_TOLERANCE_MAD = 1;
+import { detectPlanChange } from "@/lib/subscriptionPlanChange";
+import { checkAndSendBudgetAlert } from "@/lib/budgetAlerts";
 
 // Version "temps réel" du rattrapage d'abonnements (voir aussi
 // /api/webhook/subscriptions-sync pour la version "tout le mois d'un
@@ -129,46 +126,16 @@ export async function POST(req: Request) {
     const chargeAmount = -Math.abs(parsedAmount ?? subscription.price);
 
     // Détection de plan (Premium/Standard/Essentiel...) à partir du seul
-    // montant reçu : seulement si (a) un montant a été explicitement fourni
-    // (sinon on ne fait que reprendre le prix déjà connu, rien à détecter),
-    // et (b) l'abonnement vient du catalogue (`provider`) avec plusieurs
-    // formules possibles (lib/subscriptionCatalog.ts). On compare au plan
-    // dont le prix est le plus proche, et on ne renomme que si l'écart
-    // dépasse une petite tolérance (arrondis/frais bancaires).
-    //
-    // Note : le libellé du plan vit dans `Subscription.name` (convention
-    // déjà utilisée par le formulaire manuel, ex: "Netflix (Premium)"), PAS
-    // dans `subCategory` — ce dernier reste la catégorie large ("Streaming
-    // Vidéo") suggérée par le catalogue, partagée par tous les plans d'un
-    // même service, donc pas le bon endroit pour refléter un changement de
-    // formule.
-    let detectedPlanChange: {
-      previousName: string;
-      newName: string;
-      label: string;
-    } | null = null;
-    if (parsedAmount !== null && subscription.provider) {
-      const catalogEntry = findCatalogEntry(subscription.provider);
-      if (catalogEntry && catalogEntry.plans.length > 1) {
-        const closestPlan = findClosestPlan(catalogEntry, parsedAmount);
-        const priceDrifted =
-          Math.abs(closestPlan.price - subscription.price) >
-          PLAN_CHANGE_TOLERANCE_MAD;
-        const newName = `${catalogEntry.name} (${closestPlan.label})`;
-        if (priceDrifted && newName !== subscription.name) {
-          detectedPlanChange = {
-            previousName: subscription.name,
-            newName,
-            label: closestPlan.label,
-          };
-        }
-      }
-    }
+    // montant reçu : seulement si un montant a été explicitement fourni
+    // (sinon on ne fait que reprendre le prix déjà connu, rien à détecter).
+    // Logique partagée avec /api/webhook/subscriptions-import — voir
+    // lib/subscriptionPlanChange.ts pour le détail (tolérance, catalogue).
+    const detectedPlanChange = parsedAmount !== null ? detectPlanChange(subscription, parsedAmount) : null;
 
     // $transaction([...]) (forme batch) plutôt que la forme interactive
     // `async (tx) => {...}` : plus fiable contre l'adapter libSQL/Turso à
     // distance (voir lib/subscriptions.ts pour le même choix et pourquoi).
-    const [transaction] = await prisma.$transaction([
+    const transactionOps: Prisma.PrismaPromise<unknown>[] = [
       prisma.transaction.create({
         data: {
           userId,
@@ -198,7 +165,30 @@ export async function POST(req: Request) {
           ...(detectedPlanChange ? { name: detectedPlanChange.newName } : {}),
         },
       }),
-    ]);
+    ];
+
+    // Trace persistante du changement de plan dans SubscriptionPlanChange —
+    // une entrée par changement réellement appliqué (pas à chaque appel),
+    // consultable ensuite via GET /api/subscriptions/[id]/plan-history et
+    // affichée dans la page Abonnements.
+    if (detectedPlanChange) {
+      transactionOps.push(
+        prisma.subscriptionPlanChange.create({
+          data: {
+            subscriptionId: subscription.id,
+            userId,
+            previousName: detectedPlanChange.previousName,
+            newName: detectedPlanChange.newName,
+            previousPrice: detectedPlanChange.previousPrice,
+            newPrice: detectedPlanChange.newPrice,
+          },
+        }),
+      );
+    }
+
+    const [transaction] = await prisma.$transaction(transactionOps);
+
+    await checkAndSendBudgetAlert(userId, subscription.categoryId, chargeDate);
 
     notifyRefresh();
 
@@ -211,6 +201,8 @@ export async function POST(req: Request) {
             planChangeDetected: true,
             previousName: detectedPlanChange.previousName,
             newPlan: detectedPlanChange.label,
+            previousPrice: detectedPlanChange.previousPrice,
+            newPrice: detectedPlanChange.newPrice,
           }
         : {}),
     });

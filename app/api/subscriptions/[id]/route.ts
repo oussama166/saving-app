@@ -99,9 +99,12 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
 
     // On détache les transactions déjà générées plutôt que de les supprimer
     // — l'historique de dépenses passées reste intact même après suppression
-    // de la définition de l'abonnement.
+    // de la définition de l'abonnement. SubscriptionPlanChange, lui, n'a de
+    // sens que rattaché à un abonnement existant (pas de champ nullable),
+    // donc son historique de changements de plan part avec l'abonnement.
     await prisma.$transaction(async (tx) => {
       await tx.transaction.updateMany({ where: { subscriptionId: id, userId }, data: { subscriptionId: null } });
+      await tx.subscriptionPlanChange.deleteMany({ where: { subscriptionId: id } });
       await tx.subscription.delete({ where: { id } });
     });
 

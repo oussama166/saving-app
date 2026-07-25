@@ -245,8 +245,10 @@ export default function WebhookTokenCard() {
               <code className="text-body-soft">{SUBSCRIPTIONS_IMPORT_ENDPOINT_HINT}</code> — body :{' '}
               <code className="text-body-soft">{'{ "subscriptions": [{ "name": "Netflix", "price": 75 }] }'}</code>.
               <code className="text-body-soft">billingDay</code> et <code className="text-body-soft">date</code> sont
-              optionnels (le jour du mois est déduit de la date, ou du jour actuel à défaut). N&apos;ajoute rien si un
-              abonnement du même nom existe déjà — rejouer le même Shortcut plusieurs fois ne duplique rien.
+              optionnels (le jour du mois est déduit de la date, ou du jour actuel à défaut). Si un abonnement du
+              même nom existe déjà, aucun doublon n&apos;est créé — le prix/plan est mis à jour (et tracé dans
+              l&apos;historique) seulement si le montant reçu correspond à une formule différente du catalogue,
+              sinon rien ne bouge.
             </p>
           </div>
         </div>

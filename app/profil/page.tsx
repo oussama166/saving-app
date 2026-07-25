@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import {
   SlidersHorizontal,
   FileSpreadsheet,
+  FileText,
   Loader2,
   Download,
   ShieldCheck,
@@ -25,6 +26,8 @@ export default function ProfilPage() {
   const [saved, setSaved] = useState(false);
   const [generatingBilan, setGeneratingBilan] = useState(false);
   const [bilanError, setBilanError] = useState<string | null>(null);
+  const [generatingBilanPdf, setGeneratingBilanPdf] = useState(false);
+  const [bilanPdfError, setBilanPdfError] = useState<string | null>(null);
   const [emailVerified, setEmailVerified] = useState<boolean | null>(null);
 
   useEffect(() => {
@@ -98,6 +101,32 @@ export default function ProfilPage() {
       setBilanError("Impossible de générer le bilan. Réessayez.");
     } finally {
       setGeneratingBilan(false);
+    }
+  };
+
+  const handleGenerateBilanPdf = async () => {
+    setGeneratingBilanPdf(true);
+    setBilanPdfError(null);
+    try {
+      const res = await fetch("/api/reports/bilan-pdf");
+      if (!res.ok) {
+        throw new Error("Échec de la génération du PDF");
+      }
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      const today = new Date().toISOString().slice(0, 10);
+      a.href = url;
+      a.download = `bilan-financier-${today}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Bilan PDF generation error:", err);
+      setBilanPdfError("Impossible de générer le PDF. Réessayez.");
+    } finally {
+      setGeneratingBilanPdf(false);
     }
   };
 
@@ -201,6 +230,43 @@ export default function ProfilPage() {
               <>
                 <Download className="w-4 h-4" />
                 Télécharger le bilan
+              </>
+            )}
+          </button>
+        </div>
+
+        <div className="flex flex-col items-start justify-between gap-4 p-6 border bg-surface rounded-2xl border-line sm:flex-row sm:items-center">
+          <div className="flex items-center gap-4">
+            <div className="p-3 border bg-red-600/20 rounded-xl border-red-500/20">
+              <FileText className="w-6 h-6 text-red-400" />
+            </div>
+            <div>
+              <h2 className="text-sm font-black tracking-tight uppercase text-ink">
+                Bilan PDF (résumé imprimable)
+              </h2>
+              <p className="text-subtle text-xs mt-0.5 max-w-md">
+                Une page condensée : indicateurs du mois, budget par catégorie et patrimoine net — sans le détail des
+                transactions (voir l&apos;export Excel pour l&apos;historique complet).
+              </p>
+              {bilanPdfError && (
+                <p className="mt-1 text-xs text-red-400">{bilanPdfError}</p>
+              )}
+            </div>
+          </div>
+          <button
+            onClick={handleGenerateBilanPdf}
+            disabled={generatingBilanPdf}
+            className="flex items-center gap-2 bg-red-600 hover:bg-red-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-bold px-5 py-2.5 rounded-xl transition-colors whitespace-nowrap"
+          >
+            {generatingBilanPdf ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Génération...
+              </>
+            ) : (
+              <>
+                <Download className="w-4 h-4" />
+                Télécharger en PDF
               </>
             )}
           </button>

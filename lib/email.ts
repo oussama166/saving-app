@@ -95,6 +95,107 @@ export async function sendVerificationEmail(to: string, token: string): Promise<
   });
 }
 
+export async function sendBudgetAlertEmail(
+  to: string,
+  params: { categoryName: string; threshold: number; spent: number; budget: number; usedPct: number },
+): Promise<boolean> {
+  const { categoryName, threshold, spent, budget, usedPct } = params;
+  const isOver = threshold >= 100;
+  const title = isOver ? `Budget dépassé — ${categoryName}` : `Budget bientôt atteint — ${categoryName}`;
+  const fmt = (n: number) => `${Math.round(n).toLocaleString('fr-FR')} DH`;
+  const color = isOver ? '#ef4444' : '#f59e0b';
+
+  return sendEmail({
+    to,
+    subject: `${title} — Wealth OS`,
+    html: wrapEmailHtml(
+      title,
+      `
+        <p style="font-size: 14px; line-height: 1.6;">
+          La catégorie <strong>${categoryName}</strong> a atteint
+          <strong style="color: ${color};">${Math.round(usedPct)}%</strong> de son budget mensuel.
+        </p>
+        <p style="font-size: 14px; line-height: 1.6;">
+          Dépensé : <strong>${fmt(spent)}</strong> sur un budget de <strong>${fmt(budget)}</strong>.
+        </p>
+        <p style="margin: 24px 0;">
+          <a href="${getSiteUrl()}/saisie" style="background: ${color}; color: white; text-decoration: none; padding: 12px 20px; border-radius: 10px; font-size: 14px; font-weight: 700; display: inline-block;">
+            Voir le détail du budget
+          </a>
+        </p>
+        <p style="font-size: 12px; color: #64748b;">Tu ne recevras pas d'autre email pour ce palier ce mois-ci sur cette catégorie.</p>
+      `,
+    ),
+  });
+}
+
+export async function sendWeeklyDigestEmail(
+  to: string,
+  data: {
+    weekIncome: number;
+    weekExpenses: number;
+    topCategories: { name: string; amount: number }[];
+    budgetWarnings: { name: string; usedPct: number; spent: number; budget: number }[];
+    goalsCount: number;
+    goalsProgressPct: number;
+    weekGoalContributions: number;
+  },
+): Promise<boolean> {
+  const fmt = (n: number) => `${Math.round(n).toLocaleString('fr-FR')} DH`;
+
+  const topCategoriesHtml = data.topCategories.length
+    ? `<ul style="padding-left: 18px; margin: 8px 0; font-size: 13px; line-height: 1.8;">
+        ${data.topCategories.map((c) => `<li>${c.name} — <strong>${fmt(c.amount)}</strong></li>`).join('')}
+      </ul>`
+    : `<p style="font-size: 13px; color: #64748b;">Aucune dépense cette semaine.</p>`;
+
+  const warningsHtml = data.budgetWarnings.length
+    ? `<ul style="padding-left: 18px; margin: 8px 0; font-size: 13px; line-height: 1.8;">
+        ${data.budgetWarnings
+          .map(
+            (w) =>
+              `<li style="color: ${w.usedPct >= 100 ? '#ef4444' : '#f59e0b'};">${w.name} — ${w.usedPct}% (${fmt(w.spent)} / ${fmt(w.budget)})</li>`,
+          )
+          .join('')}
+      </ul>`
+    : `<p style="font-size: 13px; color: #10b981;">Tous les budgets sont sous contrôle ce mois-ci. 👍</p>`;
+
+  return sendEmail({
+    to,
+    subject: 'Ton résumé de la semaine — Wealth OS',
+    html: wrapEmailHtml(
+      'Ton résumé de la semaine',
+      `
+        <p style="font-size: 14px; line-height: 1.6;">
+          Revenus : <strong>${fmt(data.weekIncome)}</strong> — Dépenses : <strong>${fmt(data.weekExpenses)}</strong>
+        </p>
+
+        <h2 style="font-size: 13px; font-weight: 700; margin-top: 20px;">Top dépenses de la semaine</h2>
+        ${topCategoriesHtml}
+
+        <h2 style="font-size: 13px; font-weight: 700; margin-top: 20px;">Budgets à surveiller (mois en cours)</h2>
+        ${warningsHtml}
+
+        ${
+          data.goalsCount > 0
+            ? `<h2 style="font-size: 13px; font-weight: 700; margin-top: 20px;">Objectifs d'épargne</h2>
+               <p style="font-size: 13px; line-height: 1.6;">
+                 ${data.goalsCount} objectif(s) — <strong>${data.goalsProgressPct}%</strong> atteint au total.
+                 ${data.weekGoalContributions > 0 ? `Versé cette semaine : <strong>${fmt(data.weekGoalContributions)}</strong>.` : ''}
+               </p>`
+            : ''
+        }
+
+        <p style="margin: 24px 0;">
+          <a href="${getSiteUrl()}/" style="background: #2563eb; color: white; text-decoration: none; padding: 12px 20px; border-radius: 10px; font-size: 14px; font-weight: 700; display: inline-block;">
+            Ouvrir le dashboard
+          </a>
+        </p>
+      `,
+    ),
+  });
+}
+
 export async function sendPasswordResetEmail(to: string, token: string): Promise<boolean> {
   const link = `${getSiteUrl()}/reset-password?token=${encodeURIComponent(token)}`;
   return sendEmail({

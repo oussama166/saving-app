@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireWebhookAuth } from "@/lib/webhookAuth";
 import { catchUpSubscriptionCharges } from "@/lib/subscriptions";
 import { findCatalogEntryByName, findClosestPlan } from "@/lib/subscriptionCatalog";
 import { normalizeMerchantName } from "@/lib/merchantName";
+import { detectPlanChange } from "@/lib/subscriptionPlanChange";
 
 const DEFAULT_SUBSCRIPTION_CATEGORY_NAME = "Tech & Abonnements";
 
@@ -16,23 +18,25 @@ interface SubscriptionImportItem {
 
 interface ItemResult {
   input: string;
-  status: "created" | "skipped" | "error";
+  status: "created" | "updated" | "skipped" | "error";
   detail: string;
   name?: string;
 }
 
 // Import en masse depuis un Shortcut iOS qui scanne les SMS pour repérer des
 // abonnements (ex: automatisation "Trouver les messages contenant
-// 'prélevé'/'abonnement'" -> extraire nom + montant de chaque match) et les
-// crée tous d'un coup, plutôt que de les ajouter un par un à la main sur la
-// page Abonnements.
+// 'prélevé'/'abonnement'" -> extraire nom + montant de chaque match).
 //
 // Contrairement à /api/webhook/subscription-payment (qui exige que
-// l'abonnement existe déjà et logue juste un prélèvement dessus), cette
-// route CRÉE de nouveaux abonnements — mais uniquement s'ils n'existent pas
-// déjà (comparaison tolérante par nom, même logique que
-// subscription-payment), pour qu'un Shortcut relancé plusieurs fois sur les
-// mêmes SMS ne duplique rien.
+// l'abonnement existe déjà, logue un prélèvement, et ne s'occupe QUE d'un
+// abonnement à la fois), cette route traite un lot entier :
+// - nom inconnu -> crée un nouvel abonnement.
+// - nom déjà connu ET le montant révèle un changement de plan (même
+//   détection que subscription-payment, voir lib/subscriptionPlanChange.ts)
+//   -> met à jour le prix/nom de l'abonnement et trace le changement dans
+//   SubscriptionPlanChange (visible dans l'historique, page Abonnements).
+// - nom déjà connu et montant inchangé -> ne fait rien (idempotent, un
+//   Shortcut relancé sur les mêmes SMS ne duplique/modifie rien à tort).
 export async function POST(req: Request) {
   try {
     const { userId } = await requireWebhookAuth(req);
@@ -73,10 +77,29 @@ export async function POST(req: Request) {
     }
 
     const results: ItemResult[] = [];
-    const knownNames = existingSubscriptions.map((s) => ({
-      name: s.name.toLowerCase(),
-      provider: (s.provider ?? "").toLowerCase(),
+    // Liste vivante des abonnements connus (existants + créés pendant ce
+    // lot) — utilisée pour la correspondance tolérante ET pour retrouver
+    // l'enregistrement complet à mettre à jour, pas juste un booléen.
+    const knownSubs = existingSubscriptions.map((s) => ({
+      id: s.id,
+      name: s.name,
+      provider: s.provider,
+      price: s.price,
     }));
+
+    const matchExisting = (needle: string) =>
+      knownSubs.find(
+        (s) =>
+          s.name.toLowerCase() === needle ||
+          (s.provider ?? "").toLowerCase() === needle,
+      ) ??
+      knownSubs.find(
+        (s) =>
+          s.name.toLowerCase().includes(needle) ||
+          needle.includes(s.name.toLowerCase()) ||
+          (s.provider &&
+            (s.provider.toLowerCase().includes(needle) || needle.includes(s.provider.toLowerCase()))),
+      );
 
     for (const item of subscriptions) {
       const rawName = typeof item?.name === "string" ? item.name.trim() : "";
@@ -93,21 +116,45 @@ export async function POST(req: Request) {
 
       const cleanedName = normalizeMerchantName(rawName);
       const needle = cleanedName.toLowerCase();
+      const existing = matchExisting(needle);
 
-      // Même correspondance tolérante que subscription-payment : évite de
-      // recréer "Netflix" si "netflix.com" ou "NETFLIX" existe déjà, y
-      // compris parmi les abonnements désactivés (pas la peine de dupliquer
-      // un abonnement mis en pause).
-      const alreadyExists = knownNames.some(
-        (k) =>
-          k.name === needle ||
-          k.provider === needle ||
-          k.name.includes(needle) ||
-          needle.includes(k.name) ||
-          (k.provider && (k.provider.includes(needle) || needle.includes(k.provider))),
-      );
-      if (alreadyExists) {
-        results.push({ input: rawName, status: "skipped", detail: "Un abonnement correspondant existe déjà." });
+      if (existing) {
+        const change = detectPlanChange(existing, priceNum);
+        if (!change) {
+          results.push({ input: rawName, status: "skipped", detail: "Déjà à jour, rien à changer." });
+          continue;
+        }
+
+        // Même forme batch $transaction([...]) que subscription-payment
+        // (plus fiable contre l'adapter libSQL/Turso à distance qu'une
+        // transaction interactive) : met à jour l'abonnement et trace le
+        // changement en une seule fois, atomiquement.
+        await prisma.$transaction([
+          prisma.subscription.update({
+            where: { id: existing.id },
+            data: { name: change.newName, price: change.newPrice },
+          }),
+          prisma.subscriptionPlanChange.create({
+            data: {
+              subscriptionId: existing.id,
+              userId,
+              previousName: change.previousName,
+              newName: change.newName,
+              previousPrice: change.previousPrice,
+              newPrice: change.newPrice,
+            },
+          }),
+        ] as Prisma.PrismaPromise<unknown>[]);
+
+        existing.name = change.newName;
+        existing.price = change.newPrice;
+
+        results.push({
+          input: rawName,
+          status: "updated",
+          detail: `Plan changé : ${change.previousName} (${change.previousPrice.toFixed(2)} DH) → ${change.newName} (${change.newPrice.toFixed(2)} DH).`,
+          name: change.newName,
+        });
         continue;
       }
 
@@ -145,7 +192,7 @@ export async function POST(req: Request) {
 
       // Évite qu'un même nom du même lot ne soit créé deux fois (ex: deux
       // SMS différents pour le même abonnement dans une seule requête).
-      knownNames.push({ name: created.name.toLowerCase(), provider: (provider ?? "").toLowerCase() });
+      knownSubs.push({ id: created.id, name: created.name, provider, price: created.price });
 
       results.push({ input: rawName, status: "created", detail: "Abonnement créé.", name: created.name });
     }
@@ -161,6 +208,7 @@ export async function POST(req: Request) {
       success: true,
       summary: {
         created: createdCount,
+        updated: results.filter((r) => r.status === "updated").length,
         skipped: results.filter((r) => r.status === "skipped").length,
         errors: results.filter((r) => r.status === "error").length,
       },

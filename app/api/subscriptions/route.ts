@@ -14,7 +14,7 @@ export async function GET() {
     const [subscriptions, accounts, categories] = await Promise.all([
       prisma.subscription.findMany({
         where: { userId },
-        include: { category: true, account: true },
+        include: { category: true, account: true, _count: { select: { planChanges: true } } },
         orderBy: { billingDay: 'asc' },
       }),
       prisma.account.findMany({ where: { userId }, orderBy: { createdAt: 'asc' } }),
@@ -34,6 +34,7 @@ export async function GET() {
       accountId: sub.accountId,
       accountName: sub.account.name,
       nextBillingDate: sub.isActive ? getNextBillingDate(sub).toISOString() : null,
+      planChangeCount: sub._count.planChanges,
     }));
 
     const totalMonthly = subscriptions.filter((s) => s.isActive).reduce((acc, s) => acc + s.price, 0);

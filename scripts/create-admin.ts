@@ -81,6 +81,23 @@ async function main() {
 
   console.log('=== Création / réinitialisation d\'un compte admin Wealth OS ===\n');
 
+  // Diagnostic explicite de la base ciblée : la cause la plus fréquente d'un
+  // admin "créé sur la mauvaise base" n'est pas un bug du script (il lit
+  // bien process.env.TURSO_DATABASE_URL au démarrage, voir lib/prisma.ts) —
+  // c'est que la variable n'est en réalité pas présente dans CE process (ex:
+  // `export` fait dans un autre onglet de terminal, ou `npm run create-admin`
+  // relancé sans le préfixe la fois d'après). Ce log rend l'erreur visible
+  // immédiatement au lieu de la découvrir après coup dans la base.
+  if (process.env.TURSO_DATABASE_URL) {
+    console.log(`→ Base ciblée : Turso distant (${process.env.TURSO_DATABASE_URL})`);
+    if (!process.env.TURSO_AUTH_TOKEN) {
+      console.log('  ⚠ TURSO_AUTH_TOKEN absent — la connexion va probablement échouer.');
+    }
+  } else {
+    console.log('→ Base ciblée : fichier local ./dev.db (TURSO_DATABASE_URL non défini dans ce terminal)');
+  }
+  console.log('');
+
   let email = args.email?.trim().toLowerCase();
   if (!email) {
     email = (await question(rl, 'Email admin : ')).toLowerCase();
