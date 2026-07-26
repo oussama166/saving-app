@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import type { HouseholdContext } from '@/lib/household';
 import { getRatesToMad } from '@/lib/exchangeRates';
+import { resolveBudgetCycleStart } from '@/lib/budgetCycle';
 
 // Petit utilitaire partagé : une Transaction est toujours dans la devise de
 // SON compte (Account.currency), jamais forcément MAD — voir
@@ -126,7 +127,7 @@ export interface FinancialRatios {
  */
 export async function getFinancialRatios(ctx: HouseholdContext, referenceIncome: number): Promise<FinancialRatios> {
   const now = new Date();
-  const start = new Date(now.getFullYear(), now.getMonth(), 1);
+  const start = await resolveBudgetCycleStart(ctx, now);
 
   const transactions = await prisma.transaction.findMany({
     where: { userId: { in: ctx.memberIds }, date: { gte: start } },
@@ -338,7 +339,7 @@ export async function getHealthBudget(ctx: HouseholdContext, referenceIncome: nu
   const plannedMonthly = (budgetPct / 100) * referenceIncome;
 
   const now = new Date();
-  const start = new Date(now.getFullYear(), now.getMonth(), 1);
+  const start = await resolveBudgetCycleStart(ctx, now);
 
   let spentAbs = 0;
   if (category) {
@@ -445,7 +446,7 @@ export async function getRealBudgetSummary(
   });
 
   const now = new Date();
-  const start = period === 'month' ? new Date(now.getFullYear(), now.getMonth(), 1) : undefined;
+  const start = period === 'month' ? await resolveBudgetCycleStart(ctx, now) : undefined;
 
   const transactions = await prisma.transaction.findMany({
     where: {

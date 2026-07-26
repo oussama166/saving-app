@@ -149,6 +149,15 @@ model UserSettings {
   currency                  String   @default("MAD")
   emergencyFundTargetMonths Float    @default(3)
   language                  String   @default("fr") // fr, ar, en, es — voir lib/i18n.ts
+  // Jour du mois (1-28) où le salaire tombe habituellement — point de départ
+  // du "cycle budgétaire" utilisé pour tout ce qui est calculé "depuis le
+  // début du mois" (score de santé, budget détaillé, alertes...) à la place
+  // du 1er calendaire. 1 = comportement historique (calendaire), inchangé
+  // pour tous les comptes existants. Voir lib/budgetCycle.ts : ce jour n'est
+  // qu'un repère par défaut — la vraie date du salaire, si détectée parmi les
+  // transactions de revenu, prend le dessus (couvre le cas d'une paie
+  // parfois un peu plus tôt, parfois un peu plus tard).
+  budgetCycleStartDay       Int      @default(1)
   updatedAt                 DateTime @updatedAt
 }
 

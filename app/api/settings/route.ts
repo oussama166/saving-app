@@ -35,6 +35,7 @@ export async function GET() {
       data: {
         referenceIncome: settings?.referenceIncome ?? 10000,
         currency: settings?.currency ?? 'MAD',
+        budgetCycleStartDay: settings?.budgetCycleStartDay ?? 1,
         updatedAt: settings?.updatedAt ?? null,
         categories: categories.map((c) => ({
           id: c.id,
@@ -61,13 +62,26 @@ export async function PUT(req: Request) {
   try {
     const { userId } = await requireSession();
     await requireFeatureAccess('profile.budget_allocation', userId);
-    const { referenceIncome, allocations } = (await req.json()) as {
+    const { referenceIncome, allocations, budgetCycleStartDay } = (await req.json()) as {
       referenceIncome: number;
       allocations: { id: string; budgetPct: number }[];
+      budgetCycleStartDay?: number;
     };
 
     if (typeof referenceIncome !== 'number' || referenceIncome <= 0 || !Array.isArray(allocations)) {
       return NextResponse.json({ success: false, error: 'Données invalides' }, { status: 400 });
+    }
+
+    // Jour de paie optionnel (1-28, voir lib/budgetCycle.ts) — borné pour
+    // éviter un jour > nombre de jours du mois le plus court (février) et
+    // toute valeur farfelue envoyée par un client bugué. Absent/omis => on ne
+    // touche pas au réglage existant (upsert plus bas retombe sur 1 par
+    // défaut seulement à la création).
+    if (
+      budgetCycleStartDay !== undefined &&
+      (typeof budgetCycleStartDay !== 'number' || budgetCycleStartDay < 1 || budgetCycleStartDay > 28)
+    ) {
+      return NextResponse.json({ success: false, error: 'Jour de paie invalide (1-28)' }, { status: 400 });
     }
 
     const total = allocations.reduce((acc, a) => acc + Number(a.budgetPct), 0);
@@ -93,8 +107,15 @@ export async function PUT(req: Request) {
     await prisma.$transaction([
       prisma.userSettings.upsert({
         where: { userId: budgetOwnerId },
-        update: { referenceIncome },
-        create: { userId: budgetOwnerId, referenceIncome },
+        update: {
+          referenceIncome,
+          ...(budgetCycleStartDay !== undefined ? { budgetCycleStartDay } : {}),
+        },
+        create: {
+          userId: budgetOwnerId,
+          referenceIncome,
+          ...(budgetCycleStartDay !== undefined ? { budgetCycleStartDay } : {}),
+        },
       }),
       ...allocations.map((a) =>
         prisma.category.update({

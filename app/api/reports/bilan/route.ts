@@ -11,6 +11,7 @@ import { getEnrichedPortfolioAssets } from "@/lib/portfolio";
 import { getHouseholdContext } from "@/lib/household";
 import { getRatesToMad } from "@/lib/exchangeRates";
 import { requireFeatureAccess } from "@/lib/features";
+import { resolveBudgetCycleStart } from "@/lib/budgetCycle";
 
 export const dynamic = "force-dynamic";
 
@@ -51,7 +52,7 @@ export async function GET() {
     const { referenceIncome } = await getUserSettings(ctx);
 
     const now = new Date();
-    const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const firstDayOfMonth = await resolveBudgetCycleStart(ctx, now);
 
     const [
       categories,

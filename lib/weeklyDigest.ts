@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { sendWeeklyDigestEmail } from "@/lib/email";
 import { getHouseholdContext } from "@/lib/household";
+import { resolveBudgetCycleStart } from "@/lib/budgetCycle";
 
 export interface WeeklyDigestData {
   weekIncome: number;
@@ -24,20 +25,23 @@ export async function buildWeeklyDigest(userId: string): Promise<WeeklyDigestDat
   const now = new Date();
   const weekAgo = new Date(now);
   weekAgo.setDate(weekAgo.getDate() - 7);
-  const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  // userSettings récupéré à part : resolveBudgetCycleStart() en a besoin
+  // (jour de paie configuré) avant de savoir depuis quand compter les
+  // dépenses "du mois" — voir lib/budgetCycle.ts.
+  const userSettings = await prisma.userSettings.findUnique({ where: { userId: ctx.budgetOwnerId } });
+  const cycleStart = await resolveBudgetCycleStart(ctx, now, userSettings);
 
-  const [weekTransactions, monthExpenseTransactions, categories, userSettings, goals] =
+  const [weekTransactions, monthExpenseTransactions, categories, goals] =
     await Promise.all([
       prisma.transaction.findMany({
         where: { userId: { in: ctx.memberIds }, date: { gte: weekAgo } },
         include: { category: true },
       }),
       prisma.transaction.findMany({
-        where: { userId: { in: ctx.memberIds }, date: { gte: firstDayOfMonth }, amount: { lt: 0 } },
+        where: { userId: { in: ctx.memberIds }, date: { gte: cycleStart }, amount: { lt: 0 } },
         include: { category: true },
       }),
       prisma.category.findMany({ where: { userId: ctx.budgetOwnerId, type: "expense" } }),
-      prisma.userSettings.findUnique({ where: { userId: ctx.budgetOwnerId } }),
       prisma.savingsGoal.findMany({ where: { userId: { in: ctx.memberIds } } }),
     ]);
 
