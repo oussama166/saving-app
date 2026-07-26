@@ -12,17 +12,25 @@ import MedicalRecordsTable from "../components/MedicalRecordsTable";
 import { requireSession } from "@/lib/auth";
 import { getUserLocale } from "@/lib/getLocale";
 import { t } from "@/lib/i18n";
+import { getHouseholdContext } from "@/lib/household";
+import { getFeatureStatusForUser } from "@/lib/features";
+import FeatureDisabledNotice from "../components/FeatureDisabledNotice";
 export const dynamic = "force-dynamic";
 
 export default async function SantePage() {
   const { userId } = await requireSession();
+  const featureStatus = await getFeatureStatusForUser("health", userId);
+  if (!featureStatus.allowed) {
+    return <FeatureDisabledNotice featureName="Santé" message={featureStatus.message} />;
+  }
   const locale = await getUserLocale(userId);
-  const { referenceIncome } = await getUserSettings(userId);
+  const ctx = await getHouseholdContext(userId);
+  const { referenceIncome } = await getUserSettings(ctx);
   const [budget, spendingTrend, records] = await Promise.all([
-    getHealthBudget(userId, referenceIncome),
-    getHealthSpendingTrend(userId, 6),
+    getHealthBudget(ctx, referenceIncome),
+    getHealthSpendingTrend(ctx, 6),
     prisma.medicalRecord.findMany({
-      where: { userId },
+      where: { userId: { in: ctx.memberIds } },
       orderBy: { date: "desc" },
       include: {
         transaction: { select: { id: true, merchant: true, amount: true } },

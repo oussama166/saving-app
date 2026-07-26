@@ -34,7 +34,7 @@ const MAX_LIMIT = 500;
  * take/skip, acceptable à l'échelle d'une app perso (des dizaines/centaines
  * de lignes, pas des millions).
  */
-export async function getTransactionsPage(userId: string, filters: TransactionFilters = {}) {
+export async function getTransactionsPage(memberIds: string[], filters: TransactionFilters = {}) {
   const {
     search,
     type,
@@ -48,7 +48,7 @@ export async function getTransactionsPage(userId: string, filters: TransactionFi
   } = filters;
 
   const where: Prisma.TransactionWhereInput = {
-    userId,
+    userId: { in: memberIds },
     ...(search ? { merchant: { contains: search } } : {}),
     ...(categoryId ? { categoryId } : {}),
     ...(type ? { category: { type } } : {}),

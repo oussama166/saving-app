@@ -24,6 +24,7 @@ import {
   findCatalogEntry,
   type SubscriptionCatalogEntry,
 } from "../../lib/subscriptionCatalog";
+import FeatureGate from "../components/FeatureGate";
 
 interface SubscriptionItem {
   id: string;
@@ -114,6 +115,14 @@ const EMPTY_FORM: FormState = {
 };
 
 export default function AbonnementsPage() {
+  return (
+    <FeatureGate featureKey="subscriptions" featureName="Abonnements">
+      <AbonnementsPageContent />
+    </FeatureGate>
+  );
+}
+
+function AbonnementsPageContent() {
   const [subscriptions, setSubscriptions] = useState<SubscriptionItem[]>([]);
   const [totalMonthly, setTotalMonthly] = useState(0);
   const [accounts, setAccounts] = useState<OptionItem[]>([]);

@@ -1,12 +1,14 @@
 import { NextResponse } from 'next/server';
 import { getEnrichedPortfolioAssets } from '@/lib/portfolio';
 import { requireSession } from '@/lib/auth';
+import { getHouseholdContext } from '@/lib/household';
 
 export async function GET() {
   try {
     const { userId } = await requireSession();
+    const ctx = await getHouseholdContext(userId);
     const { enrichedAssets, globalCostBasis, globalLiveValue, globalProfit } =
-      await getEnrichedPortfolioAssets(userId);
+      await getEnrichedPortfolioAssets(ctx);
 
     return NextResponse.json({
       globalCostBasis,

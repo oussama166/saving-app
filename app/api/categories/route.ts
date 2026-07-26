@@ -1,14 +1,16 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireSession } from '@/lib/auth';
+import { getBudgetOwnerUserId } from '@/lib/household';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
     const { userId } = await requireSession();
+    const budgetOwnerId = await getBudgetOwnerUserId(userId);
     const categories = await prisma.category.findMany({
-      where: { userId },
+      where: { userId: budgetOwnerId },
       orderBy: { order: 'asc' },
       include: {
         subCategories: { orderBy: { name: 'asc' } },

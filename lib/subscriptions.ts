@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import { notifyRefresh } from '@/lib/sse';
 import { checkAndSendBudgetAlert } from '@/lib/budgetAlerts';
+import { getHouseholdMemberIds } from '@/lib/household';
 
 // Pas de cron serveur (contrainte hébergement gratuit) : le "prélèvement"
 // mensuel d'un abonnement est simulé par un rattrapage (catch-up) déclenché
@@ -81,8 +82,9 @@ export function getNextBillingDate(sub: SubscriptionLike, from: Date = new Date(
  * chargement de page.
  */
 export async function catchUpSubscriptionCharges(userId: string): Promise<number> {
+  const memberIds = await getHouseholdMemberIds(userId);
   const subscriptions = await prisma.subscription.findMany({
-    where: { userId, isActive: true },
+    where: { userId: { in: memberIds }, isActive: true },
   });
 
   const today = new Date();

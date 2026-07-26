@@ -6,6 +6,7 @@ import { catchUpSubscriptionCharges } from "@/lib/subscriptions";
 import { findCatalogEntryByName, findClosestPlan } from "@/lib/subscriptionCatalog";
 import { normalizeMerchantName } from "@/lib/merchantName";
 import { detectPlanChange } from "@/lib/subscriptionPlanChange";
+import { getHouseholdContext } from "@/lib/household";
 
 const DEFAULT_SUBSCRIPTION_CATEGORY_NAME = "Tech & Abonnements";
 
@@ -55,11 +56,12 @@ export async function POST(req: Request) {
     // par SMS) — "Tech & Abonnements" est la catégorie par défaut créée à
     // l'inscription (voir lib/seedDefaults.ts), avec repli sur la première
     // catégorie de dépense si l'utilisateur l'a renommée/supprimée.
+    const ctx = await getHouseholdContext(userId);
     const [account, defaultCategory, fallbackCategory, existingSubscriptions] = await Promise.all([
-      prisma.account.findFirst({ where: { userId }, orderBy: { createdAt: "asc" } }),
-      prisma.category.findFirst({ where: { userId, name: DEFAULT_SUBSCRIPTION_CATEGORY_NAME } }),
-      prisma.category.findFirst({ where: { userId, type: "expense" }, orderBy: { order: "asc" } }),
-      prisma.subscription.findMany({ where: { userId } }),
+      prisma.account.findFirst({ where: { userId: { in: ctx.memberIds } }, orderBy: { createdAt: "asc" } }),
+      prisma.category.findFirst({ where: { userId: ctx.budgetOwnerId, name: DEFAULT_SUBSCRIPTION_CATEGORY_NAME } }),
+      prisma.category.findFirst({ where: { userId: ctx.budgetOwnerId, type: "expense" }, orderBy: { order: "asc" } }),
+      prisma.subscription.findMany({ where: { userId: { in: ctx.memberIds } } }),
     ]);
 
     if (!account) {
@@ -85,6 +87,7 @@ export async function POST(req: Request) {
       name: s.name,
       provider: s.provider,
       price: s.price,
+      userId: s.userId,
     }));
 
     const matchExisting = (needle: string) =>
@@ -137,7 +140,7 @@ export async function POST(req: Request) {
           prisma.subscriptionPlanChange.create({
             data: {
               subscriptionId: existing.id,
-              userId,
+              userId: existing.userId,
               previousName: change.previousName,
               newName: change.newName,
               previousPrice: change.previousPrice,
@@ -192,7 +195,7 @@ export async function POST(req: Request) {
 
       // Évite qu'un même nom du même lot ne soit créé deux fois (ex: deux
       // SMS différents pour le même abonnement dans une seule requête).
-      knownSubs.push({ id: created.id, name: created.name, provider, price: created.price });
+      knownSubs.push({ id: created.id, name: created.name, provider, price: created.price, userId: created.userId });
 
       results.push({ input: rawName, status: "created", detail: "Abonnement créé.", name: created.name });
     }

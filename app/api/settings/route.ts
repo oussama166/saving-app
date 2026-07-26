@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireSession } from '@/lib/auth';
 import { ensureUserSeeded } from '@/lib/seedDefaults';
+import { getBudgetOwnerUserId } from '@/lib/household';
+import { requireFeatureAccess } from '@/lib/features';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,16 +14,18 @@ const SUM_TOLERANCE = 0.5;
 export async function GET() {
   try {
     const { userId } = await requireSession();
+    await requireFeatureAccess('profile', userId);
 
     // Filet de sécurité : comptes créés avant le passage à Turso (ou dont le
     // seed initial a échoué en route, ex: timeout réseau) — voir
     // lib/seedDefaults.ts. No-op si le compte est déjà correctement seedé.
     await ensureUserSeeded(prisma, userId);
+    const budgetOwnerId = await getBudgetOwnerUserId(userId);
 
     const [settings, categories] = await Promise.all([
-      prisma.userSettings.findUnique({ where: { userId } }),
+      prisma.userSettings.findUnique({ where: { userId: budgetOwnerId } }),
       prisma.category.findMany({
-        where: { userId, type: { in: ['expense', 'savings'] } },
+        where: { userId: budgetOwnerId, type: { in: ['expense', 'savings'] } },
         orderBy: { order: 'asc' },
       }),
     ]);
@@ -45,6 +49,9 @@ export async function GET() {
     if (error instanceof Error && error.message === 'UNAUTHENTICATED') {
       return NextResponse.json({ success: false, error: 'Non authentifié' }, { status: 401 });
     }
+    if (error instanceof Error && error.message === 'FEATURE_DISABLED') {
+      return NextResponse.json({ success: false, error: 'Cette fonctionnalité est temporairement désactivée.' }, { status: 403 });
+    }
     console.error('Settings GET Error:', error);
     return NextResponse.json({ success: false, error: 'Internal Server Error' }, { status: 500 });
   }
@@ -53,6 +60,7 @@ export async function GET() {
 export async function PUT(req: Request) {
   try {
     const { userId } = await requireSession();
+    await requireFeatureAccess('profile.budget_allocation', userId);
     const { referenceIncome, allocations } = (await req.json()) as {
       referenceIncome: number;
       allocations: { id: string; budgetPct: number }[];
@@ -70,10 +78,12 @@ export async function PUT(req: Request) {
       );
     }
 
-    // Vérifie que toutes les catégories fournies appartiennent bien à
-    // l'utilisateur connecté avant de les mettre à jour.
+    const budgetOwnerId = await getBudgetOwnerUserId(userId);
+
+    // Vérifie que toutes les catégories fournies appartiennent bien au foyer
+    // (propriétaire budget) avant de les mettre à jour.
     const owned = await prisma.category.findMany({
-      where: { userId, id: { in: allocations.map((a) => a.id) } },
+      where: { userId: budgetOwnerId, id: { in: allocations.map((a) => a.id) } },
       select: { id: true },
     });
     if (owned.length !== allocations.length) {
@@ -82,9 +92,9 @@ export async function PUT(req: Request) {
 
     await prisma.$transaction([
       prisma.userSettings.upsert({
-        where: { userId },
+        where: { userId: budgetOwnerId },
         update: { referenceIncome },
-        create: { userId, referenceIncome },
+        create: { userId: budgetOwnerId, referenceIncome },
       }),
       ...allocations.map((a) =>
         prisma.category.update({
@@ -98,6 +108,9 @@ export async function PUT(req: Request) {
   } catch (error) {
     if (error instanceof Error && error.message === 'UNAUTHENTICATED') {
       return NextResponse.json({ success: false, error: 'Non authentifié' }, { status: 401 });
+    }
+    if (error instanceof Error && error.message === 'FEATURE_DISABLED') {
+      return NextResponse.json({ success: false, error: 'Cette fonctionnalité est temporairement désactivée.' }, { status: 403 });
     }
     console.error('Settings PUT Error:', error);
     return NextResponse.json({ success: false, error: 'Internal Server Error' }, { status: 500 });

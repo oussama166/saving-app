@@ -4,24 +4,36 @@ import { prisma } from '@/lib/prisma';
 import { getEnrichedPortfolioAssets } from '@/lib/portfolio';
 import { getAverageMonthlyExpenses, getEmergencyFundBalance, getUserSettings } from '@/lib/financials';
 import { requireSession } from '@/lib/auth';
+import { getHouseholdContext } from '@/lib/household';
+import { getRatesToMad } from '@/lib/exchangeRates';
+import { getFeatureStatusForUser } from '@/lib/features';
+import FeatureDisabledNotice from '@/app/components/FeatureDisabledNotice';
 
 export const dynamic = 'force-dynamic';
 
 export default async function PortfolioPage() {
   const { userId } = await requireSession();
+  const featureStatus = await getFeatureStatusForUser('portfolio', userId);
+  if (!featureStatus.allowed) {
+    return <FeatureDisabledNotice featureName="Portfolio & Épargne" message={featureStatus.message} />;
+  }
+  const ctx = await getHouseholdContext(userId);
   const [accounts, portfolio, { referenceIncome, emergencyFundTargetMonths }, emergencyFundBalance] =
     await Promise.all([
-      prisma.account.findMany({ where: { userId }, orderBy: { name: 'asc' } }),
-      getEnrichedPortfolioAssets(userId),
-      getUserSettings(userId),
-      getEmergencyFundBalance(userId),
+      prisma.account.findMany({ where: { userId: { in: ctx.memberIds } }, orderBy: { name: 'asc' } }),
+      getEnrichedPortfolioAssets(ctx),
+      getUserSettings(ctx),
+      getEmergencyFundBalance(ctx),
     ]);
 
-  const avgMonthlyExpenses = await getAverageMonthlyExpenses(userId, referenceIncome);
+  const avgMonthlyExpenses = await getAverageMonthlyExpenses(ctx, referenceIncome);
   const emergencyFundTarget = emergencyFundTargetMonths * avgMonthlyExpenses;
   const emergencyFundMonthsCovered = avgMonthlyExpenses > 0 ? emergencyFundBalance / avgMonthlyExpenses : 0;
 
-  const totalChecking = accounts.filter((a) => a.type === 'checking').reduce((acc, a) => acc + a.balance, 0);
+  const fxRates = await getRatesToMad(accounts.map((a) => a.currency));
+  const totalChecking = accounts
+    .filter((a) => a.type === 'checking')
+    .reduce((acc, a) => acc + a.balance * (fxRates[a.currency] ?? 1), 0);
 
   const valueByAssetType = (types: string[]) =>
     portfolio.enrichedAssets.filter((a) => types.includes(a.assetType)).reduce((acc, a) => acc + a.liveValue, 0);

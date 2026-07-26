@@ -16,6 +16,7 @@ import {
   HandCoins,
   HelpCircle,
 } from "lucide-react";
+import FeatureGate from "../components/FeatureGate";
 
 interface DebtItem {
   id: string;
@@ -84,6 +85,14 @@ const EMPTY_FORM: FormState = {
 };
 
 export default function DettesPage() {
+  return (
+    <FeatureGate featureKey="debts" featureName="Dettes & Prêts">
+      <DettesPageContent />
+    </FeatureGate>
+  );
+}
+
+function DettesPageContent() {
   const [debts, setDebts] = useState<DebtItem[]>([]);
   const [totalRemaining, setTotalRemaining] = useState(0);
   const [accounts, setAccounts] = useState<OptionItem[]>([]);

@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import { notifyRefresh } from '@/lib/sse';
 import type { Prisma } from '@prisma/client';
+import { getHouseholdMemberIds } from '@/lib/household';
 
 // Même logique de rattrapage que lib/subscriptions.ts (pas de cron serveur —
 // contrainte hébergement gratuit) : un objectif avec autoContribute=true
@@ -108,12 +109,16 @@ export async function addManualContribution(params: {
   isAutomatic?: boolean;
 }): Promise<void> {
   const { userId, goalId, amount, date, note, isAutomatic } = params;
-  const goal = await prisma.savingsGoal.findFirst({ where: { id: goalId, userId } });
+  const memberIds = await getHouseholdMemberIds(userId);
+  const goal = await prisma.savingsGoal.findFirst({ where: { id: goalId, userId: { in: memberIds } } });
   if (!goal) throw new Error('GOAL_NOT_FOUND');
 
   await prisma.$transaction(async (tx) => {
     await insertContribution(tx, {
-      userId,
+      // Attribué au propriétaire réel de l'objectif (peut différer de la
+      // personne qui déclenche l'action, si son/sa partenaire l'a créé) —
+      // voir lib/household.ts.
+      userId: goal.userId,
       goalId,
       goalName: goal.name,
       accountId: goal.accountId,
@@ -130,8 +135,9 @@ export async function addManualContribution(params: {
 
 /** Rattrape les versements automatiques mensuels manqués pour tous les objectifs actifs d'un utilisateur. */
 export async function catchUpGoalContributions(userId: string): Promise<number> {
+  const memberIds = await getHouseholdMemberIds(userId);
   const goals = await prisma.savingsGoal.findMany({
-    where: { userId, autoContribute: true, monthlyContribution: { gt: 0 } },
+    where: { userId: { in: memberIds }, autoContribute: true, monthlyContribution: { gt: 0 } },
   });
 
   const today = new Date();
@@ -156,7 +162,7 @@ export async function catchUpGoalContributions(userId: string): Promise<number> 
 
       await prisma.$transaction(async (tx) => {
         await insertContribution(tx, {
-          userId,
+          userId: goal.userId,
           goalId: goal.id,
           goalName: goal.name,
           accountId: goal.accountId,

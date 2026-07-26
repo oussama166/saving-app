@@ -6,6 +6,7 @@ import CoachDiagnosticTab from '../components/CoachDiagnosticTab';
 import CoachGoldenRulesTab from '../components/CoachGoldenRulesTab';
 import CoachBenchmarksTab from '../components/CoachBenchmarksTab';
 import InterestSimulator from '../components/InterestSimulator';
+import FeatureGate from '../components/FeatureGate';
 
 interface DashboardData {
   metrics: {
@@ -41,6 +42,14 @@ const TABS = [
 type TabKey = (typeof TABS)[number]['key'];
 
 export default function CoachPage() {
+  return (
+    <FeatureGate featureKey="coach" featureName="Coach IA">
+      <CoachPageContent />
+    </FeatureGate>
+  );
+}
+
+function CoachPageContent() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<TabKey>('diagnostic');

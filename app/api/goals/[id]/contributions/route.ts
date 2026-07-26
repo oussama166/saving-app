@@ -2,13 +2,15 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireSession } from '@/lib/auth';
 import { addManualContribution } from '@/lib/goalContributions';
+import { getHouseholdMemberIds } from '@/lib/household';
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { userId } = await requireSession();
     const { id } = await params;
+    const memberIds = await getHouseholdMemberIds(userId);
 
-    const goal = await prisma.savingsGoal.findFirst({ where: { id, userId } });
+    const goal = await prisma.savingsGoal.findFirst({ where: { id, userId: { in: memberIds } } });
     if (!goal) {
       return NextResponse.json({ success: false, error: 'Objectif introuvable' }, { status: 404 });
     }
@@ -33,8 +35,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const { userId } = await requireSession();
     const { id } = await params;
     const { amount, date, note } = await req.json();
+    const memberIds = await getHouseholdMemberIds(userId);
 
-    const goal = await prisma.savingsGoal.findFirst({ where: { id, userId } });
+    const goal = await prisma.savingsGoal.findFirst({ where: { id, userId: { in: memberIds } } });
     if (!goal) {
       return NextResponse.json({ success: false, error: 'Objectif introuvable' }, { status: 404 });
     }

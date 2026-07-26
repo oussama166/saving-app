@@ -4,17 +4,19 @@ import { notifyRefresh } from '@/lib/sse';
 import { requireSession } from '@/lib/auth';
 import { getTransactionsPage } from '@/lib/transactions';
 import { checkAndSendBudgetAlert } from '@/lib/budgetAlerts';
+import { getHouseholdContext, getHouseholdMemberIds } from '@/lib/household';
 
 export async function POST(req: Request) {
   try {
     const { userId } = await requireSession();
     const body = await req.json();
     const { date, type, categoryId, subCategory, paymentMethod, notes, amount } = body;
+    const ctx = await getHouseholdContext(userId);
 
-    // Vérifie que la catégorie appartient bien à l'utilisateur avant de
-    // l'utiliser — sans ce contrôle, un client pourrait référencer l'ID
-    // de catégorie d'un autre utilisateur (tenant croisé).
-    const category = await prisma.category.findFirst({ where: { id: categoryId, userId } });
+    // Vérifie que la catégorie appartient bien au foyer (propriétaire budget)
+    // avant de l'utiliser — sans ce contrôle, un client pourrait référencer
+    // l'ID de catégorie d'un autre utilisateur (tenant croisé).
+    const category = await prisma.category.findFirst({ where: { id: categoryId, userId: ctx.budgetOwnerId } });
     if (!category) {
       return NextResponse.json({ success: false, error: 'Catégorie invalide' }, { status: 400 });
     }
@@ -22,7 +24,7 @@ export async function POST(req: Request) {
     const adjustedAmount = type === 'expense' ? -Math.abs(Number(amount)) : Math.abs(Number(amount));
 
     let account = await prisma.account.findFirst({
-      where: { userId, name: 'Main Checking' },
+      where: { userId: { in: ctx.memberIds }, name: 'Main Checking' },
     });
 
     if (!account) {
@@ -75,6 +77,7 @@ export async function GET(req: Request) {
   try {
     const { userId } = await requireSession();
     const { searchParams } = new URL(req.url);
+    const memberIds = await getHouseholdMemberIds(userId);
 
     const typeParam = searchParams.get('type');
     const type = typeParam === 'income' || typeParam === 'expense' || typeParam === 'savings' ? typeParam : undefined;
@@ -83,7 +86,7 @@ export async function GET(req: Request) {
     const sortDirParam = searchParams.get('sortDir');
     const sortDir = sortDirParam === 'asc' ? 'asc' : 'desc';
 
-    const { transactions, total, summary } = await getTransactionsPage(userId, {
+    const { transactions, total, summary } = await getTransactionsPage(memberIds, {
       search: searchParams.get('search') || undefined,
       type,
       categoryId: searchParams.get('categoryId') || undefined,

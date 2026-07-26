@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Plus, Check } from 'lucide-react';
 import { useLanguage } from './LanguageProvider';
@@ -17,12 +17,26 @@ interface Category {
   subCategories?: SubCategory[];
 }
 
+export interface TransactionFormPrefill {
+  date?: string;
+  categoryId?: string;
+  subCategory?: string;
+  amount?: string;
+  notes?: string;
+}
+
 interface TransactionFormProps {
   categories: Category[];
   onSuccess?: () => void;
+  // Pré-remplissage ponctuel (ex: depuis le scan de reçu, voir
+  // ReceiptScanPanel.tsx) — un objet différent (même par référence) à chaque
+  // scan déclenche le useEffect ci-dessous. `onPrefillApplied` prévient
+  // l'appelant une fois consommé, pour qu'il vide son propre état.
+  prefill?: TransactionFormPrefill | null;
+  onPrefillApplied?: () => void;
 }
 
-export default function TransactionForm({ categories, onSuccess }: TransactionFormProps) {
+export default function TransactionForm({ categories, onSuccess, prefill, onPrefillApplied }: TransactionFormProps) {
   const router = useRouter();
   const { t } = useLanguage();
   const [formData, setFormData] = useState({
@@ -36,6 +50,27 @@ export default function TransactionForm({ categories, onSuccess }: TransactionFo
   });
 
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!prefill) return;
+    // setState différé dans un microtask plutôt qu'appelé de façon
+    // synchrone dans le corps de l'effect (règle react-hooks/set-state-in-effect,
+    // voir app/household/accept/page.tsx pour le même motif).
+    Promise.resolve().then(() => {
+      const matchedCategory = prefill.categoryId ? categories.find((c) => c.id === prefill.categoryId) : undefined;
+      setFormData((prev) => ({
+        ...prev,
+        date: prefill.date || prev.date,
+        type: matchedCategory?.type || prev.type,
+        categoryId: matchedCategory?.id || prev.categoryId,
+        subCategory: prefill.subCategory ?? prev.subCategory,
+        amount: prefill.amount ?? prev.amount,
+        notes: prefill.notes ?? prev.notes,
+      }));
+      onPrefillApplied?.();
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prefill]);
 
   // L'"Enveloppe Master" doit rester cohérente avec le Type sélectionné —
   // sinon on peut enregistrer un Revenu sur une catégorie de type "expense",

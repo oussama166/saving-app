@@ -1,11 +1,13 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireSession } from '@/lib/auth';
+import { getHouseholdContext } from '@/lib/household';
 
 export async function POST(request: Request) {
   try {
     const { userId } = await requireSession();
     const { fromAccountId, toAccountId, amount } = await request.json();
+    const ctx = await getHouseholdContext(userId);
 
     if (!fromAccountId || !toAccountId || !amount || amount <= 0) {
       return NextResponse.json({ error: 'Invalid transfer details' }, { status: 400 });
@@ -13,7 +15,7 @@ export async function POST(request: Request) {
 
     const result = await prisma.$transaction(async (tx) => {
       const fromAccount = await tx.account.findFirst({
-        where: { id: fromAccountId, userId },
+        where: { id: fromAccountId, userId: { in: ctx.memberIds } },
       });
 
       if (!fromAccount) {
@@ -25,7 +27,7 @@ export async function POST(request: Request) {
       }
 
       const toAccount = await tx.account.findFirst({
-        where: { id: toAccountId, userId },
+        where: { id: toAccountId, userId: { in: ctx.memberIds } },
       });
 
       if (!toAccount) {
@@ -43,18 +45,20 @@ export async function POST(request: Request) {
       });
 
       let category = await tx.category.findFirst({
-        where: { userId, name: 'Transfer' },
+        where: { userId: ctx.budgetOwnerId, name: 'Transfer' },
       });
 
       if (!category) {
         category = await tx.category.create({
-          data: { userId, name: 'Transfer', type: 'transfer' },
+          data: { userId: ctx.budgetOwnerId, name: 'Transfer', type: 'transfer' },
         });
       }
 
       const transaction = await tx.transaction.create({
         data: {
-          userId,
+          // Attribuée au propriétaire réel du compte débité, pas forcément
+          // la personne qui déclenche le virement (voir lib/household.ts).
+          userId: fromAccount.userId,
           accountId: fromAccountId,
           categoryId: category.id,
           merchant: `Transfer to ${toAccount.name}`,
@@ -65,7 +69,7 @@ export async function POST(request: Request) {
 
       await tx.transaction.create({
         data: {
-          userId,
+          userId: toAccount.userId,
           accountId: toAccountId,
           categoryId: category.id,
           merchant: `Transfer from ${fromAccount.name}`,

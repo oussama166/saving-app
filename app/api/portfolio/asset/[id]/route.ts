@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { notifyRefresh } from '@/lib/sse';
 import { requireSession } from '@/lib/auth';
+import { getHouseholdMemberIds } from '@/lib/household';
 
 export async function DELETE(
   _req: Request,
@@ -11,7 +12,8 @@ export async function DELETE(
     const { userId } = await requireSession();
     const { id } = await params;
 
-    const existing = await prisma.portfolioAsset.findFirst({ where: { id, userId } });
+    const memberIds = await getHouseholdMemberIds(userId);
+    const existing = await prisma.portfolioAsset.findFirst({ where: { id, userId: { in: memberIds } } });
     if (!existing) {
       return NextResponse.json({ success: false, error: 'Actif introuvable' }, { status: 404 });
     }

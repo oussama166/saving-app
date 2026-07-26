@@ -3,6 +3,7 @@ import type { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { requireSession } from '@/lib/auth';
 import { notifyRefresh } from '@/lib/sse';
+import { getHouseholdContext } from '@/lib/household';
 
 const DEBT_PAYMENT_CATEGORY_NAME = 'Remboursement de dettes';
 
@@ -10,8 +11,9 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   try {
     const { userId } = await requireSession();
     const { id } = await params;
+    const ctx = await getHouseholdContext(userId);
 
-    const debt = await prisma.debt.findFirst({ where: { id, userId } });
+    const debt = await prisma.debt.findFirst({ where: { id, userId: { in: ctx.memberIds } } });
     if (!debt) {
       return NextResponse.json({ success: false, error: 'Dette introuvable' }, { status: 404 });
     }
@@ -37,8 +39,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const { id } = await params;
     const body = await req.json();
     const { amount, date, note, logTransaction, accountId } = body;
+    const ctx = await getHouseholdContext(userId);
 
-    const debt = await prisma.debt.findFirst({ where: { id, userId } });
+    const debt = await prisma.debt.findFirst({ where: { id, userId: { in: ctx.memberIds } } });
     if (!debt) {
       return NextResponse.json({ success: false, error: 'Dette introuvable' }, { status: 404 });
     }
@@ -63,8 +66,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     // ailleurs) ne doivent pas impacter le solde d'un compte suivi.
     if (logTransaction) {
       const account = accountId
-        ? await prisma.account.findFirst({ where: { id: accountId, userId } })
-        : await prisma.account.findFirst({ where: { userId }, orderBy: { createdAt: 'asc' } });
+        ? await prisma.account.findFirst({ where: { id: accountId, userId: { in: ctx.memberIds } } })
+        : await prisma.account.findFirst({ where: { userId: { in: ctx.memberIds } }, orderBy: { createdAt: 'asc' } });
       if (!account) {
         return NextResponse.json(
           { success: false, error: 'Aucun compte trouvé pour enregistrer ce remboursement.' },
@@ -72,10 +75,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         );
       }
 
-      let category = await prisma.category.findFirst({ where: { userId, name: DEBT_PAYMENT_CATEGORY_NAME } });
+      let category = await prisma.category.findFirst({ where: { userId: ctx.budgetOwnerId, name: DEBT_PAYMENT_CATEGORY_NAME } });
       if (!category) {
         category = await prisma.category.create({
-          data: { userId, name: DEBT_PAYMENT_CATEGORY_NAME, type: 'expense' },
+          data: { userId: ctx.budgetOwnerId, name: DEBT_PAYMENT_CATEGORY_NAME, type: 'expense' },
         });
       }
 

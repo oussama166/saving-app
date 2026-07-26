@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireSession } from '@/lib/auth';
+import { getHouseholdContext } from '@/lib/household';
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -17,7 +18,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       isActive?: boolean;
     };
 
-    const existing = await prisma.subscription.findFirst({ where: { id, userId } });
+    const ctx = await getHouseholdContext(userId);
+    const existing = await prisma.subscription.findFirst({ where: { id, userId: { in: ctx.memberIds } } });
     if (!existing) {
       return NextResponse.json({ success: false, error: 'Abonnement introuvable' }, { status: 404 });
     }
@@ -40,7 +42,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     }
 
     if (categoryId !== undefined) {
-      const category = await prisma.category.findFirst({ where: { id: categoryId, userId } });
+      const category = await prisma.category.findFirst({ where: { id: categoryId, userId: ctx.budgetOwnerId } });
       if (!category) {
         return NextResponse.json({ success: false, error: 'Catégorie invalide' }, { status: 400 });
       }
@@ -48,7 +50,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     }
 
     if (accountId !== undefined) {
-      const account = await prisma.account.findFirst({ where: { id: accountId, userId } });
+      const account = await prisma.account.findFirst({ where: { id: accountId, userId: { in: ctx.memberIds } } });
       if (!account) {
         return NextResponse.json({ success: false, error: 'Compte invalide' }, { status: 400 });
       }
@@ -91,8 +93,9 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
   try {
     const { userId } = await requireSession();
     const { id } = await params;
+    const ctx = await getHouseholdContext(userId);
 
-    const existing = await prisma.subscription.findFirst({ where: { id, userId } });
+    const existing = await prisma.subscription.findFirst({ where: { id, userId: { in: ctx.memberIds } } });
     if (!existing) {
       return NextResponse.json({ success: false, error: 'Abonnement introuvable' }, { status: 404 });
     }
@@ -103,7 +106,10 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
     // sens que rattaché à un abonnement existant (pas de champ nullable),
     // donc son historique de changements de plan part avec l'abonnement.
     await prisma.$transaction(async (tx) => {
-      await tx.transaction.updateMany({ where: { subscriptionId: id, userId }, data: { subscriptionId: null } });
+      await tx.transaction.updateMany({
+        where: { subscriptionId: id, userId: { in: ctx.memberIds } },
+        data: { subscriptionId: null },
+      });
       await tx.subscriptionPlanChange.deleteMany({ where: { subscriptionId: id } });
       await tx.subscription.delete({ where: { id } });
     });

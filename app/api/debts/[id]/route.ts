@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireSession } from '@/lib/auth';
+import { getHouseholdMemberIds } from '@/lib/household';
 
 const DEBT_TYPES = ['credit', 'pret_immo', 'pret_perso', 'autre'];
 
@@ -23,7 +24,8 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       isActive,
     } = body;
 
-    const existing = await prisma.debt.findFirst({ where: { id, userId } });
+    const memberIds = await getHouseholdMemberIds(userId);
+    const existing = await prisma.debt.findFirst({ where: { id, userId: { in: memberIds } } });
     if (!existing) {
       return NextResponse.json({ success: false, error: 'Dette introuvable' }, { status: 404 });
     }
@@ -76,8 +78,9 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
   try {
     const { userId } = await requireSession();
     const { id } = await params;
+    const memberIds = await getHouseholdMemberIds(userId);
 
-    const existing = await prisma.debt.findFirst({ where: { id, userId } });
+    const existing = await prisma.debt.findFirst({ where: { id, userId: { in: memberIds } } });
     if (!existing) {
       return NextResponse.json({ success: false, error: 'Dette introuvable' }, { status: 404 });
     }

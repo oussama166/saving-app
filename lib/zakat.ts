@@ -1,5 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { getEnrichedPortfolioAssets } from "@/lib/portfolio";
+import { getHouseholdContext } from "@/lib/household";
+import { getRatesToMad } from "@/lib/exchangeRates";
 
 // Seuils (nisab) traditionnels, en grammes — l'or (85g) est le plus utilisé
 // dans les calculateurs de zakat grand public, l'argent (595g) donne un
@@ -33,13 +35,15 @@ export interface ZakatWealthBreakdown {
  * ajuster manuellement selon sa propre situation/école de pensée.
  */
 export async function computeZakatableWealth(userId: string): Promise<ZakatWealthBreakdown> {
+  const ctx = await getHouseholdContext(userId);
   const [accounts, portfolio, activeDebts] = await Promise.all([
-    prisma.account.findMany({ where: { userId } }),
-    getEnrichedPortfolioAssets(userId),
-    prisma.debt.findMany({ where: { userId, isActive: true } }),
+    prisma.account.findMany({ where: { userId: { in: ctx.memberIds } } }),
+    getEnrichedPortfolioAssets(ctx),
+    prisma.debt.findMany({ where: { userId: { in: ctx.memberIds }, isActive: true } }),
   ]);
 
-  const cashAndBankBalances = accounts.reduce((acc, a) => acc + a.balance, 0);
+  const rates = await getRatesToMad(accounts.map((a) => a.currency));
+  const cashAndBankBalances = accounts.reduce((acc, a) => acc + a.balance * (rates[a.currency] ?? 1), 0);
   const portfolioValue = portfolio.globalLiveValue;
   const totalDebts = activeDebts.reduce((acc, d) => acc + d.currentBalance, 0);
 

@@ -65,8 +65,21 @@ const GEOAPIFY_CATEGORY_TO_WEALTHOS: Record<string, { categoryName: string; subC
 };
 
 // Catégories demandées à l'API (niveau général — Geoapify inclut
-// automatiquement toutes les sous-catégories correspondantes).
+// automatiquement toutes les sous-catégories correspondantes). Ne doit
+// contenir QUE des clés valides côté Geoapify (voir GEOAPIFY_CATEGORY_TO_WEALTHOS
+// ci-dessus) — les clés purement locales (LOCAL_ONLY_CATEGORY_HINTS
+// ci-dessous) ne doivent jamais y apparaître, sous peine de faire échouer
+// l'appel réseau réel avec une catégorie inconnue.
 const REQUESTED_CATEGORIES = Object.keys(GEOAPIFY_CATEGORY_TO_WEALTHOS).join(',');
+
+// Catégories devinées uniquement à partir de mots-clés locaux (jamais
+// envoyées à l'API Geoapify) — pour des cas où le mot-clé du nom est un
+// signal plus fiable que ce que renverrait une recherche géographique. Ex :
+// "Glovo" est classé MCC 4789 ("transport") par les banques, mais désigne en
+// pratique presque toujours une livraison de repas au Maroc.
+const LOCAL_ONLY_CATEGORY_HINTS: Record<string, { categoryName: string; subCategoryName?: string }> = {
+  'local.food_delivery': { categoryName: 'Alimentation & Restauration', subCategoryName: 'Livraison à domicile' },
+};
 
 // Mots-clés (FR/EN/darija translittéré, déjà normalisés — minuscules, sans
 // accents) trouvés dans le nom du marchand envoyé par Apple Pay. Utilisés
@@ -95,8 +108,21 @@ const MERCHANT_KEYWORD_HINTS: { keywords: string[]; categories: string[] }[] = [
       'donut', 'sushi', 'ramen', 'noodle', 'pasta', 'pates', 'msemen', 'rghaif',
       'tajine', 'couscous', 'harira', 'glace', 'glacier', 'icecream', 'ice cream',
       'patisserie', 'boulangerie', 'bakery', 'pastry',
+      // Enseignes précises (marocaines/internationales) courantes sur les
+      // relevés bancaires marocains, pas forcément couvertes par les termes
+      // génériques ci-dessus.
+      'mcdo', 'mcdonald', 'kfc', 'crusty', 'dominos', "domino's",
     ],
     categories: ['catering.fast_food'],
+  },
+  {
+    // Livraison de repas — au Maroc, désigne quasi toujours de la
+    // restauration livrée (Glovo fait aussi colis/courses, mais l'usage
+    // dominant sur un relevé bancaire perso reste la commande de repas).
+    // Volontairement une clé locale (voir LOCAL_ONLY_CATEGORY_HINTS), jamais
+    // envoyée à Geoapify.
+    keywords: ['glovo'],
+    categories: ['local.food_delivery'],
   },
   { keywords: ['bar', 'pub', 'biergarten'], categories: ['catering.bar', 'catering.pub'] },
   { keywords: ['traiteur', 'buffet'], categories: ['catering.restaurant', 'catering.food_court'] },
@@ -106,7 +132,7 @@ const MERCHANT_KEYWORD_HINTS: { keywords: string[]; categories: string[] }[] = [
   {
     // Grandes surfaces / chaînes de supermarché présentes au Maroc + termes génériques.
     keywords: [
-      'supermarche', 'supermarket', 'hypermarche', 'hypermarket', 'epicerie',
+      'supermarche', 'supermarket', 'hypermarche', 'hypermarket', 'hyper u', 'epicerie',
       'superette', 'hanouty', 'alimentation generale', 'mini market', 'minimarket', 'proxi',
       'marjane', 'carrefour', 'aswak assalam', 'aswak', 'label vie', 'labelvie',
       'bim', 'atacadao', 'ultra', 'kariann', 'sodigrain', 'aina market',
@@ -175,7 +201,7 @@ function namesLikelyMatch(a: string, b: string): boolean {
 
 function resolveCategory(categories: string[]): { categoryName: string; subCategoryName?: string } | null {
   for (const cat of categories) {
-    const match = GEOAPIFY_CATEGORY_TO_WEALTHOS[cat];
+    const match = GEOAPIFY_CATEGORY_TO_WEALTHOS[cat] ?? LOCAL_ONLY_CATEGORY_HINTS[cat];
     if (match) return match;
   }
   return null;

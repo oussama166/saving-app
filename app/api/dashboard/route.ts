@@ -3,12 +3,17 @@ import { prisma } from "@/lib/prisma";
 import { getEnrichedPortfolioAssets } from "@/lib/portfolio";
 import { NEEDS_CATEGORIES } from "@/lib/financials";
 import { requireSession } from "@/lib/auth";
+import { getHouseholdContext } from "@/lib/household";
+import { getRatesToMad } from "@/lib/exchangeRates";
+import { requireFeatureAccess } from "@/lib/features";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
     const { userId } = await requireSession();
+    await requireFeatureAccess("dashboard", userId);
+    const ctx = await getHouseholdContext(userId);
 
     const now = new Date();
     const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -23,31 +28,43 @@ export async function GET() {
       last3MonthsExpenses,
       portfolio,
     ] = await Promise.all([
-      prisma.account.findMany({ where: { userId, type: "checking" } }),
-      prisma.savingsGoal.findMany({ where: { userId } }),
+      prisma.account.findMany({ where: { userId: { in: ctx.memberIds }, type: "checking" } }),
+      prisma.savingsGoal.findMany({ where: { userId: { in: ctx.memberIds } } }),
       prisma.transaction.findMany({
-        where: { userId, date: { gte: firstDayOfMonth } },
-        include: { category: true },
+        where: { userId: { in: ctx.memberIds }, date: { gte: firstDayOfMonth } },
+        include: { category: true, account: { select: { currency: true } } },
       }),
-      prisma.category.findMany({ where: { userId } }),
-      prisma.userSettings.findUnique({ where: { userId } }),
+      prisma.category.findMany({ where: { userId: ctx.budgetOwnerId } }),
+      prisma.userSettings.findUnique({ where: { userId: ctx.budgetOwnerId } }),
       prisma.transaction.findMany({
-        where: { userId, date: { gte: threeMonthsAgo }, amount: { lt: 0 } },
+        where: { userId: { in: ctx.memberIds }, date: { gte: threeMonthsAgo }, amount: { lt: 0 } },
+        include: { account: { select: { currency: true } } },
       }),
-      getEnrichedPortfolioAssets(userId),
+      getEnrichedPortfolioAssets(ctx),
     ]);
 
     // Dettes actives — pour le patrimoine net (actifs - dettes), voir carte
     // Dettes du dashboard et /debts pour le détail.
-    const activeDebts = await prisma.debt.findMany({ where: { userId, isActive: true } });
+    const activeDebts = await prisma.debt.findMany({ where: { userId: { in: ctx.memberIds }, isActive: true } });
     const totalDebts = activeDebts.reduce((acc, d) => acc + d.currentBalance, 0);
 
     // Revenu de référence (page Profil) — fallback si UserSettings n'existe pas encore
     const referenceIncome = userSettings?.referenceIncome ?? 10000;
 
+    // Taux de conversion vers MAD pour les comptes en devise étrangère (voir
+    // lib/exchangeRates.ts) — MAD lui-même ne coûte ni requête ni appel réseau.
+    // Rassemble les devises distinctes de TOUTES les sources ci-dessus (pas
+    // seulement les comptes courants) : une transaction peut provenir d'un
+    // compte non-courant (ex: épargne en devise étrangère).
+    const fxRates = await getRatesToMad([
+      ...checkingAccounts.map((a) => a.currency),
+      ...allTransactions.map((tx) => tx.account.currency),
+      ...last3MonthsExpenses.map((tx) => tx.account.currency),
+    ]);
+
     // Basic Metrics
     const totalCheckingBalance = checkingAccounts.reduce(
-      (acc, curr) => acc + curr.balance,
+      (acc, curr) => acc + curr.balance * (fxRates[curr.currency] ?? 1),
       0,
     );
     const totalSavingsLocked = savingsGoals.reduce(
@@ -62,10 +79,11 @@ export async function GET() {
     const expensesByCategoryMap: Record<string, number> = {};
 
     allTransactions.forEach((tx) => {
-      if (tx.amount > 0) {
-        income += tx.amount;
+      const amount = tx.amount * (fxRates[tx.account.currency] ?? 1);
+      if (amount > 0) {
+        income += amount;
       } else {
-        const absAmount = Math.abs(tx.amount);
+        const absAmount = Math.abs(amount);
         expenses += absAmount;
         expensesByCategoryMap[tx.category.name] =
           (expensesByCategoryMap[tx.category.name] || 0) + absAmount;
@@ -78,7 +96,7 @@ export async function GET() {
     // 3 derniers mois. Si pas assez d'historique, on retombe sur 50% du
     // revenu de référence comme estimation.
     const totalExpenses3Months = last3MonthsExpenses.reduce(
-      (acc, tx) => acc + Math.abs(tx.amount),
+      (acc, tx) => acc + Math.abs(tx.amount * (fxRates[tx.account.currency] ?? 1)),
       0,
     );
     const avgMonthlyExpenses =
@@ -160,7 +178,7 @@ export async function GET() {
     };
 
     const recentTransactions = await prisma.transaction.findMany({
-      where: { userId },
+      where: { userId: { in: ctx.memberIds } },
       take: 10,
       orderBy: { date: "desc" },
       include: {
@@ -204,6 +222,12 @@ export async function GET() {
       return NextResponse.json(
         { success: false, error: "Non authentifié" },
         { status: 401 },
+      );
+    }
+    if (error instanceof Error && error.message === "FEATURE_DISABLED") {
+      return NextResponse.json(
+        { success: false, error: "Cette fonctionnalité est temporairement désactivée." },
+        { status: 403 },
       );
     }
     console.error("Dashboard Aggregator Error:", error);

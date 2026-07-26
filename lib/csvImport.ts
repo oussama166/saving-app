@@ -1,11 +1,18 @@
 // Parsing tolérant de CSV de relevé bancaire — les banques marocaines
 // exportent dans des formats assez variés (délimiteur virgule ou
 // point-virgule, montant en une colonne signée ou en deux colonnes
-// débit/crédit séparées, dates en DD/MM/YYYY ou YYYY-MM-DD...). Plutôt que
-// d'exiger un format unique, on détecte automatiquement les colonnes par
-// leur en-tête (FR/EN, insensible à la casse/aux accents) et on retombe sur
-// un ordre positionnel (date, libellé, montant) si les en-têtes ne sont pas
-// reconnus.
+// débit/crédit séparées, dates en DD/MM/YYYY ou YYYY-MM-DD, en-têtes qui ne
+// matchent pas toujours nos motifs FR/EN reconnus...). Plutôt que de
+// deviner en silence et risquer un import mal aligné, le flux est en deux
+// temps :
+// 1. detectCsvColumns() : sniff délimiteur + en-têtes + une "meilleure
+//    estimation" de mapping, SANS parser les lignes — sert à afficher un
+//    aperçu (voir /api/transactions/csv-preview) que l'utilisateur peut
+//    corriger avant de confirmer.
+// 2. parseBankCsvWithMapping() : parse RÉELLEMENT les lignes avec un mapping
+//    explicite (deviné à l'étape 1, corrigé par l'utilisateur, ou repris
+//    d'un CsvImportProfile déjà enregistré pour ce même format d'en-tête —
+//    voir prisma/schema.prisma).
 
 export interface ParsedCsvRow {
   line: number; // numéro de ligne dans le fichier (1-based, en-tête compris) — pour les messages d'erreur
@@ -22,6 +29,30 @@ export interface CsvParseError {
 export interface CsvParseResult {
   rows: ParsedCsvRow[];
   errors: CsvParseError[];
+}
+
+// Mapping explicite des colonnes — soit `amountIdx` (une colonne signée),
+// soit `debitIdx`/`creditIdx` (deux colonnes séparées), jamais les deux à
+// vide. -1 = colonne absente.
+export interface CsvColumnMapping {
+  delimiter: string;
+  hasHeaderRow: boolean; // false = la 1ère ligne est déjà une donnée (repli positionnel)
+  dateIdx: number;
+  merchantIdx: number;
+  amountIdx: number;
+  debitIdx: number;
+  creditIdx: number;
+}
+
+export interface CsvDetectionResult {
+  mapping: CsvColumnMapping;
+  headerCells: string[]; // en-têtes bruts (tels quels dans le fichier), [] si hasHeaderRow=false
+  headerRecognized: boolean; // true si detecté par en-tête, false si repli positionnel (à vérifier par l'utilisateur)
+  previewRows: string[][]; // 5 premières lignes de DONNÉES (hors en-tête), pour l'aperçu UI
+  // Signature stable de la structure de ce fichier (délimiteur + en-têtes
+  // normalisés) — sert de clé pour retrouver/enregistrer un
+  // CsvImportProfile (voir app/api/transactions/csv-preview/route.ts).
+  headerSignature: string;
 }
 
 function normalizeHeader(h: string): string {
@@ -108,19 +139,35 @@ function parseDate(raw: string): Date | null {
   return Number.isNaN(fallback.getTime()) ? null : fallback;
 }
 
-export function parseBankCsv(csvText: string): CsvParseResult {
-  const lines = csvText.split(/\r\n|\n|\r/).filter((l) => l.trim().length > 0);
-  const rows: ParsedCsvRow[] = [];
-  const errors: CsvParseError[] = [];
+function splitLines(csvText: string): string[] {
+  return csvText.split(/\r\n|\n|\r/).filter((l) => l.trim().length > 0);
+}
 
+/**
+ * Sniff le fichier (délimiteur, en-têtes, meilleure estimation de mapping)
+ * sans parser les lignes — sert à construire l'aperçu de mapping affiché à
+ * l'utilisateur (voir /api/transactions/csv-preview) avant tout import réel.
+ */
+export function detectCsvColumns(csvText: string): CsvDetectionResult {
+  const lines = splitLines(csvText);
   if (lines.length === 0) {
-    return { rows, errors: [{ line: 0, message: 'Fichier vide.' }] };
+    const emptyMapping: CsvColumnMapping = {
+      delimiter: ',',
+      hasHeaderRow: false,
+      dateIdx: 0,
+      merchantIdx: 1,
+      amountIdx: 2,
+      debitIdx: -1,
+      creditIdx: -1,
+    };
+    return { mapping: emptyMapping, headerCells: [], headerRecognized: false, previewRows: [], headerSignature: 'empty' };
   }
 
   const delimiter = detectDelimiter(lines[0]);
-  const headerCells = splitCsvLine(lines[0], delimiter).map(normalizeHeader);
+  const rawHeaderCells = splitCsvLine(lines[0], delimiter);
+  const normalizedHeaderCells = rawHeaderCells.map(normalizeHeader);
 
-  const findIndex = (candidates: string[]) => headerCells.findIndex((h) => candidates.includes(h));
+  const findIndex = (candidates: string[]) => normalizedHeaderCells.findIndex((h) => candidates.includes(h));
   let dateIdx = findIndex(DATE_HEADERS);
   let merchantIdx = findIndex(MERCHANT_HEADERS);
   let amountIdx = findIndex(AMOUNT_HEADERS);
@@ -128,17 +175,54 @@ export function parseBankCsv(csvText: string): CsvParseResult {
   const creditIdx = findIndex(CREDIT_HEADERS);
 
   const headerRecognized = dateIdx !== -1 && merchantIdx !== -1 && (amountIdx !== -1 || (debitIdx !== -1 && creditIdx !== -1));
-  const dataStartLine = headerRecognized ? 1 : 0;
 
   if (!headerRecognized) {
     // Repli positionnel : colonne 0 = date, 1 = libellé, 2 = montant — ordre
     // le plus courant dans les exports bancaires marocains sans en-tête
-    // reconnu. La première ligne est alors traitée comme une donnée, pas un
-    // en-tête (sauf si elle échoue à parser, auquel cas on la signale).
+    // reconnu. À confirmer/corriger par l'utilisateur dans l'aperçu.
     dateIdx = 0;
     merchantIdx = 1;
     amountIdx = 2;
   }
+
+  const dataStartLine = headerRecognized ? 1 : 0;
+  const previewRows = lines.slice(dataStartLine, dataStartLine + 5).map((l) => splitCsvLine(l, delimiter));
+
+  // Signature stable : délimiteur + en-têtes normalisés joints — deux
+  // exports du même compte/de la même banque produisent la même signature
+  // d'une fois sur l'autre, ce qui permet de retrouver un CsvImportProfile
+  // déjà enregistré. Si pas d'en-tête reconnu, on inclut aussi le nombre de
+  // colonnes de la 1ère ligne (repli positionnel — moins précis mais mieux
+  // que rien).
+  const headerSignature = headerRecognized
+    ? `h:${delimiter}:${normalizedHeaderCells.join('|')}`
+    : `p:${delimiter}:cols${rawHeaderCells.length}`;
+
+  return {
+    mapping: { delimiter, hasHeaderRow: headerRecognized, dateIdx, merchantIdx, amountIdx, debitIdx, creditIdx },
+    headerCells: rawHeaderCells,
+    headerRecognized,
+    previewRows,
+    headerSignature,
+  };
+}
+
+/**
+ * Parse le CSV avec un mapping de colonnes EXPLICITE (issu de
+ * detectCsvColumns(), corrigé par l'utilisateur, ou repris d'un
+ * CsvImportProfile enregistré) — jamais de re-détection ici.
+ */
+export function parseBankCsvWithMapping(csvText: string, mapping: CsvColumnMapping): CsvParseResult {
+  const lines = splitLines(csvText);
+  const rows: ParsedCsvRow[] = [];
+  const errors: CsvParseError[] = [];
+
+  if (lines.length === 0) {
+    return { rows, errors: [{ line: 0, message: 'Fichier vide.' }] };
+  }
+
+  const { delimiter, hasHeaderRow, dateIdx, merchantIdx, amountIdx, debitIdx, creditIdx } = mapping;
+  const dataStartLine = hasHeaderRow ? 1 : 0;
 
   for (let i = dataStartLine; i < lines.length; i++) {
     const lineNumber = i + 1;
@@ -174,4 +258,14 @@ export function parseBankCsv(csvText: string): CsvParseResult {
   }
 
   return { rows, errors };
+}
+
+/**
+ * Raccourci pratique : détecte le mapping puis parse dans la foulée — utilisé
+ * quand on ne veut pas du flux d'aperçu (ex: tests, ou un futur webhook CSV
+ * automatisé où personne ne peut corriger le mapping à la main).
+ */
+export function parseBankCsv(csvText: string): CsvParseResult {
+  const { mapping } = detectCsvColumns(csvText);
+  return parseBankCsvWithMapping(csvText, mapping);
 }

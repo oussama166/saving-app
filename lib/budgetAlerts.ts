@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { sendBudgetAlertEmail } from "@/lib/email";
 import { formatYearMonth } from "@/lib/subscriptions";
+import { getHouseholdContext } from "@/lib/household";
 
 // Paliers vérifiés du plus haut au plus bas : si une seule transaction fait
 // passer une catégorie de 50% à 120% d'un coup, on notifie uniquement le
@@ -28,11 +29,17 @@ export async function checkAndSendBudgetAlert(
     const category = await prisma.category.findUnique({ where: { id: categoryId } });
     if (!category || category.type !== "expense" || category.budgetPct <= 0) return;
 
-    const [userSettings, user] = await Promise.all([
-      prisma.userSettings.findUnique({ where: { userId } }),
-      prisma.user.findUnique({ where: { id: userId }, select: { email: true } }),
+    // Budget partagé : le foyer entier (voir lib/household.ts) — le seuil
+    // se calcule sur les dépenses de TOUS les membres sur cette catégorie
+    // partagée, et l'email part vers chaque membre plutôt qu'un seul (sinon
+    // le partenaire ne saurait jamais que le budget commun dérape).
+    const ctx = await getHouseholdContext(userId);
+
+    const [userSettings, members] = await Promise.all([
+      prisma.userSettings.findUnique({ where: { userId: ctx.budgetOwnerId } }),
+      prisma.user.findMany({ where: { id: { in: ctx.memberIds } }, select: { email: true } }),
     ]);
-    if (!user) return;
+    if (members.length === 0) return;
 
     const referenceIncome = userSettings?.referenceIncome ?? 10000;
     const budget = (category.budgetPct / 100) * referenceIncome;
@@ -40,7 +47,7 @@ export async function checkAndSendBudgetAlert(
 
     const firstDayOfMonth = new Date(txDate.getFullYear(), txDate.getMonth(), 1);
     const monthExpenses = await prisma.transaction.findMany({
-      where: { userId, categoryId, date: { gte: firstDayOfMonth }, amount: { lt: 0 } },
+      where: { userId: { in: ctx.memberIds }, categoryId, date: { gte: firstDayOfMonth }, amount: { lt: 0 } },
       select: { amount: true },
     });
     const spent = monthExpenses.reduce((acc, t) => acc + Math.abs(t.amount), 0);
@@ -60,14 +67,18 @@ export async function checkAndSendBudgetAlert(
       // on ne retente pas indéfiniment à chaque transaction suivante — le
       // "presque tout le monde reçoit une alerte" est préférable à un email
       // renvoyé en boucle en cas de souci temporaire côté Resend.
-      await prisma.budgetAlertSent.create({ data: { userId, categoryId, yearMonth, threshold } });
-      await sendBudgetAlertEmail(user.email, {
-        categoryName: category.name,
-        threshold,
-        spent,
-        budget,
-        usedPct,
-      });
+      await prisma.budgetAlertSent.create({ data: { userId: ctx.budgetOwnerId, categoryId, yearMonth, threshold } });
+      await Promise.all(
+        members.map((m) =>
+          sendBudgetAlertEmail(m.email, {
+            categoryName: category.name,
+            threshold,
+            spent,
+            budget,
+            usedPct,
+          }),
+        ),
+      );
       return;
     }
   } catch (error) {

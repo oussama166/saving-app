@@ -1,4 +1,20 @@
 import { prisma } from '@/lib/prisma';
+import type { HouseholdContext } from '@/lib/household';
+import { getRatesToMad } from '@/lib/exchangeRates';
+
+// Petit utilitaire partagé : une Transaction est toujours dans la devise de
+// SON compte (Account.currency), jamais forcément MAD — voir
+// lib/exchangeRates.ts. `rates` doit contenir au moins la devise de chaque
+// transaction concernée (construit via getRatesToMad() sur les devises
+// distinctes réellement présentes dans le lot chargé).
+function toMad(amount: number, currency: string, rates: Record<string, number>): number {
+  return amount * (rates[currency] ?? 1);
+}
+
+async function ratesForAccounts(transactions: { account: { currency: string } }[]): Promise<Record<string, number>> {
+  const currencies = transactions.map((tx) => tx.account.currency);
+  return getRatesToMad(currencies);
+}
 
 // Catégories "Besoins" (essentielles / charges fixes) — utilisé à la fois
 // pour la règle 50/30/20 (app/api/dashboard/route.ts) et pour le ratio de
@@ -18,20 +34,24 @@ export const NEEDS_CATEGORIES = new Set([
  * Même formule que app/api/dashboard/route.ts — à terme, faire pointer
  * le dashboard vers ce helper pour éviter toute divergence de calcul.
  */
-export async function getAverageMonthlyExpenses(userId: string, referenceIncome: number, months = 3) {
+export async function getAverageMonthlyExpenses(ctx: HouseholdContext, referenceIncome: number, months = 3) {
   const now = new Date();
   const since = new Date(now.getFullYear(), now.getMonth() - months, 1);
 
   const transactions = await prisma.transaction.findMany({
-    where: { userId, date: { gte: since }, amount: { lt: 0 } },
+    where: { userId: { in: ctx.memberIds }, date: { gte: since }, amount: { lt: 0 } },
+    include: { account: { select: { currency: true } } },
   });
 
-  const total = transactions.reduce((acc, tx) => acc + Math.abs(tx.amount), 0);
+  const rates = await ratesForAccounts(transactions);
+  const total = transactions.reduce((acc, tx) => acc + Math.abs(toMad(tx.amount, tx.account.currency, rates)), 0);
   return total > 0 ? total / months : referenceIncome * 0.5;
 }
 
-export async function getUserSettings(userId: string) {
-  const settings = await prisma.userSettings.findUnique({ where: { userId } });
+// Réglages (revenu de référence, devise...) : un seul jeu partagé pour tout
+// le foyer, porté par le propriétaire budget — voir lib/household.ts.
+export async function getUserSettings(ctx: HouseholdContext) {
+  const settings = await prisma.userSettings.findUnique({ where: { userId: ctx.budgetOwnerId } });
   return {
     referenceIncome: settings?.referenceIncome ?? 10000,
     emergencyFundTargetMonths: settings?.emergencyFundTargetMonths ?? 3,
@@ -49,16 +69,20 @@ export async function getUserSettings(userId: string) {
  * (CategoryArchive) pour cette catégorie, pour que le solde reste exact
  * même après un archivage/nettoyage (voir app/api/backup/archive/route.ts).
  */
-export async function getEmergencyFundBalance(userId: string) {
-  const category = await prisma.category.findFirst({ where: { userId, name: 'Épargne Sécurité' } });
+export async function getEmergencyFundBalance(ctx: HouseholdContext) {
+  const category = await prisma.category.findFirst({ where: { userId: ctx.budgetOwnerId, name: 'Épargne Sécurité' } });
   if (!category) return 0;
 
   const [transactions, archive] = await Promise.all([
-    prisma.transaction.findMany({ where: { userId, categoryId: category.id } }),
+    prisma.transaction.findMany({
+      where: { userId: { in: ctx.memberIds }, categoryId: category.id },
+      include: { account: { select: { currency: true } } },
+    }),
     prisma.categoryArchive.findUnique({ where: { categoryId: category.id } }),
   ]);
 
-  const liveTotal = transactions.reduce((acc, tx) => acc + tx.amount, 0);
+  const rates = await ratesForAccounts(transactions);
+  const liveTotal = transactions.reduce((acc, tx) => acc + toMad(tx.amount, tx.account.currency, rates), 0);
   return liveTotal + (archive?.archivedTotal ?? 0);
 }
 
@@ -67,16 +91,20 @@ export async function getEmergencyFundBalance(userId: string) {
  * générique pour tout futur calcul "depuis le début" (ex: coût d'acquisition
  * cumulé des Investissements & Trading).
  */
-export async function getCategoryLifetimeTotal(userId: string, categoryName: string) {
-  const category = await prisma.category.findFirst({ where: { userId, name: categoryName } });
+export async function getCategoryLifetimeTotal(ctx: HouseholdContext, categoryName: string) {
+  const category = await prisma.category.findFirst({ where: { userId: ctx.budgetOwnerId, name: categoryName } });
   if (!category) return 0;
 
   const [transactions, archive] = await Promise.all([
-    prisma.transaction.findMany({ where: { userId, categoryId: category.id } }),
+    prisma.transaction.findMany({
+      where: { userId: { in: ctx.memberIds }, categoryId: category.id },
+      include: { account: { select: { currency: true } } },
+    }),
     prisma.categoryArchive.findUnique({ where: { categoryId: category.id } }),
   ]);
 
-  const liveTotal = transactions.reduce((acc, tx) => acc + tx.amount, 0);
+  const rates = await ratesForAccounts(transactions);
+  const liveTotal = transactions.reduce((acc, tx) => acc + toMad(tx.amount, tx.account.currency, rates), 0);
   return liveTotal + (archive?.archivedTotal ?? 0);
 }
 
@@ -96,27 +124,29 @@ export interface FinancialRatios {
  * (revenu - charges fixes - épargne). Si aucun revenu n'a encore été
  * enregistré ce mois-ci, on retombe sur le revenu de référence (Profil).
  */
-export async function getFinancialRatios(userId: string, referenceIncome: number): Promise<FinancialRatios> {
+export async function getFinancialRatios(ctx: HouseholdContext, referenceIncome: number): Promise<FinancialRatios> {
   const now = new Date();
   const start = new Date(now.getFullYear(), now.getMonth(), 1);
 
   const transactions = await prisma.transaction.findMany({
-    where: { userId, date: { gte: start } },
-    include: { category: true },
+    where: { userId: { in: ctx.memberIds }, date: { gte: start } },
+    include: { category: true, account: { select: { currency: true } } },
   });
 
+  const rates = await ratesForAccounts(transactions);
   let income = 0;
   let fixedCharges = 0;
   let savings = 0;
   let totalExpenses = 0;
 
   for (const tx of transactions) {
+    const amount = toMad(tx.amount, tx.account.currency, rates);
     if (tx.category.type === 'income') {
-      income += tx.amount;
+      income += amount;
     } else if (tx.category.type === 'savings') {
-      savings += Math.abs(tx.amount);
+      savings += Math.abs(amount);
     } else {
-      const abs = Math.abs(tx.amount);
+      const abs = Math.abs(amount);
       totalExpenses += abs;
       if (NEEDS_CATEGORIES.has(tx.category.name)) fixedCharges += abs;
     }
@@ -152,7 +182,7 @@ export interface MonthlyAnalytics {
  * variation des dépenses vs mois précédent). Calculé à la volée — pas de
  * modèle de snapshot dédié pour l'instant.
  */
-export async function getMonthlyAnalytics(userId: string, monthsCount = 6): Promise<MonthlyAnalytics[]> {
+export async function getMonthlyAnalytics(ctx: HouseholdContext, monthsCount = 6): Promise<MonthlyAnalytics[]> {
   const now = new Date();
   const months = Array.from({ length: monthsCount }, (_, i) => {
     const offset = monthsCount - 1 - i;
@@ -164,10 +194,11 @@ export async function getMonthlyAnalytics(userId: string, monthsCount = 6): Prom
   });
 
   const transactions = await prisma.transaction.findMany({
-    where: { userId, date: { gte: months[0].start } },
-    include: { category: true },
+    where: { userId: { in: ctx.memberIds }, date: { gte: months[0].start } },
+    include: { category: true, account: { select: { currency: true } } },
   });
 
+  const rates = await ratesForAccounts(transactions);
   const buckets = new Map(
     months.map((m) => [
       m.key,
@@ -179,13 +210,14 @@ export async function getMonthlyAnalytics(userId: string, monthsCount = 6): Prom
     const bucketMonth = months.find((m) => tx.date >= m.start && tx.date < m.end);
     if (!bucketMonth) continue;
     const bucket = buckets.get(bucketMonth.key)!;
+    const amount = toMad(tx.amount, tx.account.currency, rates);
 
     if (tx.category.type === 'income') {
-      bucket.income += tx.amount;
+      bucket.income += amount;
     } else if (tx.category.type === 'savings') {
-      bucket.savings += Math.abs(tx.amount);
+      bucket.savings += Math.abs(amount);
     } else {
-      const abs = Math.abs(tx.amount);
+      const abs = Math.abs(amount);
       bucket.expenses += abs;
       bucket.categoryTotals.set(tx.category.name, (bucket.categoryTotals.get(tx.category.name) ?? 0) + abs);
     }
@@ -235,7 +267,7 @@ export interface CategoryTrend {
  * mois par mois — sert à repérer les catégories qui dérapent dans la durée
  * plutôt que sur un seul mois isolé.
  */
-export async function getTopCategoriesTrend(userId: string, monthsCount = 6, topN = 5): Promise<CategoryTrend[]> {
+export async function getTopCategoriesTrend(ctx: HouseholdContext, monthsCount = 6, topN = 5): Promise<CategoryTrend[]> {
   const now = new Date();
   const months = Array.from({ length: monthsCount }, (_, i) => {
     const offset = monthsCount - 1 - i;
@@ -247,10 +279,11 @@ export async function getTopCategoriesTrend(userId: string, monthsCount = 6, top
   });
 
   const transactions = await prisma.transaction.findMany({
-    where: { userId, date: { gte: months[0].start }, category: { type: 'expense' } },
-    include: { category: true },
+    where: { userId: { in: ctx.memberIds }, date: { gte: months[0].start }, category: { type: 'expense' } },
+    include: { category: true, account: { select: { currency: true } } },
   });
 
+  const rates = await ratesForAccounts(transactions);
   const totals = new Map<string, number>();
   const perMonth = new Map<string, Map<string, number>>(); // nom catégorie -> mois -> montant
 
@@ -258,7 +291,7 @@ export async function getTopCategoriesTrend(userId: string, monthsCount = 6, top
     const bucketMonth = months.find((m) => tx.date >= m.start && tx.date < m.end);
     if (!bucketMonth) continue;
 
-    const abs = Math.abs(tx.amount);
+    const abs = Math.abs(toMad(tx.amount, tx.account.currency, rates));
     const name = tx.category.name;
     totals.set(name, (totals.get(name) ?? 0) + abs);
 
@@ -299,8 +332,8 @@ export interface HealthBudget {
  * revenu de référence (page Profil), comparé aux dépenses réelles du mois
  * en cours sur cette catégorie.
  */
-export async function getHealthBudget(userId: string, referenceIncome: number): Promise<HealthBudget> {
-  const category = await prisma.category.findFirst({ where: { userId, name: 'Santé & Médical' } });
+export async function getHealthBudget(ctx: HouseholdContext, referenceIncome: number): Promise<HealthBudget> {
+  const category = await prisma.category.findFirst({ where: { userId: ctx.budgetOwnerId, name: 'Santé & Médical' } });
   const budgetPct = category?.budgetPct ?? 0;
   const plannedMonthly = (budgetPct / 100) * referenceIncome;
 
@@ -309,11 +342,15 @@ export async function getHealthBudget(userId: string, referenceIncome: number): 
 
   let spentAbs = 0;
   if (category) {
-    const agg = await prisma.transaction.aggregate({
-      where: { userId, categoryId: category.id, date: { gte: start } },
-      _sum: { amount: true },
+    // findMany + reduce plutôt que prisma.aggregate() : la conversion en MAD
+    // (compte en devise étrangère) doit se faire par transaction avant de
+    // sommer, un aggregate() SQL ne peut pas appliquer un taux de change.
+    const txs = await prisma.transaction.findMany({
+      where: { userId: { in: ctx.memberIds }, categoryId: category.id, date: { gte: start } },
+      include: { account: { select: { currency: true } } },
     });
-    spentAbs = Math.abs(agg._sum.amount ?? 0);
+    const rates = await ratesForAccounts(txs);
+    spentAbs = Math.abs(txs.reduce((acc, tx) => acc + toMad(tx.amount, tx.account.currency, rates), 0));
   }
 
   const remaining = plannedMonthly - spentAbs;
@@ -341,7 +378,7 @@ export interface HealthSpendingPoint {
  * `monthsCount` derniers mois — sert à tracer la tendance sur la page Santé
  * (au lieu d'un seul chiffre du mois en cours comme dans getHealthBudget).
  */
-export async function getHealthSpendingTrend(userId: string, monthsCount = 6): Promise<HealthSpendingPoint[]> {
+export async function getHealthSpendingTrend(ctx: HouseholdContext, monthsCount = 6): Promise<HealthSpendingPoint[]> {
   const now = new Date();
   const months = Array.from({ length: monthsCount }, (_, i) => {
     const offset = monthsCount - 1 - i;
@@ -352,17 +389,19 @@ export async function getHealthSpendingTrend(userId: string, monthsCount = 6): P
     return { key, label, start, end };
   });
 
-  const category = await prisma.category.findFirst({ where: { userId, name: 'Santé & Médical' } });
+  const category = await prisma.category.findFirst({ where: { userId: ctx.budgetOwnerId, name: 'Santé & Médical' } });
   if (!category) return months.map((m) => ({ month: m.key, label: m.label, amount: 0 }));
 
   const transactions = await prisma.transaction.findMany({
-    where: { userId, categoryId: category.id, date: { gte: months[0].start } },
+    where: { userId: { in: ctx.memberIds }, categoryId: category.id, date: { gte: months[0].start } },
+    include: { account: { select: { currency: true } } },
   });
+  const rates = await ratesForAccounts(transactions);
 
   return months.map((m) => {
     const amount = transactions
       .filter((tx) => tx.date >= m.start && tx.date < m.end)
-      .reduce((acc, tx) => acc + Math.abs(tx.amount), 0);
+      .reduce((acc, tx) => acc + Math.abs(toMad(tx.amount, tx.account.currency, rates)), 0);
     return { month: m.key, label: m.label, amount: Math.round(amount) };
   });
 }
@@ -397,11 +436,11 @@ const OVER_BUDGET_MARGIN_PCT = 3;
  * améliorer si l'historique global doit rester exact après un nettoyage.
  */
 export async function getRealBudgetSummary(
-  userId: string,
+  ctx: HouseholdContext,
   period: 'month' | 'all' = 'month',
 ): Promise<RealBudgetSummary> {
   const categories = await prisma.category.findMany({
-    where: { userId, type: { in: ['expense', 'savings'] } },
+    where: { userId: ctx.budgetOwnerId, type: { in: ['expense', 'savings'] } },
     orderBy: { order: 'asc' },
   });
 
@@ -410,15 +449,20 @@ export async function getRealBudgetSummary(
 
   const transactions = await prisma.transaction.findMany({
     where: {
-      userId,
+      userId: { in: ctx.memberIds },
       categoryId: { in: categories.map((c) => c.id) },
       ...(start ? { date: { gte: start } } : {}),
     },
+    include: { account: { select: { currency: true } } },
   });
 
+  const rates = await ratesForAccounts(transactions);
   const spentByCategory = new Map<string, number>();
   for (const tx of transactions) {
-    spentByCategory.set(tx.categoryId, (spentByCategory.get(tx.categoryId) ?? 0) + Math.abs(tx.amount));
+    spentByCategory.set(
+      tx.categoryId,
+      (spentByCategory.get(tx.categoryId) ?? 0) + Math.abs(toMad(tx.amount, tx.account.currency, rates)),
+    );
   }
 
   const totalAnalyzed = [...spentByCategory.values()].reduce((acc, v) => acc + v, 0);

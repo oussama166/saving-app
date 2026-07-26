@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { notifyRefresh } from '@/lib/sse';
 import { requireSession } from '@/lib/auth';
+import { getHouseholdMemberIds } from '@/lib/household';
 
 const ASSET_TYPES = ['Action', 'ETF', 'Crypto', 'OPCVM', 'Or'] as const;
 
@@ -25,14 +26,16 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: false, error: 'Type d\'actif invalide' }, { status: 400 });
     }
 
+    const memberIds = await getHouseholdMemberIds(userId);
+
     if (id) {
-      const existing = await prisma.portfolioAsset.findFirst({ where: { id, userId } });
+      const existing = await prisma.portfolioAsset.findFirst({ where: { id, userId: { in: memberIds } } });
       if (!existing) {
         return NextResponse.json({ success: false, error: 'Actif introuvable' }, { status: 404 });
       }
     }
 
-    let account = await prisma.account.findFirst({ where: { userId, name: 'Portfolio' } });
+    let account = await prisma.account.findFirst({ where: { userId: { in: memberIds }, name: 'Portfolio' } });
     if (!account) {
       account = await prisma.account.create({
         data: { userId, name: 'Portfolio', type: 'investment', balance: 0 },

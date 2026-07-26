@@ -2,12 +2,14 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { notifyRefresh } from '@/lib/sse';
 import { requireSession } from '@/lib/auth';
+import { getHouseholdContext } from '@/lib/household';
 
 export async function GET() {
   try {
     const { userId } = await requireSession();
+    const ctx = await getHouseholdContext(userId);
     const records = await prisma.medicalRecord.findMany({
-      where: { userId },
+      where: { userId: { in: ctx.memberIds } },
       orderBy: { date: 'desc' },
       include: {
         transaction: { select: { id: true, merchant: true, amount: true } },
@@ -34,12 +36,13 @@ export async function POST(req: Request) {
     }
 
     const absAmount = Math.abs(Number(amount));
+    const ctx = await getHouseholdContext(userId);
 
     // Lien optionnel avec une Transaction "Santé & Médical" : crédite la même
     // écriture que Saisie & Histo (compte "Main Checking", montant négatif),
     // pour que le soin apparaisse aussi dans l'historique et les totaux.
     if (linkTransaction) {
-      const category = await prisma.category.findFirst({ where: { userId, name: 'Santé & Médical' } });
+      const category = await prisma.category.findFirst({ where: { userId: ctx.budgetOwnerId, name: 'Santé & Médical' } });
       if (!category) {
         return NextResponse.json(
           { success: false, error: 'Catégorie "Santé & Médical" introuvable' },
@@ -47,7 +50,7 @@ export async function POST(req: Request) {
         );
       }
 
-      let account = await prisma.account.findFirst({ where: { userId, name: 'Main Checking' } });
+      let account = await prisma.account.findFirst({ where: { userId: { in: ctx.memberIds }, name: 'Main Checking' } });
       if (!account) {
         account = await prisma.account.create({
           data: { userId, name: 'Main Checking', type: 'checking', balance: 0 },

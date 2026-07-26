@@ -9,6 +9,7 @@ import FinanceAgent from "./components/FinanceAgent";
 import InterestSimulator from "./components/InterestSimulator";
 import { Bell } from "lucide-react";
 import { useLanguage } from "./components/LanguageProvider";
+import FeatureGate from "./components/FeatureGate";
 
 function getInitials(name: string | null, email: string | null): string {
   if (name && name.trim()) {
@@ -48,6 +49,14 @@ interface DashboardData {
 }
 
 export default function Dashboard() {
+  return (
+    <FeatureGate featureKey="dashboard" featureName="Dashboard">
+      <DashboardContent />
+    </FeatureGate>
+  );
+}
+
+function DashboardContent() {
   const { t, locale } = useLanguage();
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -83,7 +92,13 @@ export default function Dashboard() {
   };
 
   useEffect(() => {
-    fetchData();
+    // Différé en microtask (voir react-hooks/set-state-in-effect) : évite
+    // que l'appel synchrone à fetchData() dans le corps de l'effet soit
+    // traité comme un setState direct par la règle de lint, même si
+    // l'écriture d'état réelle n'arrive qu'après le fetch (asynchrone).
+    Promise.resolve().then(() => {
+      fetchData();
+    });
 
     // SSE for real-time updates
     const eventSource = new EventSource("/api/events");
