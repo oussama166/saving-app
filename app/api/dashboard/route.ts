@@ -6,6 +6,7 @@ import { requireSession } from "@/lib/auth";
 import { getHouseholdContext } from "@/lib/household";
 import { getRatesToMad } from "@/lib/exchangeRates";
 import { requireFeatureAccess } from "@/lib/features";
+import { resolveBudgetCycleStart } from "@/lib/budgetCycle";
 
 export const dynamic = "force-dynamic";
 
@@ -16,7 +17,12 @@ export async function GET() {
     const ctx = await getHouseholdContext(userId);
 
     const now = new Date();
-    const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    // userSettings récupéré à part (avant le Promise.all) car
+    // resolveBudgetCycleStart() en a besoin pour situer le début du cycle
+    // budgétaire en cours — évite une deuxième requête identique en le
+    // passant en `preloadedSettings`.
+    const userSettings = await prisma.userSettings.findUnique({ where: { userId: ctx.budgetOwnerId } });
+    const cycleStart = await resolveBudgetCycleStart(ctx, now, userSettings);
     const threeMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 3, 1);
 
     const [
@@ -24,18 +30,16 @@ export async function GET() {
       savingsGoals,
       allTransactions,
       categories,
-      userSettings,
       last3MonthsExpenses,
       portfolio,
     ] = await Promise.all([
       prisma.account.findMany({ where: { userId: { in: ctx.memberIds }, type: "checking" } }),
       prisma.savingsGoal.findMany({ where: { userId: { in: ctx.memberIds } } }),
       prisma.transaction.findMany({
-        where: { userId: { in: ctx.memberIds }, date: { gte: firstDayOfMonth } },
+        where: { userId: { in: ctx.memberIds }, date: { gte: cycleStart } },
         include: { category: true, account: { select: { currency: true } } },
       }),
       prisma.category.findMany({ where: { userId: ctx.budgetOwnerId } }),
-      prisma.userSettings.findUnique({ where: { userId: ctx.budgetOwnerId } }),
       prisma.transaction.findMany({
         where: { userId: { in: ctx.memberIds }, date: { gte: threeMonthsAgo }, amount: { lt: 0 } },
         include: { account: { select: { currency: true } } },

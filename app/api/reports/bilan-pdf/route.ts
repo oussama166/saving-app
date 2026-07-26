@@ -8,6 +8,7 @@ import { computeZakatableWealth } from "@/lib/zakat";
 import { getHouseholdContext } from "@/lib/household";
 import { getRatesToMad } from "@/lib/exchangeRates";
 import { requireFeatureAccess } from "@/lib/features";
+import { resolveBudgetCycleStart } from "@/lib/budgetCycle";
 
 // Runtime Node explicite : pdfkit utilise des API Node (Buffer, streams,
 // fs pour ses fichiers de polices) incompatibles avec le runtime Edge.
@@ -34,7 +35,7 @@ export async function GET() {
     const ctx = await getHouseholdContext(userId);
     const { referenceIncome } = await getUserSettings(ctx);
     const now = new Date();
-    const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const firstDayOfMonth = await resolveBudgetCycleStart(ctx, now);
 
     const [categories, monthTransactions, savingsGoals, portfolio, emergencyFundBalance, accounts, zakat] =
       await Promise.all([

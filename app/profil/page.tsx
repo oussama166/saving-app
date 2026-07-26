@@ -46,6 +46,7 @@ export default function ProfilPage() {
 
 function ProfilPageContent() {
   const [referenceIncome, setReferenceIncome] = useState(10000);
+  const [budgetCycleStartDay, setBudgetCycleStartDay] = useState(1);
   const [allocations, setAllocations] = useState<AllocationRow[]>([]);
   const [updatedAt, setUpdatedAt] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -83,6 +84,7 @@ function ProfilPageContent() {
       .then((result) => {
         if (result.success) {
           setReferenceIncome(result.data.referenceIncome);
+          setBudgetCycleStartDay(result.data.budgetCycleStartDay ?? 1);
           setAllocations(
             result.data.categories.map(
               (c: { id: string; name: string; budgetPct: number }) => ({
@@ -193,6 +195,7 @@ function ProfilPageContent() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           referenceIncome,
+          budgetCycleStartDay,
           allocations: allocations.map((a) => ({
             id: a.id,
             budgetPct: a.budgetPct,
@@ -245,6 +248,11 @@ function ProfilPageContent() {
               onReferenceIncomeChange={(v) => {
                 setSaved(false);
                 setReferenceIncome(v);
+              }}
+              budgetCycleStartDay={budgetCycleStartDay}
+              onBudgetCycleStartDayChange={(v) => {
+                setSaved(false);
+                setBudgetCycleStartDay(v);
               }}
               allocations={allocations}
               onAllocationChange={handleAllocationChange}

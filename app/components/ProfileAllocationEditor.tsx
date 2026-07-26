@@ -11,6 +11,8 @@ export interface AllocationRow {
 interface Props {
   referenceIncome: number;
   onReferenceIncomeChange: (value: number) => void;
+  budgetCycleStartDay: number;
+  onBudgetCycleStartDayChange: (value: number) => void;
   allocations: AllocationRow[];
   onAllocationChange: (id: string, pct: number) => void;
   onSave: () => void;
@@ -24,6 +26,8 @@ const formatCUR = (val: number) =>
 export default function ProfileAllocationEditor({
   referenceIncome,
   onReferenceIncomeChange,
+  budgetCycleStartDay,
+  onBudgetCycleStartDayChange,
   allocations,
   onAllocationChange,
   onSave,
@@ -51,6 +55,33 @@ export default function ProfileAllocationEditor({
             className="bg-transparent text-blue-400 font-bold text-xl w-32 text-right outline-none"
           />
           <span className="text-subtle font-bold text-sm">DH</span>
+        </div>
+      </div>
+
+      {/* Jour de paie / début du cycle budgétaire */}
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div>
+          <h3 className="text-base font-bold text-ink">Jour de Paie (Cycle Budgétaire)</h3>
+          <p className="text-[12px] text-subtle mt-0.5 max-w-md">
+            Le &quot;mois en cours&quot; (score de santé, budget détaillé...) démarre à ce jour-là plutôt
+            que le 1er du mois. Laissez 1 pour garder le calendrier classique. Si votre salaire tombe
+            parfois quelques jours avant ou après, on détecte automatiquement la vraie date à partir de
+            vos transactions de revenu.
+          </p>
+        </div>
+        <div className="flex items-center gap-2 bg-page border border-line rounded-xl px-4 py-2.5">
+          <input
+            type="number"
+            min={1}
+            max={28}
+            step={1}
+            value={budgetCycleStartDay}
+            onChange={(e) =>
+              onBudgetCycleStartDayChange(Math.min(28, Math.max(1, Number(e.target.value) || 1)))
+            }
+            className="bg-transparent text-blue-400 font-bold text-xl w-16 text-right outline-none"
+          />
+          <span className="text-subtle font-bold text-sm">du mois</span>
         </div>
       </div>
 
