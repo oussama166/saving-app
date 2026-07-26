@@ -24,6 +24,9 @@ export async function deleteUserDataInTx(tx: Prisma.TransactionClient, userId: s
   // référence aussi Debt, donc avant lui aussi). SubscriptionPlanChange
   // référence Subscription (RESTRICT), donc doit partir avant elle.
   // BudgetAlertSent référence Category (RESTRICT), donc avant elle aussi.
+  // CsvImportProfile référence directement User (RESTRICT) et ne dépend
+  // d'aucune autre table ici — peut partir à n'importe quel moment avant le
+  // user.delete final, groupé avec userSettings/aiAdviceCache par commodité.
   await tx.goalContribution.deleteMany({ where: { userId } });
   await tx.debtPayment.deleteMany({ where: { userId } });
   await tx.medicalRecord.deleteMany({ where: { userId } });
@@ -40,6 +43,8 @@ export async function deleteUserDataInTx(tx: Prisma.TransactionClient, userId: s
   await tx.account.deleteMany({ where: { userId } });
   await tx.userSettings.deleteMany({ where: { userId } });
   await tx.aiAdviceCache.deleteMany({ where: { userId } });
+  await tx.csvImportProfile.deleteMany({ where: { userId } });
+  await tx.featureAccessGrant.deleteMany({ where: { userId } });
 
   // Foyer partagé (voir lib/household.ts) : max 2 membres, donc retirer
   // n'importe quel membre laisse au plus 1 personne — un foyer "à 1" n'a pas

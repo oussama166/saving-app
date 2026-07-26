@@ -7,11 +7,17 @@ import CategoryTrends from '../components/CategoryTrends';
 import TrendsInsight from '../components/TrendsInsight';
 import { requireSession } from '@/lib/auth';
 import { getHouseholdContext } from '@/lib/household';
+import { getFeatureStatusForUser } from '@/lib/features';
+import FeatureDisabledNotice from '../components/FeatureDisabledNotice';
 
 export const dynamic = 'force-dynamic';
 
 export default async function AnalysePage() {
   const { userId } = await requireSession();
+  const featureStatus = await getFeatureStatusForUser('analytics', userId);
+  if (!featureStatus.allowed) {
+    return <FeatureDisabledNotice featureName="Analyse & Tendances" message={featureStatus.message} />;
+  }
   const ctx = await getHouseholdContext(userId);
   const { referenceIncome } = await getUserSettings(ctx);
   const [monthly, ratios, topCategories] = await Promise.all([

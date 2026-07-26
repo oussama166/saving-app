@@ -3,11 +3,13 @@ import { streamText, convertToModelMessages } from "ai";
 import { prisma } from "@/lib/prisma";
 import { requireSession } from "@/lib/auth";
 import { getHouseholdContext } from "@/lib/household";
+import { requireFeatureAccess } from "@/lib/features";
 
 export const maxDuration = 30;
 
 export async function POST(req: Request) {
   const { userId } = await requireSession();
+  await requireFeatureAccess("coach", userId);
   const { messages } = await req.json();
   const ctx = await getHouseholdContext(userId);
 

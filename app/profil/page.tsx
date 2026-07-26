@@ -18,8 +18,33 @@ import WebhookTokenCard from "../components/WebhookTokenCard";
 import AccountSecurityCard from "../components/AccountSecurityCard";
 import TwoFactorCard from "../components/TwoFactorCard";
 import HouseholdCard from "../components/HouseholdCard";
+import AccountsCard from "../components/AccountsCard";
+import FeatureGate from "../components/FeatureGate";
+import FeatureDisabledInlineCard from "../components/FeatureDisabledInlineCard";
+
+const PROFILE_SUBFEATURE_KEYS = [
+  "profile.budget_allocation",
+  "profile.export_excel",
+  "profile.export_pdf",
+  "profile.account_security",
+  "profile.two_factor",
+  "profile.household",
+  "profile.accounts",
+  "profile.webhook_token",
+] as const;
+
+type ProfileSubfeatureKey = (typeof PROFILE_SUBFEATURE_KEYS)[number];
+type SubfeatureStatusMap = Record<ProfileSubfeatureKey, { allowed: boolean; message: string | null }>;
 
 export default function ProfilPage() {
+  return (
+    <FeatureGate featureKey="profile" featureName="Profil & Réglages">
+      <ProfilPageContent />
+    </FeatureGate>
+  );
+}
+
+function ProfilPageContent() {
   const [referenceIncome, setReferenceIncome] = useState(10000);
   const [allocations, setAllocations] = useState<AllocationRow[]>([]);
   const [updatedAt, setUpdatedAt] = useState<string | null>(null);
@@ -31,8 +56,28 @@ export default function ProfilPage() {
   const [generatingBilanPdf, setGeneratingBilanPdf] = useState(false);
   const [bilanPdfError, setBilanPdfError] = useState<string | null>(null);
   const [emailVerified, setEmailVerified] = useState<boolean | null>(null);
+  const [subfeatures, setSubfeatures] = useState<SubfeatureStatusMap | null>(null);
 
   useEffect(() => {
+    fetch(`/api/features/check?keys=${PROFILE_SUBFEATURE_KEYS.join(",")}`, { cache: "no-store" })
+      .then((res) => res.json())
+      .then((result) => {
+        // Fail-open : en cas d'échec de la vérification, on affiche tout
+        // plutôt que de bloquer par erreur (même politique que <FeatureGate>).
+        if (result.success) {
+          setSubfeatures(result.data);
+        } else {
+          setSubfeatures(
+            Object.fromEntries(PROFILE_SUBFEATURE_KEYS.map((k) => [k, { allowed: true, message: null }])) as SubfeatureStatusMap,
+          );
+        }
+      })
+      .catch(() =>
+        setSubfeatures(
+          Object.fromEntries(PROFILE_SUBFEATURE_KEYS.map((k) => [k, { allowed: true, message: null }])) as SubfeatureStatusMap,
+        ),
+      );
+
     fetch("/api/settings")
       .then((res) => res.json())
       .then((result) => {
@@ -132,6 +177,13 @@ export default function ProfilPage() {
     }
   };
 
+  // Optimiste tant que la vérification n'est pas revenue (subfeatures ===
+  // null) : on affiche tout par défaut plutôt que de faire clignoter les
+  // cartes (masquées puis réaffichées) — cohérent avec la politique
+  // fail-open du reste du système de fonctionnalités.
+  const isSubfeatureAllowed = (key: ProfileSubfeatureKey) => subfeatures === null || subfeatures[key]?.allowed !== false;
+  const subfeatureMessage = (key: ProfileSubfeatureKey) => subfeatures?.[key]?.message ?? null;
+
   const handleSave = async () => {
     setSaving(true);
     setSaved(false);
@@ -181,6 +233,11 @@ export default function ProfilPage() {
           <div className="flex items-center justify-center py-24">
             <div className="w-12 h-12 border-b-2 border-blue-500 rounded-full animate-spin" />
           </div>
+        ) : !isSubfeatureAllowed("profile.budget_allocation") ? (
+          <FeatureDisabledInlineCard
+            featureName="Allocation budgétaire (50/30/20)"
+            message={subfeatureMessage("profile.budget_allocation")}
+          />
         ) : (
           <div className="grid items-start grid-cols-1 gap-8 lg:grid-cols-2">
             <ProfileAllocationEditor
@@ -199,88 +256,125 @@ export default function ProfilPage() {
           </div>
         )}
 
-        <div className="flex flex-col items-start justify-between gap-4 p-6 border bg-surface rounded-2xl border-line sm:flex-row sm:items-center">
-          <div className="flex items-center gap-4">
-            <div className="p-3 border bg-emerald-600/20 rounded-xl border-emerald-500/20">
-              <FileSpreadsheet className="w-6 h-6 text-emerald-400" />
+        {!isSubfeatureAllowed("profile.export_excel") ? (
+          <FeatureDisabledInlineCard featureName="Export Bilan Excel" message={subfeatureMessage("profile.export_excel")} />
+        ) : (
+          <div className="flex flex-col items-start justify-between gap-4 p-6 border bg-surface rounded-2xl border-line sm:flex-row sm:items-center">
+            <div className="flex items-center gap-4">
+              <div className="p-3 border bg-emerald-600/20 rounded-xl border-emerald-500/20">
+                <FileSpreadsheet className="w-6 h-6 text-emerald-400" />
+              </div>
+              <div>
+                <h2 className="text-sm font-black tracking-tight uppercase text-ink">
+                  Générateur de Bilan Excel
+                </h2>
+                <p className="text-subtle text-xs mt-0.5 max-w-md">
+                  Export .xlsx complet : résumé mensuel &amp; budget, historique
+                  de toutes les transactions, et patrimoine (portefeuille,
+                  objectifs, fonds d&apos;urgence).
+                </p>
+                {bilanError && (
+                  <p className="mt-1 text-xs text-red-400">{bilanError}</p>
+                )}
+              </div>
             </div>
-            <div>
-              <h2 className="text-sm font-black tracking-tight uppercase text-ink">
-                Générateur de Bilan Excel
-              </h2>
-              <p className="text-subtle text-xs mt-0.5 max-w-md">
-                Export .xlsx complet : résumé mensuel &amp; budget, historique
-                de toutes les transactions, et patrimoine (portefeuille,
-                objectifs, fonds d&apos;urgence).
-              </p>
-              {bilanError && (
-                <p className="mt-1 text-xs text-red-400">{bilanError}</p>
+            <button
+              onClick={handleGenerateBilan}
+              disabled={generatingBilan}
+              className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-bold px-5 py-2.5 rounded-xl transition-colors whitespace-nowrap"
+            >
+              {generatingBilan ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Génération...
+                </>
+              ) : (
+                <>
+                  <Download className="w-4 h-4" />
+                  Télécharger le bilan
+                </>
               )}
-            </div>
+            </button>
           </div>
-          <button
-            onClick={handleGenerateBilan}
-            disabled={generatingBilan}
-            className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-bold px-5 py-2.5 rounded-xl transition-colors whitespace-nowrap"
-          >
-            {generatingBilan ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Génération...
-              </>
-            ) : (
-              <>
-                <Download className="w-4 h-4" />
-                Télécharger le bilan
-              </>
-            )}
-          </button>
-        </div>
+        )}
 
-        <div className="flex flex-col items-start justify-between gap-4 p-6 border bg-surface rounded-2xl border-line sm:flex-row sm:items-center">
-          <div className="flex items-center gap-4">
-            <div className="p-3 border bg-red-600/20 rounded-xl border-red-500/20">
-              <FileText className="w-6 h-6 text-red-400" />
+        {!isSubfeatureAllowed("profile.export_pdf") ? (
+          <FeatureDisabledInlineCard featureName="Export Bilan PDF" message={subfeatureMessage("profile.export_pdf")} />
+        ) : (
+          <div className="flex flex-col items-start justify-between gap-4 p-6 border bg-surface rounded-2xl border-line sm:flex-row sm:items-center">
+            <div className="flex items-center gap-4">
+              <div className="p-3 border bg-red-600/20 rounded-xl border-red-500/20">
+                <FileText className="w-6 h-6 text-red-400" />
+              </div>
+              <div>
+                <h2 className="text-sm font-black tracking-tight uppercase text-ink">
+                  Bilan PDF (résumé imprimable)
+                </h2>
+                <p className="text-subtle text-xs mt-0.5 max-w-md">
+                  Une page condensée : indicateurs du mois, budget par catégorie et patrimoine net — sans le détail des
+                  transactions (voir l&apos;export Excel pour l&apos;historique complet).
+                </p>
+                {bilanPdfError && (
+                  <p className="mt-1 text-xs text-red-400">{bilanPdfError}</p>
+                )}
+              </div>
             </div>
-            <div>
-              <h2 className="text-sm font-black tracking-tight uppercase text-ink">
-                Bilan PDF (résumé imprimable)
-              </h2>
-              <p className="text-subtle text-xs mt-0.5 max-w-md">
-                Une page condensée : indicateurs du mois, budget par catégorie et patrimoine net — sans le détail des
-                transactions (voir l&apos;export Excel pour l&apos;historique complet).
-              </p>
-              {bilanPdfError && (
-                <p className="mt-1 text-xs text-red-400">{bilanPdfError}</p>
+            <button
+              onClick={handleGenerateBilanPdf}
+              disabled={generatingBilanPdf}
+              className="flex items-center gap-2 bg-red-600 hover:bg-red-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-bold px-5 py-2.5 rounded-xl transition-colors whitespace-nowrap"
+            >
+              {generatingBilanPdf ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Génération...
+                </>
+              ) : (
+                <>
+                  <Download className="w-4 h-4" />
+                  Télécharger en PDF
+                </>
               )}
-            </div>
+            </button>
           </div>
-          <button
-            onClick={handleGenerateBilanPdf}
-            disabled={generatingBilanPdf}
-            className="flex items-center gap-2 bg-red-600 hover:bg-red-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-bold px-5 py-2.5 rounded-xl transition-colors whitespace-nowrap"
-          >
-            {generatingBilanPdf ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Génération...
-              </>
-            ) : (
-              <>
-                <Download className="w-4 h-4" />
-                Télécharger en PDF
-              </>
-            )}
-          </button>
-        </div>
+        )}
 
-        <AccountSecurityCard />
+        {isSubfeatureAllowed("profile.account_security") ? (
+          <AccountSecurityCard />
+        ) : (
+          <FeatureDisabledInlineCard featureName="Sécurité du compte" message={subfeatureMessage("profile.account_security")} />
+        )}
 
-        <TwoFactorCard />
+        {isSubfeatureAllowed("profile.two_factor") ? (
+          <TwoFactorCard />
+        ) : (
+          <FeatureDisabledInlineCard
+            featureName="Authentification à deux facteurs"
+            message={subfeatureMessage("profile.two_factor")}
+          />
+        )}
 
-        <HouseholdCard />
+        {isSubfeatureAllowed("profile.household") ? (
+          <HouseholdCard />
+        ) : (
+          <FeatureDisabledInlineCard featureName="Foyer partagé" message={subfeatureMessage("profile.household")} />
+        )}
 
-        {emailVerified ? (
+        {isSubfeatureAllowed("profile.accounts") ? (
+          <AccountsCard />
+        ) : (
+          <FeatureDisabledInlineCard
+            featureName="Comptes bancaires (multi-devises)"
+            message={subfeatureMessage("profile.accounts")}
+          />
+        )}
+
+        {!isSubfeatureAllowed("profile.webhook_token") ? (
+          <FeatureDisabledInlineCard
+            featureName="Token Webhook (iOS Shortcut)"
+            message={subfeatureMessage("profile.webhook_token")}
+          />
+        ) : emailVerified ? (
           <WebhookTokenCard />
         ) : (
           <LockedWebhookCard verified={emailVerified} />

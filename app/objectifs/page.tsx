@@ -7,11 +7,17 @@ import InterestSimulator from '../components/InterestSimulator';
 import TangerFinancialAdvice from '../components/TangerFinancialAdvice';
 import { requireSession } from '@/lib/auth';
 import { getHouseholdContext } from '@/lib/household';
+import { getFeatureStatusForUser } from '@/lib/features';
+import FeatureDisabledNotice from '../components/FeatureDisabledNotice';
 
 export const dynamic = 'force-dynamic';
 
 export default async function ObjectifsPage() {
   const { userId } = await requireSession();
+  const featureStatus = await getFeatureStatusForUser('goals', userId);
+  if (!featureStatus.allowed) {
+    return <FeatureDisabledNotice featureName="Objectifs" message={featureStatus.message} />;
+  }
   const ctx = await getHouseholdContext(userId);
   // GoalsTable gère désormais son propre fetch (liste, comptes, catégories,
   // rattrapage des versements auto) côté client — ici on ne garde qu'un

@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma';
-import TransactionForm from '@/app/components/TransactionForm';
+import SaisieEntryPanel from '@/app/components/SaisieEntryPanel';
 import HistoryTable from '@/app/components/HistoryTable';
 import CsvImportPanel from '@/app/components/CsvImportPanel';
 import { Database } from 'lucide-react';
@@ -8,11 +8,17 @@ import { getTransactionsPage } from '@/lib/transactions';
 import { getUserLocale } from '@/lib/getLocale';
 import { t } from '@/lib/i18n';
 import { getHouseholdContext } from '@/lib/household';
+import { getFeatureStatusForUser } from '@/lib/features';
+import FeatureDisabledNotice from '@/app/components/FeatureDisabledNotice';
 
 export const dynamic = 'force-dynamic';
 
 export default async function SaisiePage() {
   const { userId } = await requireSession();
+  const featureStatus = await getFeatureStatusForUser('transactions', userId);
+  if (!featureStatus.allowed) {
+    return <FeatureDisabledNotice featureName="Saisie & Historique" message={featureStatus.message} />;
+  }
   const locale = await getUserLocale(userId);
   const ctx = await getHouseholdContext(userId);
   const [categories, accounts, { transactions, total, summary }] = await Promise.all([
@@ -49,8 +55,8 @@ export default async function SaisiePage() {
           </div>
         </header>
 
-        {/* Manual Entry Form */}
-        <TransactionForm categories={categories} />
+        {/* Scan de reçu + Saisie manuelle */}
+        <SaisieEntryPanel categories={categories} />
 
         {/* Import CSV — alternative aux webhooks iOS pour Android / banques sans notif exploitable */}
         <CsvImportPanel accounts={accounts} />

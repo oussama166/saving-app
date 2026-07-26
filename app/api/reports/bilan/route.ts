@@ -9,6 +9,8 @@ import {
 } from "@/lib/financials";
 import { getEnrichedPortfolioAssets } from "@/lib/portfolio";
 import { getHouseholdContext } from "@/lib/household";
+import { getRatesToMad } from "@/lib/exchangeRates";
+import { requireFeatureAccess } from "@/lib/features";
 
 export const dynamic = "force-dynamic";
 
@@ -36,6 +38,7 @@ function styleHeaderRow(row: ExcelJS.Row) {
 export async function GET() {
   try {
     const { userId } = await requireSession();
+    await requireFeatureAccess("profile.export_excel", userId);
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) {
       return NextResponse.json(
@@ -66,7 +69,7 @@ export async function GET() {
       }),
       prisma.transaction.findMany({
         where: { userId: { in: ctx.memberIds }, date: { gte: firstDayOfMonth } },
-        include: { category: true },
+        include: { category: true, account: { select: { currency: true } } },
       }),
       prisma.transaction.findMany({
         where: { userId: { in: ctx.memberIds } },
@@ -84,25 +87,31 @@ export async function GET() {
     ]);
 
     // ---- Calculs résumé mensuel ----
+    const fxRates = await getRatesToMad([
+      ...monthTransactions.map((tx) => tx.account.currency),
+      ...accounts.map((a) => a.currency),
+    ]);
+
     let income = 0;
     let expenses = 0;
     let savingsMoved = 0;
     const spentByCategoryId = new Map<string, number>();
 
     for (const tx of monthTransactions) {
+      const amount = tx.amount * (fxRates[tx.account.currency] ?? 1);
       if (tx.category.type === "income") {
-        income += tx.amount;
+        income += amount;
       } else if (tx.category.type === "savings") {
-        savingsMoved += Math.abs(tx.amount);
+        savingsMoved += Math.abs(amount);
         spentByCategoryId.set(
           tx.categoryId,
-          (spentByCategoryId.get(tx.categoryId) ?? 0) + Math.abs(tx.amount),
+          (spentByCategoryId.get(tx.categoryId) ?? 0) + Math.abs(amount),
         );
       } else {
-        expenses += Math.abs(tx.amount);
+        expenses += Math.abs(amount);
         spentByCategoryId.set(
           tx.categoryId,
-          (spentByCategoryId.get(tx.categoryId) ?? 0) + Math.abs(tx.amount),
+          (spentByCategoryId.get(tx.categoryId) ?? 0) + Math.abs(amount),
         );
       }
     }
@@ -112,7 +121,7 @@ export async function GET() {
 
     const totalChecking = accounts
       .filter((a) => a.type === "checking")
-      .reduce((acc, a) => acc + a.balance, 0);
+      .reduce((acc, a) => acc + a.balance * (fxRates[a.currency] ?? 1), 0);
     const totalGoalsSaved = savingsGoals.reduce(
       (acc, g) => acc + g.currentAmount,
       0,
@@ -249,11 +258,16 @@ export async function GET() {
       { header: "Compte", key: "account", width: 18 },
       { header: "Moyen de paiement", key: "paymentMethod", width: 18 },
       { header: "Montant", key: "amount", width: 16 },
+      { header: "Devise", key: "currency", width: 10 },
       { header: "Type", key: "type", width: 12 },
     ];
     styleHeaderRow(sheet2.getRow(1));
 
     for (const tx of allTransactions) {
+      // Montant affiché dans la devise NATIVE du compte (pas converti) —
+      // colonne "Devise" ajoutée pour lever toute ambiguïté sur un compte en
+      // devise étrangère, voir lib/exchangeRates.ts pour la conversion MAD
+      // utilisée uniquement dans les totaux agrégés ci-dessus.
       const row = sheet2.addRow({
         date: tx.date.toLocaleDateString("fr-FR"),
         merchant: tx.merchant,
@@ -262,6 +276,7 @@ export async function GET() {
         account: tx.account.name,
         paymentMethod: tx.paymentMethod ?? "",
         amount: tx.amount,
+        currency: tx.account.currency,
         type:
           tx.category.type === "income"
             ? "Revenu"
@@ -269,12 +284,12 @@ export async function GET() {
               ? "Épargne"
               : "Dépense",
       });
-      row.getCell("amount").numFmt = MAD_FORMAT;
+      row.getCell("amount").numFmt = '#,##0.00';
       if (tx.amount < 0)
         row.getCell("amount").font = { color: { argb: "FFEF4444" } };
       else row.getCell("amount").font = { color: { argb: "FF10B981" } };
     }
-    sheet2.autoFilter = { from: "A1", to: `H${allTransactions.length + 1}` };
+    sheet2.autoFilter = { from: "A1", to: `I${allTransactions.length + 1}` };
 
     // ===== Feuille 3 : Patrimoine (Portfolio + Objectifs + Fonds d'urgence) =====
     const sheet3 = workbook.addWorksheet("Patrimoine");
@@ -412,6 +427,12 @@ export async function GET() {
       return NextResponse.json(
         { success: false, error: "Non authentifié" },
         { status: 401 },
+      );
+    }
+    if (error instanceof Error && error.message === "FEATURE_DISABLED") {
+      return NextResponse.json(
+        { success: false, error: "Cette fonctionnalité est temporairement désactivée." },
+        { status: 403 },
       );
     }
     console.error("Bilan Excel Generation Error:", error);

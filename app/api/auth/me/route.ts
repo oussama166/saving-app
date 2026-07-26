@@ -24,7 +24,20 @@ export async function GET() {
 
     const user = await prisma.user.findUnique({ where: { id: session.userId } });
     if (!user) {
-      return NextResponse.json({ success: false, error: 'Non authentifié' }, { status: 401 });
+      // Le compte n'existe plus (supprimé — par l'utilisateur lui-même ou
+      // par un admin via app/api/admin/users/[id] DELETE) mais le cookie de
+      // session, lui, reste valide côté navigateur (signature JWT toujours
+      // correcte) jusqu'à son expiration naturelle (30 jours) — sans ça,
+      // TopNav re-polling cette route en boucle resterait bloqué sur ce même
+      // 401 indéfiniment, et toute route qui essaie d'ÉCRIRE une donnée
+      // rattachée à ce userId (ex: ensureUserSeeded) échouerait avec une
+      // erreur de contrainte FOREIGN KEY (le userId ne correspond plus à
+      // aucun User). On coupe donc le cookie ici, comme pour la suspension
+      // ci-dessous — le prochain chargement de page renvoie proprement vers
+      // /login au lieu de laisser une session fantôme.
+      const response = NextResponse.json({ success: false, error: 'Non authentifié' }, { status: 401 });
+      response.cookies.set(SESSION_COOKIE, '', { ...SESSION_COOKIE_OPTIONS, maxAge: 0 });
+      return response;
     }
 
     // Compte suspendu par un admin (voir app/api/admin/users/[id]/suspend) :

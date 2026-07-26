@@ -1,5 +1,20 @@
 import { prisma } from '@/lib/prisma';
 import type { HouseholdContext } from '@/lib/household';
+import { getRatesToMad } from '@/lib/exchangeRates';
+
+// Petit utilitaire partagé : une Transaction est toujours dans la devise de
+// SON compte (Account.currency), jamais forcément MAD — voir
+// lib/exchangeRates.ts. `rates` doit contenir au moins la devise de chaque
+// transaction concernée (construit via getRatesToMad() sur les devises
+// distinctes réellement présentes dans le lot chargé).
+function toMad(amount: number, currency: string, rates: Record<string, number>): number {
+  return amount * (rates[currency] ?? 1);
+}
+
+async function ratesForAccounts(transactions: { account: { currency: string } }[]): Promise<Record<string, number>> {
+  const currencies = transactions.map((tx) => tx.account.currency);
+  return getRatesToMad(currencies);
+}
 
 // Catégories "Besoins" (essentielles / charges fixes) — utilisé à la fois
 // pour la règle 50/30/20 (app/api/dashboard/route.ts) et pour le ratio de
@@ -25,9 +40,11 @@ export async function getAverageMonthlyExpenses(ctx: HouseholdContext, reference
 
   const transactions = await prisma.transaction.findMany({
     where: { userId: { in: ctx.memberIds }, date: { gte: since }, amount: { lt: 0 } },
+    include: { account: { select: { currency: true } } },
   });
 
-  const total = transactions.reduce((acc, tx) => acc + Math.abs(tx.amount), 0);
+  const rates = await ratesForAccounts(transactions);
+  const total = transactions.reduce((acc, tx) => acc + Math.abs(toMad(tx.amount, tx.account.currency, rates)), 0);
   return total > 0 ? total / months : referenceIncome * 0.5;
 }
 
@@ -57,11 +74,15 @@ export async function getEmergencyFundBalance(ctx: HouseholdContext) {
   if (!category) return 0;
 
   const [transactions, archive] = await Promise.all([
-    prisma.transaction.findMany({ where: { userId: { in: ctx.memberIds }, categoryId: category.id } }),
+    prisma.transaction.findMany({
+      where: { userId: { in: ctx.memberIds }, categoryId: category.id },
+      include: { account: { select: { currency: true } } },
+    }),
     prisma.categoryArchive.findUnique({ where: { categoryId: category.id } }),
   ]);
 
-  const liveTotal = transactions.reduce((acc, tx) => acc + tx.amount, 0);
+  const rates = await ratesForAccounts(transactions);
+  const liveTotal = transactions.reduce((acc, tx) => acc + toMad(tx.amount, tx.account.currency, rates), 0);
   return liveTotal + (archive?.archivedTotal ?? 0);
 }
 
@@ -75,11 +96,15 @@ export async function getCategoryLifetimeTotal(ctx: HouseholdContext, categoryNa
   if (!category) return 0;
 
   const [transactions, archive] = await Promise.all([
-    prisma.transaction.findMany({ where: { userId: { in: ctx.memberIds }, categoryId: category.id } }),
+    prisma.transaction.findMany({
+      where: { userId: { in: ctx.memberIds }, categoryId: category.id },
+      include: { account: { select: { currency: true } } },
+    }),
     prisma.categoryArchive.findUnique({ where: { categoryId: category.id } }),
   ]);
 
-  const liveTotal = transactions.reduce((acc, tx) => acc + tx.amount, 0);
+  const rates = await ratesForAccounts(transactions);
+  const liveTotal = transactions.reduce((acc, tx) => acc + toMad(tx.amount, tx.account.currency, rates), 0);
   return liveTotal + (archive?.archivedTotal ?? 0);
 }
 
@@ -105,21 +130,23 @@ export async function getFinancialRatios(ctx: HouseholdContext, referenceIncome:
 
   const transactions = await prisma.transaction.findMany({
     where: { userId: { in: ctx.memberIds }, date: { gte: start } },
-    include: { category: true },
+    include: { category: true, account: { select: { currency: true } } },
   });
 
+  const rates = await ratesForAccounts(transactions);
   let income = 0;
   let fixedCharges = 0;
   let savings = 0;
   let totalExpenses = 0;
 
   for (const tx of transactions) {
+    const amount = toMad(tx.amount, tx.account.currency, rates);
     if (tx.category.type === 'income') {
-      income += tx.amount;
+      income += amount;
     } else if (tx.category.type === 'savings') {
-      savings += Math.abs(tx.amount);
+      savings += Math.abs(amount);
     } else {
-      const abs = Math.abs(tx.amount);
+      const abs = Math.abs(amount);
       totalExpenses += abs;
       if (NEEDS_CATEGORIES.has(tx.category.name)) fixedCharges += abs;
     }
@@ -168,9 +195,10 @@ export async function getMonthlyAnalytics(ctx: HouseholdContext, monthsCount = 6
 
   const transactions = await prisma.transaction.findMany({
     where: { userId: { in: ctx.memberIds }, date: { gte: months[0].start } },
-    include: { category: true },
+    include: { category: true, account: { select: { currency: true } } },
   });
 
+  const rates = await ratesForAccounts(transactions);
   const buckets = new Map(
     months.map((m) => [
       m.key,
@@ -182,13 +210,14 @@ export async function getMonthlyAnalytics(ctx: HouseholdContext, monthsCount = 6
     const bucketMonth = months.find((m) => tx.date >= m.start && tx.date < m.end);
     if (!bucketMonth) continue;
     const bucket = buckets.get(bucketMonth.key)!;
+    const amount = toMad(tx.amount, tx.account.currency, rates);
 
     if (tx.category.type === 'income') {
-      bucket.income += tx.amount;
+      bucket.income += amount;
     } else if (tx.category.type === 'savings') {
-      bucket.savings += Math.abs(tx.amount);
+      bucket.savings += Math.abs(amount);
     } else {
-      const abs = Math.abs(tx.amount);
+      const abs = Math.abs(amount);
       bucket.expenses += abs;
       bucket.categoryTotals.set(tx.category.name, (bucket.categoryTotals.get(tx.category.name) ?? 0) + abs);
     }
@@ -251,9 +280,10 @@ export async function getTopCategoriesTrend(ctx: HouseholdContext, monthsCount =
 
   const transactions = await prisma.transaction.findMany({
     where: { userId: { in: ctx.memberIds }, date: { gte: months[0].start }, category: { type: 'expense' } },
-    include: { category: true },
+    include: { category: true, account: { select: { currency: true } } },
   });
 
+  const rates = await ratesForAccounts(transactions);
   const totals = new Map<string, number>();
   const perMonth = new Map<string, Map<string, number>>(); // nom catégorie -> mois -> montant
 
@@ -261,7 +291,7 @@ export async function getTopCategoriesTrend(ctx: HouseholdContext, monthsCount =
     const bucketMonth = months.find((m) => tx.date >= m.start && tx.date < m.end);
     if (!bucketMonth) continue;
 
-    const abs = Math.abs(tx.amount);
+    const abs = Math.abs(toMad(tx.amount, tx.account.currency, rates));
     const name = tx.category.name;
     totals.set(name, (totals.get(name) ?? 0) + abs);
 
@@ -312,11 +342,15 @@ export async function getHealthBudget(ctx: HouseholdContext, referenceIncome: nu
 
   let spentAbs = 0;
   if (category) {
-    const agg = await prisma.transaction.aggregate({
+    // findMany + reduce plutôt que prisma.aggregate() : la conversion en MAD
+    // (compte en devise étrangère) doit se faire par transaction avant de
+    // sommer, un aggregate() SQL ne peut pas appliquer un taux de change.
+    const txs = await prisma.transaction.findMany({
       where: { userId: { in: ctx.memberIds }, categoryId: category.id, date: { gte: start } },
-      _sum: { amount: true },
+      include: { account: { select: { currency: true } } },
     });
-    spentAbs = Math.abs(agg._sum.amount ?? 0);
+    const rates = await ratesForAccounts(txs);
+    spentAbs = Math.abs(txs.reduce((acc, tx) => acc + toMad(tx.amount, tx.account.currency, rates), 0));
   }
 
   const remaining = plannedMonthly - spentAbs;
@@ -360,12 +394,14 @@ export async function getHealthSpendingTrend(ctx: HouseholdContext, monthsCount 
 
   const transactions = await prisma.transaction.findMany({
     where: { userId: { in: ctx.memberIds }, categoryId: category.id, date: { gte: months[0].start } },
+    include: { account: { select: { currency: true } } },
   });
+  const rates = await ratesForAccounts(transactions);
 
   return months.map((m) => {
     const amount = transactions
       .filter((tx) => tx.date >= m.start && tx.date < m.end)
-      .reduce((acc, tx) => acc + Math.abs(tx.amount), 0);
+      .reduce((acc, tx) => acc + Math.abs(toMad(tx.amount, tx.account.currency, rates)), 0);
     return { month: m.key, label: m.label, amount: Math.round(amount) };
   });
 }
@@ -417,11 +453,16 @@ export async function getRealBudgetSummary(
       categoryId: { in: categories.map((c) => c.id) },
       ...(start ? { date: { gte: start } } : {}),
     },
+    include: { account: { select: { currency: true } } },
   });
 
+  const rates = await ratesForAccounts(transactions);
   const spentByCategory = new Map<string, number>();
   for (const tx of transactions) {
-    spentByCategory.set(tx.categoryId, (spentByCategory.get(tx.categoryId) ?? 0) + Math.abs(tx.amount));
+    spentByCategory.set(
+      tx.categoryId,
+      (spentByCategory.get(tx.categoryId) ?? 0) + Math.abs(toMad(tx.amount, tx.account.currency, rates)),
+    );
   }
 
   const totalAnalyzed = [...spentByCategory.values()].reduce((acc, v) => acc + v, 0);

@@ -6,6 +6,8 @@ import { getUserSettings, getEmergencyFundBalance } from "@/lib/financials";
 import { getEnrichedPortfolioAssets } from "@/lib/portfolio";
 import { computeZakatableWealth } from "@/lib/zakat";
 import { getHouseholdContext } from "@/lib/household";
+import { getRatesToMad } from "@/lib/exchangeRates";
+import { requireFeatureAccess } from "@/lib/features";
 
 // Runtime Node explicite : pdfkit utilise des API Node (Buffer, streams,
 // fs pour ses fichiers de polices) incompatibles avec le runtime Edge.
@@ -23,6 +25,7 @@ const MAD = (n: number) => `${n.toLocaleString("fr-FR", { maximumFractionDigits:
 export async function GET() {
   try {
     const { userId } = await requireSession();
+    await requireFeatureAccess("profile.export_pdf", userId);
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) {
       return NextResponse.json({ success: false, error: "Utilisateur introuvable" }, { status: 404 });
@@ -38,7 +41,7 @@ export async function GET() {
         prisma.category.findMany({ where: { userId: ctx.budgetOwnerId }, orderBy: { order: "asc" } }),
         prisma.transaction.findMany({
           where: { userId: { in: ctx.memberIds }, date: { gte: firstDayOfMonth } },
-          include: { category: true },
+          include: { category: true, account: { select: { currency: true } } },
         }),
         prisma.savingsGoal.findMany({ where: { userId: { in: ctx.memberIds } } }),
         getEnrichedPortfolioAssets(ctx),
@@ -47,24 +50,32 @@ export async function GET() {
         computeZakatableWealth(userId),
       ]);
 
+    const fxRates = await getRatesToMad([
+      ...monthTransactions.map((tx) => tx.account.currency),
+      ...accounts.map((a) => a.currency),
+    ]);
+
     let income = 0;
     let expenses = 0;
     let savingsMoved = 0;
     const spentByCategoryId = new Map<string, number>();
     for (const tx of monthTransactions) {
+      const amount = tx.amount * (fxRates[tx.account.currency] ?? 1);
       if (tx.category.type === "income") {
-        income += tx.amount;
+        income += amount;
       } else if (tx.category.type === "savings") {
-        savingsMoved += Math.abs(tx.amount);
-        spentByCategoryId.set(tx.categoryId, (spentByCategoryId.get(tx.categoryId) ?? 0) + Math.abs(tx.amount));
+        savingsMoved += Math.abs(amount);
+        spentByCategoryId.set(tx.categoryId, (spentByCategoryId.get(tx.categoryId) ?? 0) + Math.abs(amount));
       } else {
-        expenses += Math.abs(tx.amount);
-        spentByCategoryId.set(tx.categoryId, (spentByCategoryId.get(tx.categoryId) ?? 0) + Math.abs(tx.amount));
+        expenses += Math.abs(amount);
+        spentByCategoryId.set(tx.categoryId, (spentByCategoryId.get(tx.categoryId) ?? 0) + Math.abs(amount));
       }
     }
     const effectiveIncome = income > 0 ? income : referenceIncome;
     const cashFlow = income - expenses - savingsMoved;
-    const totalChecking = accounts.filter((a) => a.type === "checking").reduce((acc, a) => acc + a.balance, 0);
+    const totalChecking = accounts
+      .filter((a) => a.type === "checking")
+      .reduce((acc, a) => acc + a.balance * (fxRates[a.currency] ?? 1), 0);
     const totalGoalsSaved = savingsGoals.reduce((acc, g) => acc + g.currentAmount, 0);
     const netWorth = totalChecking + emergencyFundBalance + totalGoalsSaved + portfolio.globalLiveValue - zakat.totalDebts;
 
@@ -186,6 +197,9 @@ export async function GET() {
   } catch (error) {
     if (error instanceof Error && error.message === "UNAUTHENTICATED") {
       return NextResponse.json({ success: false, error: "Non authentifié" }, { status: 401 });
+    }
+    if (error instanceof Error && error.message === "FEATURE_DISABLED") {
+      return NextResponse.json({ success: false, error: "Cette fonctionnalité est temporairement désactivée." }, { status: 403 });
     }
     console.error("Bilan PDF Generation Error:", error);
     return NextResponse.json({ success: false, error: "Internal Server Error" }, { status: 500 });

@@ -2,12 +2,14 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireSession } from '@/lib/auth';
 import { getHouseholdContext } from '@/lib/household';
+import { requireFeatureAccess } from '@/lib/features';
 
 const DEBT_TYPES = ['credit', 'pret_immo', 'pret_perso', 'autre'];
 
 export async function GET() {
   try {
     const { userId } = await requireSession();
+    await requireFeatureAccess('debts', userId);
     const ctx = await getHouseholdContext(userId);
 
     const [debts, accounts] = await Promise.all([
@@ -35,6 +37,9 @@ export async function GET() {
   } catch (error) {
     if (error instanceof Error && error.message === 'UNAUTHENTICATED') {
       return NextResponse.json({ success: false, error: 'Non authentifié' }, { status: 401 });
+    }
+    if (error instanceof Error && error.message === 'FEATURE_DISABLED') {
+      return NextResponse.json({ success: false, error: 'Cette fonctionnalité est temporairement désactivée.' }, { status: 403 });
     }
     console.error('Debts GET Error:', error);
     return NextResponse.json({ success: false, error: 'Internal Server Error' }, { status: 500 });

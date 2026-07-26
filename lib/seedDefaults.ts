@@ -102,7 +102,7 @@ export const DEFAULT_CATEGORIES: {
     type: 'expense',
     order: 13,
     budgetPct: 8,
-    subCategories: ['Réparations', 'Amendes', 'Imprévus divers'],
+    subCategories: ['Réparations', 'Amendes', 'Imprévus divers', 'Virement Bancaire'],
   },
   {
     // Nécessaire pour que le sélecteur "Revenu (+)" du formulaire de saisie ait

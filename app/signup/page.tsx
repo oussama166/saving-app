@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, Suspense } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { UserPlus } from 'lucide-react';
@@ -13,13 +13,32 @@ function SignupForm() {
   const searchParams = useSearchParams();
   const { t } = useLanguage();
   const [name, setName] = useState('');
-  // Préremplie depuis ?email= (ex: lien "Créer un compte" depuis
-  // /household/accept — l'invitation cible une adresse précise).
-  const [email, setEmail] = useState(searchParams.get('email') ?? '');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  // Lus depuis un effet, jamais directement pendant le rendu :
+  // useSearchParams() peut différer entre le rendu serveur et la première
+  // passe client (surtout après une navigation interne avec lien déjà
+  // préchargé) — les utiliser directement dans le JSX/l'état initial
+  // provoque une erreur d'hydratation (constatée sur le lien "Se connecter"
+  // équivalent de app/login/page.tsx). null/vide au premier rendu des deux
+  // côtés = pas de désaccord possible.
+  const [nextParam, setNextParam] = useState<string | null>(null);
+  useEffect(() => {
+    Promise.resolve().then(() => {
+      setNextParam(searchParams.get('next'));
+      // Préremplie depuis ?email= (ex: lien "Créer un compte" depuis
+      // /household/accept — l'invitation cible une adresse précise) — ne
+      // touche pas au champ si l'utilisateur a déjà commencé à taper.
+      const emailParam = searchParams.get('email');
+      if (emailParam) {
+        setEmail((current) => current || emailParam);
+      }
+    });
+  }, [searchParams]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -141,7 +160,7 @@ function SignupForm() {
           <p className="text-center text-[13px] text-subtle">
             {t('auth.hasAccount')}{' '}
             <Link
-              href={searchParams.get('next') ? `/login?next=${encodeURIComponent(searchParams.get('next')!)}` : '/login'}
+              href={nextParam ? `/login?next=${encodeURIComponent(nextParam)}` : '/login'}
               className="text-blue-400 font-semibold hover:text-blue-300"
             >
               {t('auth.loginLink')}

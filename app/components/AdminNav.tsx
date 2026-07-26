@@ -3,12 +3,13 @@
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
-import { ShieldCheck, LogOut, Users, LayoutDashboard, ScrollText, UserCog, Repeat } from "lucide-react";
+import { ShieldCheck, LogOut, Users, LayoutDashboard, ScrollText, UserCog, Repeat, ShieldQuestion } from "lucide-react";
 import ThemeToggle from "./ThemeToggle";
 
 const navLinks = [
   { href: "/admin", label: "Vue d'ensemble", icon: LayoutDashboard, exact: true },
   { href: "/admin/users", label: "Utilisateurs", icon: Users, exact: false },
+  { href: "/admin/features", label: "Fonctionnalités", icon: ShieldQuestion, exact: false },
   { href: "/admin/subscriptions", label: "Abonnements", icon: Repeat, exact: false },
   { href: "/admin/audit-log", label: "Journal d'audit", icon: ScrollText, exact: false },
   { href: "/admin/admins", label: "Admins", icon: UserCog, exact: false },

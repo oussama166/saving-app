@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, Suspense } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { LogIn, ShieldCheck } from 'lucide-react';
@@ -26,6 +26,20 @@ function LoginForm() {
   const [useRecoveryCode, setUseRecoveryCode] = useState(false);
   const [twoFactorError, setTwoFactorError] = useState<string | null>(null);
   const [twoFactorLoading, setTwoFactorLoading] = useState(false);
+
+  // Lu depuis un effet (jamais directement pendant le rendu) : useSearchParams()
+  // peut renvoyer une valeur différente entre le rendu serveur (SSR, à partir
+  // de l'URL de la requête initiale) et la première passe client (surtout
+  // après une navigation interne avec un lien déjà préchargé) — utiliser
+  // directement searchParams.get('next') dans le JSX provoque une erreur
+  // d'hydratation (constaté sur le lien "Créer un compte" ci-dessous). null
+  // au premier rendu des deux côtés = pas de désaccord possible.
+  const [nextParam, setNextParam] = useState<string | null>(null);
+  useEffect(() => {
+    Promise.resolve().then(() => {
+      setNextParam(searchParams.get('next'));
+    });
+  }, [searchParams]);
 
   const goToNext = () => {
     const next = searchParams.get('next') || '/';
@@ -217,7 +231,7 @@ function LoginForm() {
           <p className="text-center text-[13px] text-subtle">
             {t('auth.noAccount')}{' '}
             <Link
-              href={searchParams.get('next') ? `/signup?next=${encodeURIComponent(searchParams.get('next')!)}` : '/signup'}
+              href={nextParam ? `/signup?next=${encodeURIComponent(nextParam)}` : '/signup'}
               className="text-blue-400 font-semibold hover:text-blue-300"
             >
               {t('auth.createAccount')}

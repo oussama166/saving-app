@@ -3,12 +3,21 @@ import type { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { requireSession } from '@/lib/auth';
 import { notifyRefresh } from '@/lib/sse';
-import { parseBankCsv } from '@/lib/csvImport';
+import { parseBankCsv, parseBankCsvWithMapping, type CsvColumnMapping } from '@/lib/csvImport';
 import { guessCategoryFromMerchantName } from '@/lib/placeCategory';
+import { parseBankStatementLine, guessCategoryFromMcc } from '@/lib/bankStatementParser';
 import { getHouseholdContext } from '@/lib/household';
 
 const UNCATEGORIZED_NAME = 'Uncategorized';
-const CHUNK_SIZE = 25; // évite un $transaction([...]) trop long sur un gros relevé
+// Réduit de 25 à 10 après une erreur P2028 en prod ("rollback cannot be
+// executed on an expired transaction") : le timeout par défaut de Prisma
+// pour un $transaction([...]) est 5000ms, et 25 créations séquentielles vers
+// Turso (round-trip réseau à chaque écriture, pas un fichier local) peuvent
+// largement dépasser ça. Un chunk plus petit + un timeout explicite plus
+// généreux (voir plus bas) couvrent le cas d'un gros relevé sur une
+// connexion lente.
+const CHUNK_SIZE = 10;
+const CHUNK_TRANSACTION_TIMEOUT_MS = 15000;
 
 function dayKey(date: Date): string {
   return date.toISOString().slice(0, 10);
@@ -21,8 +30,38 @@ function dayKey(date: Date): string {
 export async function POST(req: Request) {
   try {
     const { userId } = await requireSession();
-    const body = await req.json();
-    const { csv, accountId } = body as { csv?: string; accountId?: string };
+    // Même garde-fou que /api/transactions/csv-preview : lecture en texte
+    // brut puis JSON.parse manuel pour éviter un crash 500 si le corps
+    // arrive vide/tronqué (ex: requête envoyée pendant un rechargement
+    // Turbopack de cette route).
+    const rawBody = await req.text();
+    if (!rawBody) {
+      return NextResponse.json({ success: false, error: 'Requête vide — réessaie.' }, { status: 400 });
+    }
+    let body: unknown;
+    try {
+      body = JSON.parse(rawBody);
+    } catch {
+      return NextResponse.json({ success: false, error: 'Corps de requête invalide — réessaie.' }, { status: 400 });
+    }
+    const {
+      csv,
+      accountId,
+      mapping,
+      headerSignature,
+      saveProfile,
+      bankLabel,
+    } = body as {
+      csv?: string;
+      accountId?: string;
+      // Mapping explicite (issu de l'aperçu /api/transactions/csv-preview,
+      // éventuellement corrigé par l'utilisateur) — si absent, on retombe
+      // sur l'auto-détection historique (voir lib/csvImport.ts).
+      mapping?: CsvColumnMapping;
+      headerSignature?: string;
+      saveProfile?: boolean;
+      bankLabel?: string;
+    };
 
     if (!csv || typeof csv !== 'string') {
       return NextResponse.json({ success: false, error: 'Champ "csv" requis (contenu du fichier).' }, { status: 400 });
@@ -42,7 +81,19 @@ export async function POST(req: Request) {
       });
     }
 
-    const { rows, errors: parseErrors } = parseBankCsv(csv);
+    const { rows, errors: parseErrors } = mapping ? parseBankCsvWithMapping(csv, mapping) : parseBankCsv(csv);
+
+    // Mémorise ce mapping pour ce format de fichier (voir CsvImportProfile)
+    // si demandé — la prochaine fois qu'un fichier avec la même signature
+    // d'en-tête arrive, /api/transactions/csv-preview le reprendra
+    // automatiquement sans redemander de mapping.
+    if (mapping && headerSignature && saveProfile) {
+      await prisma.csvImportProfile.upsert({
+        where: { userId_headerSignature: { userId: ctx.budgetOwnerId, headerSignature } },
+        update: { ...mapping, bankLabel: bankLabel || undefined },
+        create: { userId: ctx.budgetOwnerId, headerSignature, bankLabel: bankLabel || null, ...mapping },
+      });
+    }
 
     if (rows.length === 0) {
       return NextResponse.json({
@@ -56,7 +107,11 @@ export async function POST(req: Request) {
     // transaction existe déjà pour ce compte avec la même date (jour), le
     // même montant et le même libellé — permet de relancer un import sur un
     // relevé qui se chevauche partiellement (ex: mois courant re-exporté)
-    // sans créer de doublons.
+    // sans créer de doublons. La clé utilise désormais la description
+    // NETTOYÉE (voir parseBankStatementLine plus bas) pour rester cohérente
+    // avec ce qui sera effectivement stocké — les transactions déjà
+    // importées avant ce nettoyage (libellé brut) ne matcheront pas et
+    // pourront apparaître en double une seule fois, à nettoyer à la main.
     const minDate = new Date(Math.min(...rows.map((r) => r.date.getTime())));
     const maxDate = new Date(Math.max(...rows.map((r) => r.date.getTime())));
     maxDate.setHours(23, 59, 59, 999);
@@ -88,14 +143,32 @@ export async function POST(req: Request) {
     const toCreate: { data: Prisma.TransactionCreateInput }[] = [];
 
     for (const row of rows) {
-      const key = `${dayKey(row.date)}|${row.amount}|${row.merchant.toLowerCase()}`;
+      // Nettoyage du libellé brut de banque (retire numéro de carte masqué,
+      // date déjà stockée par ailleurs, code MCC...) + extraction de la
+      // méthode de paiement et d'éventuels indices de catégorie propres aux
+      // opérations bancaires (commission, agios, virement...) — voir
+      // lib/bankStatementParser.ts.
+      const parsedLine = parseBankStatementLine(row.merchant);
+      const cleanMerchant = parsedLine.cleanDescription || row.merchant;
+
+      const key = `${dayKey(row.date)}|${row.amount}|${cleanMerchant.toLowerCase()}`;
       if (existingKeys.has(key)) {
         duplicatesSkipped += 1;
         continue;
       }
       existingKeys.add(key); // évite aussi les doublons internes au fichier lui-même
 
-      const guess = row.amount < 0 ? guessCategoryFromMerchantName(row.merchant) : null;
+      // Priorité de catégorisation pour une dépense (jamais pour un revenu) :
+      // 1. Catégorie déjà tranchée par le parseur de ligne bancaire
+      //    (commission, agios, retrait GAB, facture télécom...) ;
+      // 2. Mot-clé reconnu dans le libellé nettoyé (marque connue :
+      //    "Marjane", "McDo", "Glovo"...) — plus fiable qu'un MCC générique
+      //    quand disponible ;
+      // 3. Code MCC (Merchant Category Code) fourni par la banque, en repli.
+      const guess =
+        row.amount < 0
+          ? (parsedLine.categoryHint ?? guessCategoryFromMerchantName(cleanMerchant) ?? guessCategoryFromMcc(parsedLine.mcc))
+          : null;
       const categoryName = guess?.categoryName ?? UNCATEGORIZED_NAME;
       let categoryId: string;
       try {
@@ -111,7 +184,8 @@ export async function POST(req: Request) {
           account: { connect: { id: account.id } },
           category: { connect: { id: categoryId } },
           subCategory: guess?.subCategoryName ?? null,
-          merchant: row.merchant,
+          paymentMethod: parsedLine.paymentMethod,
+          merchant: cleanMerchant,
           amount: row.amount,
           date: row.date,
         },
@@ -124,8 +198,13 @@ export async function POST(req: Request) {
       const chunk = toCreate.slice(i, i + CHUNK_SIZE);
       // $transaction([...]) en forme batch (pas interactive) — même choix
       // que les autres écritures groupées du projet, plus fiable contre
-      // l'adapter libSQL/Turso à distance.
-      await prisma.$transaction(chunk.map((c) => prisma.transaction.create(c)));
+      // l'adapter libSQL/Turso à distance. `timeout` explicite (défaut
+      // Prisma : 5000ms) pour laisser de la marge à la latence réseau réelle
+      // vers Turso plutôt qu'un fichier SQLite local.
+      await prisma.$transaction(
+        chunk.map((c) => prisma.transaction.create(c)),
+        { timeout: CHUNK_TRANSACTION_TIMEOUT_MS },
+      );
     }
 
     if (totalDelta !== 0) {

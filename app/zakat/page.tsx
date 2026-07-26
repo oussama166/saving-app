@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Gem, Info } from "lucide-react";
+import FeatureGate from "../components/FeatureGate";
 
 // Dupliqué depuis lib/zakat.ts (constantes pures) plutôt qu'importé
 // directement : ce fichier est un composant client, et lib/zakat.ts importe
@@ -21,6 +22,14 @@ interface Breakdown {
 const fmt = (n: number) => `${n.toLocaleString("fr-FR", { maximumFractionDigits: 2 })} DH`;
 
 export default function ZakatPage() {
+  return (
+    <FeatureGate featureKey="zakat" featureName="Zakat">
+      <ZakatPageContent />
+    </FeatureGate>
+  );
+}
+
+function ZakatPageContent() {
   const [breakdown, setBreakdown] = useState<Breakdown | null>(null);
   const [loading, setLoading] = useState(true);
   const [basis, setBasis] = useState<"gold" | "silver">("gold");

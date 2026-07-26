@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { requireSession } from '@/lib/auth';
 import { ensureUserSeeded } from '@/lib/seedDefaults';
 import { getBudgetOwnerUserId } from '@/lib/household';
+import { requireFeatureAccess } from '@/lib/features';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,6 +14,7 @@ const SUM_TOLERANCE = 0.5;
 export async function GET() {
   try {
     const { userId } = await requireSession();
+    await requireFeatureAccess('profile', userId);
 
     // Filet de sécurité : comptes créés avant le passage à Turso (ou dont le
     // seed initial a échoué en route, ex: timeout réseau) — voir
@@ -47,6 +49,9 @@ export async function GET() {
     if (error instanceof Error && error.message === 'UNAUTHENTICATED') {
       return NextResponse.json({ success: false, error: 'Non authentifié' }, { status: 401 });
     }
+    if (error instanceof Error && error.message === 'FEATURE_DISABLED') {
+      return NextResponse.json({ success: false, error: 'Cette fonctionnalité est temporairement désactivée.' }, { status: 403 });
+    }
     console.error('Settings GET Error:', error);
     return NextResponse.json({ success: false, error: 'Internal Server Error' }, { status: 500 });
   }
@@ -55,6 +60,7 @@ export async function GET() {
 export async function PUT(req: Request) {
   try {
     const { userId } = await requireSession();
+    await requireFeatureAccess('profile.budget_allocation', userId);
     const { referenceIncome, allocations } = (await req.json()) as {
       referenceIncome: number;
       allocations: { id: string; budgetPct: number }[];
@@ -102,6 +108,9 @@ export async function PUT(req: Request) {
   } catch (error) {
     if (error instanceof Error && error.message === 'UNAUTHENTICATED') {
       return NextResponse.json({ success: false, error: 'Non authentifié' }, { status: 401 });
+    }
+    if (error instanceof Error && error.message === 'FEATURE_DISABLED') {
+      return NextResponse.json({ success: false, error: 'Cette fonctionnalité est temporairement désactivée.' }, { status: 403 });
     }
     console.error('Settings PUT Error:', error);
     return NextResponse.json({ success: false, error: 'Internal Server Error' }, { status: 500 });

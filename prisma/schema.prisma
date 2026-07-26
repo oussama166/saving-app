@@ -61,6 +61,84 @@ model User {
   // plus un foyer à la fois (@unique sur userId côté HouseholdMember).
   householdMembership   HouseholdMember?
   sentHouseholdInvites  HouseholdInvite[] @relation("HouseholdInvitesSent")
+
+  csvImportProfiles CsvImportProfile[]
+
+  // Exceptions d'accès à des fonctionnalités désactivées globalement (voir
+  // lib/features.ts et Feature ci-dessous) — accordées individuellement par
+  // un admin.
+  featureAccessGrants FeatureAccessGrant[]
+}
+
+// Mémorise le mapping de colonnes d'un format de CSV bancaire déjà vu (voir
+// lib/csvImport.ts) — la prochaine fois qu'un fichier avec la même
+// signature d'en-tête est importé, le mapping est repris automatiquement
+// sans redemander à l'utilisateur de faire correspondre les colonnes.
+// Rattaché au propriétaire budget (userId), donc partagé par tout le foyer
+// — le format d'export d'une banque ne dépend pas de qui importe le fichier.
+model CsvImportProfile {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id])
+  headerSignature String
+  bankLabel       String? // nom donné par l'utilisateur (ex: "CIH Bank"), affichage seulement
+  delimiter       String
+  hasHeaderRow    Boolean  @default(true)
+  dateIdx         Int
+  merchantIdx     Int
+  amountIdx       Int
+  debitIdx        Int
+  creditIdx       Int
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([userId, headerSignature])
+}
+
+// Interrupteur global par section/fonctionnalité de l'app (voir
+// lib/features.ts pour le registre des clés connues et la logique de
+// vérification). `key` est stable dans le code (ex: "dashboard",
+// "transactions", "coach") — la ligne est créée paresseusement (upsert) au
+// premier accès à la page Admin > Fonctionnalités si elle n'existe pas
+// encore, donc l'absence de ligne = fonctionnalité active par défaut (voir
+// isFeatureEnabledForUser, "fail-open" volontaire pour ne jamais bloquer par
+// erreur une fonctionnalité qui n'a pas encore été enregistrée).
+model Feature {
+  key         String   @id
+  name        String // libellé affiché dans l'admin, ex: "Coach IA"
+  description String?
+  enabled     Boolean  @default(true)
+  // Regroupe une sous-fonctionnalité sous sa section parente pour
+  // l'affichage admin (ex: "profile.two_factor" a parentKey = "profile") —
+  // purement organisationnel, n'affecte PAS la logique de vérification :
+  // chaque clé (parente ou enfant) est vérifiée indépendamment via
+  // isFeatureEnabledForUser. Désactiver le parent bloque toute la page (voir
+  // <FeatureGate>) ; désactiver un enfant ne masque que son bloc précis dans
+  // la page (voir <FeatureDisabledInlineCard>).
+  parentKey   String?
+  // Message affiché à la place du texte générique par défaut quand cette
+  // fonctionnalité est désactivée (voir FeatureDisabledNotice /
+  // FeatureDisabledInlineCard) — ex: "Cette fonctionnalité revient le 1er
+  // août." Optionnel, texte générique utilisé si vide.
+  customMessage String?
+  updatedAt   DateTime @updatedAt
+
+  accessGrants FeatureAccessGrant[]
+}
+
+// Exception d'accès accordée par un admin à un utilisateur précis pour une
+// fonctionnalité désactivée globalement (Feature.enabled = false) — voir
+// isFeatureEnabledForUser dans lib/features.ts. N'a aucun effet si la
+// fonctionnalité est déjà activée globalement (juste redondant dans ce cas).
+model FeatureAccessGrant {
+  id          String   @id @default(cuid())
+  featureKey  String
+  feature     Feature  @relation(fields: [featureKey], references: [key])
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  grantedAt   DateTime @default(now())
+
+  @@unique([featureKey, userId])
 }
 
 model UserSettings {
@@ -81,12 +159,28 @@ model Account {
   name            String
   type            String // checking, savings, investment
   balance         Float            @default(0)
+  // Devise du compte — "MAD" pour l'immense majorité des comptes (comptes
+  // courants marocains). Un compte en devise étrangère (ex: Wise/Payoneer en
+  // USD/EUR pour un revenu freelance) garde son solde ET ses transactions
+  // dans CETTE devise ; la conversion en MAD ne se fait qu'à l'affichage/à
+  // l'agrégation (dashboard, patrimoine, zakat...), voir lib/exchangeRates.ts.
+  currency        String           @default("MAD")
   transactions    Transaction[]
   portfolioAssets PortfolioAsset[]
   subscriptions   Subscription[]
   savingsGoals    SavingsGoal[]
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
+}
+
+// Cache des taux de conversion vers MAD (devise de référence de l'app) —
+// évite d'interroger l'API externe (open.er-api.com, gratuite, sans clé) à
+// chaque requête. Une ligne par devise étrangère réellement utilisée par un
+// compte ; rafraîchie si `fetchedAt` a plus de 24h (voir lib/exchangeRates.ts).
+model ExchangeRateCache {
+  currency  String   @id // "USD", "EUR"... (jamais "MAD" — taux 1 implicite)
+  rateToMad Float // 1 unité de `currency` = rateToMad MAD
+  fetchedAt DateTime @default(now())
 }
 
 model Category {
