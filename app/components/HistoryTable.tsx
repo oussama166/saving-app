@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import { Trash2, Search, Download, X, ArrowUp, ArrowDown, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Fragment, useEffect, useRef, useState } from 'react';
+import { Trash2, Pencil, Check, Search, Download, X, ArrowUp, ArrowDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useLanguage } from './LanguageProvider';
 
 interface Transaction {
@@ -17,14 +17,40 @@ interface Transaction {
     type: string;
   };
   account: {
+    id?: string;
     name: string;
   };
+}
+
+interface SubCategory {
+  id: string;
+  name: string;
 }
 
 interface Category {
   id: string;
   name: string;
   type: string;
+  // Optionnel : nécessaire pour peupler le sélecteur de sous-catégorie de la
+  // ligne en édition (voir startEdit) — absent si l'appelant ne le fournit
+  // pas, l'édition retombe simplement sur "aucune sous-catégorie".
+  subCategories?: SubCategory[];
+}
+
+const PAYMENT_METHODS = [
+  { value: 'Carte Bancaire', labelKey: 'payment.bankCard' },
+  { value: 'Virement Bancaire', labelKey: 'payment.bankTransfer' },
+  { value: 'Espèces', labelKey: 'payment.cash' },
+  { value: 'Chèque', labelKey: 'payment.check' },
+  { value: 'CIH Pay/Mobile', labelKey: 'payment.cihPay' },
+  { value: 'PayPal', labelKey: 'payment.paypal' },
+  { value: 'Apple Pay', labelKey: 'payment.applePay' },
+  { value: 'BMCE DIRECT', labelKey: 'payment.bmceDirect' },
+] as const;
+
+interface AccountOption {
+  id: string;
+  name: string;
 }
 
 interface Summary {
@@ -40,6 +66,7 @@ interface HistoryTableProps {
   initialTotal: number;
   initialSummary: Summary;
   categories: Category[];
+  accounts?: AccountOption[];
 }
 
 type TypeFilter = '' | 'income' | 'expense' | 'savings';
@@ -53,6 +80,7 @@ export default function HistoryTable({
   initialTotal,
   initialSummary,
   categories,
+  accounts = [],
 }: HistoryTableProps) {
   const { t } = useLanguage();
 
@@ -70,10 +98,29 @@ export default function HistoryTable({
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
 
+  // Édition en ligne — remplace les cellules de la ligne par des champs le
+  // temps de la correction, plutôt qu'un modal séparé (voir PATCH
+  // /api/transactions/[id]). Le montant est saisi en valeur absolue, comme
+  // dans TransactionForm : le signe suit toujours le type de la catégorie
+  // choisie, jamais un champ séparé.
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState<{
+    date: string;
+    categoryId: string;
+    subCategory: string;
+    paymentMethod: string;
+    accountId: string;
+    merchant: string;
+    amount: string;
+  } | null>(null);
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
+
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
   const [type, setType] = useState<TypeFilter>('');
   const [categoryId, setCategoryId] = useState('');
+  const [accountId, setAccountId] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [sortBy, setSortBy] = useState<SortBy>('date');
@@ -111,6 +158,7 @@ export default function HistoryTable({
     if (search) params.set('search', search);
     if (type) params.set('type', type);
     if (categoryId) params.set('categoryId', categoryId);
+    if (accountId) params.set('accountId', accountId);
     if (dateFrom) params.set('dateFrom', dateFrom);
     if (dateTo) params.set('dateTo', dateTo);
     params.set('sortBy', sortBy);
@@ -134,7 +182,7 @@ export default function HistoryTable({
       .finally(() => setLoading(false));
 
     return () => controller.abort();
-  }, [search, type, categoryId, dateFrom, dateTo, sortBy, sortDir, offset]);
+  }, [search, type, categoryId, accountId, dateFrom, dateTo, sortBy, sortDir, offset]);
 
   const formatMAD = (amt: number) =>
     new Intl.NumberFormat('fr-MA', { style: 'currency', currency: 'MAD' }).format(amt);
@@ -169,6 +217,78 @@ export default function HistoryTable({
     }
   };
 
+  const startEdit = (tx: Transaction) => {
+    setEditingId(tx.id);
+    setEditError(null);
+    setEditForm({
+      date: new Date(tx.date).toISOString().split('T')[0],
+      categoryId: tx.category.id ?? '',
+      subCategory: tx.subCategory ?? '',
+      paymentMethod: tx.paymentMethod ?? '',
+      accountId: tx.account.id ?? '',
+      merchant: tx.merchant,
+      amount: String(Math.abs(tx.amount)),
+    });
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditForm(null);
+    setEditError(null);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingId || !editForm) return;
+    setSavingEdit(true);
+    setEditError(null);
+    try {
+      const res = await fetch(`/api/transactions/${editingId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          date: editForm.date,
+          categoryId: editForm.categoryId,
+          subCategory: editForm.subCategory || undefined,
+          paymentMethod: editForm.paymentMethod || undefined,
+          notes: editForm.merchant,
+          amount: editForm.amount,
+          accountId: editForm.accountId || undefined,
+        }),
+      });
+      const result = await res.json();
+      if (!result.success) {
+        setEditError(result.error || t('historique.editError'));
+        return;
+      }
+
+      const oldTx = transactions.find((tx) => tx.id === editingId);
+      const updated: Transaction = result.data;
+      setTransactions((prev) => prev.map((tx) => (tx.id === editingId ? updated : tx)));
+      if (oldTx) {
+        setSummary((prev) => {
+          const next = { ...prev };
+          // Retire l'ancienne contribution au résumé...
+          if (oldTx.category.type === 'income') next.totalIncome -= oldTx.amount;
+          else if (oldTx.category.type === 'savings') next.totalSavings -= Math.abs(oldTx.amount);
+          else next.totalExpense -= Math.abs(oldTx.amount);
+          // ...puis applique la nouvelle (catégorie/montant potentiellement changés).
+          if (updated.category.type === 'income') next.totalIncome += updated.amount;
+          else if (updated.category.type === 'savings') next.totalSavings += Math.abs(updated.amount);
+          else next.totalExpense += Math.abs(updated.amount);
+          next.net = next.totalIncome - next.totalExpense - next.totalSavings;
+          return next;
+        });
+      }
+
+      cancelEdit();
+    } catch (error) {
+      console.error('Edit Error:', error);
+      setEditError(t('historique.editError'));
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
   const toggleSort = (col: SortBy) => {
     if (sortBy === col) {
       setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
@@ -184,12 +304,13 @@ export default function HistoryTable({
     setSearch('');
     setType('');
     setCategoryId('');
+    setAccountId('');
     setDateFrom('');
     setDateTo('');
     setOffset(0);
   };
 
-  const hasActiveFilters = Boolean(search || type || categoryId || dateFrom || dateTo);
+  const hasActiveFilters = Boolean(search || type || categoryId || accountId || dateFrom || dateTo);
 
   const handleExport = async () => {
     setExporting(true);
@@ -198,6 +319,7 @@ export default function HistoryTable({
       if (search) params.set('search', search);
       if (type) params.set('type', type);
       if (categoryId) params.set('categoryId', categoryId);
+      if (accountId) params.set('accountId', accountId);
       if (dateFrom) params.set('dateFrom', dateFrom);
       if (dateTo) params.set('dateTo', dateTo);
       params.set('sortBy', sortBy);
@@ -281,6 +403,11 @@ export default function HistoryTable({
 
   const page = Math.floor(offset / PAGE_SIZE) + 1;
   const totalPages = Math.max(Math.ceil(total / PAGE_SIZE), 1);
+  // Colonne "Compte" affichée seulement si le foyer a plus d'un compte (voir
+  // <th>/<td> conditionnels ci-dessous) — les colSpan de la ligne vide et du
+  // pied de tableau doivent suivre le même total de colonnes.
+  const columnCount = accounts.length > 1 ? 9 : 8;
+  const summaryMiddleColSpan = accounts.length > 1 ? 5 : 4;
 
   return (
     <div className="bg-surface rounded-xl border border-line overflow-hidden shadow-2xl">
@@ -329,6 +456,24 @@ export default function HistoryTable({
               </option>
             ))}
           </select>
+
+          {accounts.length > 1 && (
+            <select
+              value={accountId}
+              onChange={(e) => {
+                setAccountId(e.target.value);
+                setOffset(0);
+              }}
+              className="bg-page border border-line rounded-lg px-2.5 py-1.5 text-[12px] text-body focus:border-blue-500 outline-none"
+            >
+              <option value="">{t('common.allAccounts')}</option>
+              {accounts.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.name}
+                </option>
+              ))}
+            </select>
+          )}
 
           <input
             type="date"
@@ -410,6 +555,11 @@ export default function HistoryTable({
               <th className="py-3 px-5 font-bold uppercase tracking-wider border-b border-line-subtle">
                 {t('common.method')}
               </th>
+              {accounts.length > 1 && (
+                <th className="py-3 px-5 font-bold uppercase tracking-wider border-b border-line-subtle">
+                  {t('common.account')}
+                </th>
+              )}
               <th className="py-3 px-5 font-bold uppercase tracking-wider border-b border-line-subtle">
                 {t('common.description')}
               </th>
@@ -427,41 +577,197 @@ export default function HistoryTable({
             </tr>
           </thead>
           <tbody className="divide-y divide-line-subtle/50">
-            {transactions.map((tx) => (
-              <tr key={tx.id} className="hover:bg-surface-alt/30 transition-colors group">
-                <td className="py-3 px-5 text-muted font-medium">{formatDate(tx.date)}</td>
-                <td className="py-3 px-5">{typeBadge(tx.category.type)}</td>
-                <td className="py-3 px-5">
-                  <span className="text-body font-bold">{tx.category.name}</span>
-                </td>
-                <td className="py-3 px-5 text-muted">{tx.subCategory || '-'}</td>
-                <td className="py-3 px-5 text-muted">{tx.paymentMethod || '-'}</td>
-                <td className="py-3 px-5 text-body-soft max-w-xs truncate">{tx.merchant}</td>
-                <td
-                  className={`py-3 px-5 text-right font-black ${tx.amount > 0 ? 'text-emerald-400' : 'text-red-400'}`}
-                >
-                  {tx.amount > 0 ? '+' : ''}
-                  {formatMAD(tx.amount)}
-                </td>
-                <td className="py-3 px-5 text-right">
-                  <button
-                    onClick={() => handleDelete(tx)}
-                    disabled={deletingId === tx.id}
-                    className="p-1.5 rounded-lg bg-surface-alt hover:bg-red-600/20 text-muted hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100 disabled:opacity-50"
-                    title={t('common.delete')}
-                  >
-                    {deletingId === tx.id ? (
-                      <div className="w-3.5 h-3.5 border-2 border-red-400/30 border-t-red-400 rounded-full animate-spin" />
-                    ) : (
-                      <Trash2 className="w-3.5 h-3.5" />
+            {transactions.map((tx) => {
+              if (editingId === tx.id && editForm) {
+                const editCategory = categories.find((c) => c.id === editForm.categoryId);
+                const editSubCategories = editCategory?.subCategories ?? [];
+                const inputCls =
+                  'w-full bg-page border border-line rounded-md p-1.5 text-[11px] text-body outline-none focus:border-blue-500';
+                return (
+                  <Fragment key={tx.id}>
+                    <tr className="bg-blue-500/5 ring-1 ring-inset ring-blue-500/20">
+                      <td className="py-2 px-5">
+                        <input
+                          type="date"
+                          value={editForm.date}
+                          onChange={(e) => setEditForm({ ...editForm, date: e.target.value })}
+                          className={inputCls}
+                        />
+                      </td>
+                      <td className="py-2 px-5">{typeBadge(editCategory?.type ?? tx.category.type)}</td>
+                      <td className="py-2 px-5">
+                        <select
+                          value={editForm.categoryId}
+                          onChange={(e) => setEditForm({ ...editForm, categoryId: e.target.value, subCategory: '' })}
+                          className={inputCls}
+                        >
+                          {(['expense', 'income', 'savings'] as const).map((groupType) => {
+                            const group = categories.filter((c) => c.type === groupType);
+                            if (group.length === 0) return null;
+                            return (
+                              <optgroup
+                                key={groupType}
+                                label={t(
+                                  groupType === 'expense'
+                                    ? 'form.typeExpense'
+                                    : groupType === 'income'
+                                      ? 'form.typeIncome'
+                                      : 'form.typeSavings',
+                                )}
+                              >
+                                {group.map((c) => (
+                                  <option key={c.id} value={c.id}>
+                                    {c.name}
+                                  </option>
+                                ))}
+                              </optgroup>
+                            );
+                          })}
+                        </select>
+                      </td>
+                      <td className="py-2 px-5">
+                        <select
+                          value={editForm.subCategory}
+                          onChange={(e) => setEditForm({ ...editForm, subCategory: e.target.value })}
+                          disabled={editSubCategories.length === 0}
+                          className={`${inputCls} disabled:opacity-50`}
+                        >
+                          <option value="">{t('form.noSubcategory')}</option>
+                          {editSubCategories.map((sub) => (
+                            <option key={sub.id} value={sub.name}>
+                              {sub.name}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
+                      <td className="py-2 px-5">
+                        <select
+                          value={editForm.paymentMethod}
+                          onChange={(e) => setEditForm({ ...editForm, paymentMethod: e.target.value })}
+                          className={inputCls}
+                        >
+                          <option value="">—</option>
+                          {PAYMENT_METHODS.map((m) => (
+                            <option key={m.value} value={m.value}>
+                              {t(m.labelKey)}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
+                      {accounts.length > 1 && (
+                        <td className="py-2 px-5">
+                          <select
+                            value={editForm.accountId}
+                            onChange={(e) => setEditForm({ ...editForm, accountId: e.target.value })}
+                            className={inputCls}
+                          >
+                            {accounts.map((a) => (
+                              <option key={a.id} value={a.id}>
+                                {a.name}
+                              </option>
+                            ))}
+                          </select>
+                        </td>
+                      )}
+                      <td className="py-2 px-5">
+                        <input
+                          type="text"
+                          value={editForm.merchant}
+                          onChange={(e) => setEditForm({ ...editForm, merchant: e.target.value })}
+                          className={inputCls}
+                        />
+                      </td>
+                      <td className="py-2 px-5">
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={editForm.amount}
+                          onChange={(e) => setEditForm({ ...editForm, amount: e.target.value })}
+                          className={`${inputCls} text-right font-bold`}
+                        />
+                      </td>
+                      <td className="py-2 px-5 text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <button
+                            onClick={handleSaveEdit}
+                            disabled={savingEdit}
+                            className="p-1.5 rounded-lg bg-emerald-600/10 hover:bg-emerald-600/20 text-emerald-400 transition-colors disabled:opacity-50"
+                            title={t('common.save')}
+                          >
+                            {savingEdit ? (
+                              <div className="w-3.5 h-3.5 border-2 border-emerald-400/30 border-t-emerald-400 rounded-full animate-spin" />
+                            ) : (
+                              <Check className="w-3.5 h-3.5" />
+                            )}
+                          </button>
+                          <button
+                            onClick={cancelEdit}
+                            disabled={savingEdit}
+                            className="p-1.5 rounded-lg bg-surface-alt hover:bg-surface-strong text-muted transition-colors disabled:opacity-50"
+                            title={t('common.cancel')}
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                    {editError && (
+                      <tr className="bg-blue-500/5">
+                        <td colSpan={columnCount} className="py-2 px-5 text-[11px] text-red-400">
+                          {editError}
+                        </td>
+                      </tr>
                     )}
-                  </button>
-                </td>
-              </tr>
-            ))}
+                  </Fragment>
+                );
+              }
+
+              return (
+                <tr key={tx.id} className="hover:bg-surface-alt/30 transition-colors group">
+                  <td className="py-3 px-5 text-muted font-medium">{formatDate(tx.date)}</td>
+                  <td className="py-3 px-5">{typeBadge(tx.category.type)}</td>
+                  <td className="py-3 px-5">
+                    <span className="text-body font-bold">{tx.category.name}</span>
+                  </td>
+                  <td className="py-3 px-5 text-muted">{tx.subCategory || '-'}</td>
+                  <td className="py-3 px-5 text-muted">{tx.paymentMethod || '-'}</td>
+                  {accounts.length > 1 && <td className="py-3 px-5 text-muted">{tx.account.name}</td>}
+                  <td className="py-3 px-5 text-body-soft max-w-xs truncate">{tx.merchant}</td>
+                  <td
+                    className={`py-3 px-5 text-right font-black ${tx.amount > 0 ? 'text-emerald-400' : 'text-red-400'}`}
+                  >
+                    {tx.amount > 0 ? '+' : ''}
+                    {formatMAD(tx.amount)}
+                  </td>
+                  <td className="py-3 px-5 text-right">
+                    <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100">
+                      <button
+                        onClick={() => startEdit(tx)}
+                        className="p-1.5 rounded-lg bg-surface-alt hover:bg-blue-600/20 text-muted hover:text-blue-400 transition-colors"
+                        title={t('common.edit')}
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => handleDelete(tx)}
+                        disabled={deletingId === tx.id}
+                        className="p-1.5 rounded-lg bg-surface-alt hover:bg-red-600/20 text-muted hover:text-red-400 transition-colors disabled:opacity-50"
+                        title={t('common.delete')}
+                      >
+                        {deletingId === tx.id ? (
+                          <div className="w-3.5 h-3.5 border-2 border-red-400/30 border-t-red-400 rounded-full animate-spin" />
+                        ) : (
+                          <Trash2 className="w-3.5 h-3.5" />
+                        )}
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
             {transactions.length === 0 && !loading && (
               <tr>
-                <td colSpan={8} className="py-20 text-center text-subtle italic">
+                <td colSpan={columnCount} className="py-20 text-center text-subtle italic">
                   {t('historique.noTransactions')}
                 </td>
               </tr>
@@ -473,7 +779,7 @@ export default function HistoryTable({
                 <td colSpan={2} className="py-3 px-5 text-[10px] font-bold uppercase text-subtle">
                   {t('common.total')} ({summary.count})
                 </td>
-                <td colSpan={4} className="py-3 px-5 text-[11px] text-subtle">
+                <td colSpan={summaryMiddleColSpan} className="py-3 px-5 text-[11px] text-subtle">
                   <span className="text-emerald-400 font-bold">+{formatMAD(summary.totalIncome)}</span>
                   {' · '}
                   <span className="text-red-400 font-bold">-{formatMAD(summary.totalExpense)}</span>

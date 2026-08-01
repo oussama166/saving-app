@@ -7,6 +7,7 @@ import CoachGoldenRulesTab from '../components/CoachGoldenRulesTab';
 import CoachBenchmarksTab from '../components/CoachBenchmarksTab';
 import InterestSimulator from '../components/InterestSimulator';
 import FeatureGate from '../components/FeatureGate';
+import type { BudgetMethodResult } from '@/lib/budgetMethods';
 
 interface DashboardData {
   metrics: {
@@ -23,11 +24,11 @@ interface DashboardData {
     remainingAmount: number;
     usedPct: number;
   }[];
-  rule503020: {
-    needs: { amount: number; pct: number };
-    wants: { amount: number; pct: number };
-    savings: { amount: number; pct: number };
-  };
+  // Le Diagnostic Coach IA suivait auparavant la répartition 50/30/20 quelle
+  // que soit la méthode réellement choisie par l'utilisateur en page Profil
+  // (lib/budgetMethods.ts) — désormais alimenté par la méthode réelle.
+  budgetMethod: string;
+  budgetMethodResult: BudgetMethodResult | null;
   referenceIncome: number;
   avgMonthlyExpenses: number;
 }
@@ -101,7 +102,8 @@ function CoachPageContent() {
               (data ? (
                 <CoachDiagnosticTab
                   budgetDetails={data.budgetDetails}
-                  rule503020={data.rule503020}
+                  budgetMethodKey={data.budgetMethod}
+                  budgetMethodResult={data.budgetMethodResult}
                   emergencyFundMonths={data.metrics.emergencyFundMonths}
                   healthScore={data.metrics.healthScore}
                 />

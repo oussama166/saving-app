@@ -6,6 +6,8 @@ export interface AllocationRow {
   id: string;
   name: string;
   budgetPct: number;
+  type?: string;
+  budgetGroup?: string | null;
 }
 
 interface Props {
@@ -15,6 +17,10 @@ interface Props {
   onBudgetCycleStartDayChange: (value: number) => void;
   allocations: AllocationRow[];
   onAllocationChange: (id: string, pct: number) => void;
+  // Groupe "essentiel / discrétionnaire" par catégorie de dépense — utilisé
+  // par les méthodes en ratio (50/30/20, 70/20/10...), voir BudgetMethodCard.
+  // Optionnel : si omis, le toggle ne s'affiche pas (rétro-compatible).
+  onBudgetGroupChange?: (id: string, group: 'essential' | 'discretionary') => void;
   onSave: () => void;
   saving: boolean;
   saved: boolean;
@@ -30,6 +36,7 @@ export default function ProfileAllocationEditor({
   onBudgetCycleStartDayChange,
   allocations,
   onAllocationChange,
+  onBudgetGroupChange,
   onSave,
   saving,
   saved,
@@ -111,6 +118,34 @@ export default function ProfileAllocationEditor({
                 <span className="text-sm font-semibold text-body">{a.name}</span>
                 <span className="text-xs text-subtle font-mono">{formatCUR((a.budgetPct / 100) * referenceIncome)}</span>
               </div>
+              {onBudgetGroupChange && a.type === 'expense' && (
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => onBudgetGroupChange(a.id, 'essential')}
+                    aria-pressed={a.budgetGroup === 'essential'}
+                    className={`text-[10px] font-bold uppercase tracking-widest px-2 py-1 rounded-full border transition-colors ${
+                      a.budgetGroup === 'essential'
+                        ? 'text-blue-400 bg-blue-500/10 border-blue-500/30'
+                        : 'text-subtle bg-page border-line hover:border-line-strong'
+                    }`}
+                  >
+                    Essentiel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onBudgetGroupChange(a.id, 'discretionary')}
+                    aria-pressed={a.budgetGroup === 'discretionary'}
+                    className={`text-[10px] font-bold uppercase tracking-widest px-2 py-1 rounded-full border transition-colors ${
+                      a.budgetGroup === 'discretionary'
+                        ? 'text-purple-400 bg-purple-500/10 border-purple-500/30'
+                        : 'text-subtle bg-page border-line hover:border-line-strong'
+                    }`}
+                  >
+                    Discrétionnaire
+                  </button>
+                </div>
+              )}
               <div className="flex items-center gap-3">
                 <input
                   type="range"

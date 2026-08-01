@@ -1,34 +1,17 @@
-import { generateObject } from 'ai';
 import { NextResponse } from 'next/server';
-import { z } from 'zod';
-import { coachModel } from '@/lib/aiProvider';
-import { getCachedAdvice, setCachedAdvice } from '@/lib/aiCache';
+import { streamCoachAdvice } from '@/lib/coachHandler';
+import { preventionCoverageSchema as adviceSchema } from '@/lib/coachSchemas';
 import { requireSession } from '@/lib/auth';
 import { getUserLocale } from '@/lib/getLocale';
 import { aiLanguageInstruction } from '@/lib/i18n';
 
 const CACHE_KEY = 'prevention-coverage';
 
-const adviceSchema = z.object({
-  bilanAnnuel: z
-    .string()
-    .describe("2 phrases courtes: conseil de bilan de santé préventif, adapté au budget santé actuel de l'utilisateur."),
-  couvertureCnss: z
-    .string()
-    .describe('2 phrases courtes: conseil sur la couverture CNSS/AMO, tenant compte des dossiers de remboursement en attente.'),
-  mutuelle: z
-    .string()
-    .describe("2 phrases courtes: conseil sur une mutuelle complémentaire, adapté au poids réel des dépenses santé sur le revenu."),
-  pharmacieGeneriques: z
-    .string()
-    .describe('2 phrases courtes: conseil pratique pour réduire la facture pharmacie/médicaments.'),
-});
-
 export async function POST(req: Request) {
   try {
     const { userId } = await requireSession();
     const locale = await getUserLocale(userId);
-    const { spentThisMonth, weightOnIncomePct, remaining, pendingReimbursementTotal, pendingCount, recordsCount } =
+    const { spentThisMonth, weightOnIncomePct, remaining, pendingReimbursementTotal, pendingCount, recordsCount, force } =
       await req.json();
 
     if (
@@ -39,24 +22,6 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: false, error: 'Données santé invalides' }, { status: 400 });
     }
 
-    // 1. Cache hebdomadaire — évite un appel LLM à chaque chargement de page.
-    const cached = await getCachedAdvice<{
-      bilanAnnuel: string;
-      couvertureCnss: string;
-      mutuelle: string;
-      pharmacieGeneriques: string;
-    }>(userId, `${CACHE_KEY}:${locale}`);
-
-    if (cached) {
-      return NextResponse.json({
-        success: true,
-        advice: cached.content,
-        cached: true,
-        generatedAt: cached.generatedAt,
-      });
-    }
-
-    // 2. Cache absent ou périmé (> 7 jours) — on régénère.
     const systemPrompt = `Tu es un conseiller santé/prévoyance basé à Tanger, Maroc. Style: ultra concis, chiffré quand pertinent, jamais générique. Bonne connaissance du système marocain (CNSS, AMO, mutuelles privées, pharmacies, génériques). ${aiLanguageInstruction(locale)}`;
 
     const userPrompt = `Situation santé de l'utilisateur :
@@ -68,16 +33,16 @@ export async function POST(req: Request) {
 
 Rédige 4 blocs de conseils courts et personnalisés à cette situation : Bilan de Santé Annuel, Couverture CNSS/AMO, Mutuelle Complémentaire, Pharmacie & Génériques.`;
 
-    const { object } = await generateObject({
-      model: coachModel,
+    return await streamCoachAdvice({
+      userId,
+      locale,
+      baseCacheKey: CACHE_KEY,
+      input: { spentThisMonth, weightOnIncomePct, remaining, pendingReimbursementTotal, pendingCount, recordsCount },
+      schema: adviceSchema,
       system: systemPrompt,
       prompt: userPrompt,
-      schema: adviceSchema,
+      force,
     });
-
-    const generatedAt = await setCachedAdvice(userId, `${CACHE_KEY}:${locale}`, object);
-
-    return NextResponse.json({ success: true, advice: object, cached: false, generatedAt });
   } catch (error) {
     if (error instanceof Error && error.message === 'UNAUTHENTICATED') {
       return NextResponse.json({ success: false, error: 'Non authentifié' }, { status: 401 });

@@ -25,8 +25,24 @@ export interface TransactionFormPrefill {
   notes?: string;
 }
 
+interface AccountOption {
+  id: string;
+  name: string;
+}
+
 interface TransactionFormProps {
   categories: Category[];
+  // Comptes du foyer — permet de choisir sur quel compte (courant, épargne,
+  // ...) enregistrer la saisie manuelle. Optionnel/vide toléré : le serveur
+  // retombe sur "Main Checking" si accountId est absent (voir
+  // app/api/transactions/route.ts), donc les appelants existants qui ne
+  // passent pas cette prop continuent de fonctionner à l'identique.
+  accounts?: AccountOption[];
+  // Libellés marchands récents du foyer (voir app/saisie/page.tsx) —
+  // proposés en autocomplétion native du navigateur (<datalist>) sur le
+  // champ description, pour accélérer la saisie répétée d'un même
+  // commerçant sans rien imposer (on peut toujours taper autre chose).
+  recentMerchants?: string[];
   onSuccess?: () => void;
   // Pré-remplissage ponctuel (ex: depuis le scan de reçu, voir
   // ReceiptScanPanel.tsx) — un objet différent (même par référence) à chaque
@@ -36,7 +52,14 @@ interface TransactionFormProps {
   onPrefillApplied?: () => void;
 }
 
-export default function TransactionForm({ categories, onSuccess, prefill, onPrefillApplied }: TransactionFormProps) {
+export default function TransactionForm({
+  categories,
+  accounts = [],
+  recentMerchants = [],
+  onSuccess,
+  prefill,
+  onPrefillApplied,
+}: TransactionFormProps) {
   const router = useRouter();
   const { t } = useLanguage();
   const [formData, setFormData] = useState({
@@ -47,6 +70,7 @@ export default function TransactionForm({ categories, onSuccess, prefill, onPref
     paymentMethod: 'Carte Bancaire',
     amount: '',
     notes: '',
+    accountId: accounts[0]?.id || '',
   });
 
   const [loading, setLoading] = useState(false);
@@ -135,6 +159,23 @@ export default function TransactionForm({ categories, onSuccess, prefill, onPref
               required
             />
           </div>
+
+          {accounts.length > 1 && (
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[10px] uppercase font-bold text-subtle tracking-widest ml-1">{t('form.account')}</label>
+              <select
+                value={formData.accountId}
+                onChange={(e) => setFormData({ ...formData, accountId: e.target.value })}
+                className="bg-page border border-line text-body rounded-lg p-2.5 focus:border-blue-500 outline-none transition-colors text-sm"
+              >
+                {accounts.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           <div className="flex flex-col gap-1.5">
             <label className="text-[10px] uppercase font-bold text-subtle tracking-widest ml-1">{t('historique.type')}</label>
@@ -225,11 +266,19 @@ export default function TransactionForm({ categories, onSuccess, prefill, onPref
             <label className="text-[10px] uppercase font-bold text-subtle tracking-widest ml-1">{t('historique.notes')}</label>
             <input
               type="text"
+              list="merchant-suggestions"
               placeholder={t('form.notesPlaceholder')}
               value={formData.notes}
               onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
               className="bg-page border border-line text-body rounded-lg p-2.5 focus:border-blue-500 outline-none transition-colors text-sm"
             />
+            {recentMerchants.length > 0 && (
+              <datalist id="merchant-suggestions">
+                {recentMerchants.map((merchant) => (
+                  <option key={merchant} value={merchant} />
+                ))}
+              </datalist>
+            )}
           </div>
 
           <div className="flex flex-col justify-end md:col-start-4">

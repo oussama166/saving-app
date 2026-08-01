@@ -1,27 +1,11 @@
-import { generateObject } from 'ai';
 import { NextResponse } from 'next/server';
-import { z } from 'zod';
-import { coachModel } from '@/lib/aiProvider';
-import { getCachedAdvice, setCachedAdvice } from '@/lib/aiCache';
+import { streamCoachAdvice } from '@/lib/coachHandler';
+import { emergencyFundSchema as adviceSchema } from '@/lib/coachSchemas';
 import { requireSession } from '@/lib/auth';
 import { getUserLocale } from '@/lib/getLocale';
 import { aiLanguageInstruction } from '@/lib/i18n';
 
 const CACHE_KEY = 'emergency-fund';
-
-const adviceSchema = z.object({
-  objectif: z
-    .string()
-    .describe('Une phrase courte et directe: diagnostic de la situation actuelle (manque, correct, ou excédentaire).'),
-  methode: z
-    .string()
-    .describe('Une phrase courte et concrète: action chiffrée à prendre ce mois-ci (virement, réallocation...).'),
-  recommandations: z
-    .array(z.string())
-    .min(2)
-    .max(3)
-    .describe('2 à 3 placements ou banques marocaines courts (5-10 mots chacun), adaptés au montant en jeu.'),
-});
 
 export async function POST(req: Request) {
   try {
@@ -33,6 +17,7 @@ export async function POST(req: Request) {
       emergencyFundTargetMonths,
       monthsCovered,
       avgMonthlyExpenses,
+      force,
     } = await req.json();
 
     if (
@@ -43,22 +28,6 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: false, error: 'Données financières invalides' }, { status: 400 });
     }
 
-    // 1. Cache hebdomadaire — évite un appel Gemini à chaque chargement de page.
-    const cached = await getCachedAdvice<{ objectif: string; methode: string; recommandations: string[] }>(
-      userId,
-      `${CACHE_KEY}:${locale}`,
-    );
-
-    if (cached) {
-      return NextResponse.json({
-        success: true,
-        advice: cached.content,
-        cached: true,
-        generatedAt: cached.generatedAt,
-      });
-    }
-
-    // 2. Cache absent ou périmé (> 7 jours) — on régénère.
     const gapAmount = emergencyFundTarget - emergencyFundBalance;
 
     const systemPrompt = `Tu es un conseiller financier basé à Tanger, Maroc, spécialisé en fonds d'urgence. Style: ultra concis, chiffré, jamais générique. Connaissance de l'écosystème bancaire marocain (CIH, Attijariwafa, Bank Of Africa, Bons du Trésor). ${aiLanguageInstruction(locale)}`;
@@ -72,16 +41,16 @@ export async function POST(req: Request) {
 
 Donne un diagnostic + une méthode + des recommandations, chacun en UNE phrase courte, adaptés précisément à ces chiffres.`;
 
-    const { object } = await generateObject({
-      model: coachModel,
+    return await streamCoachAdvice({
+      userId,
+      locale,
+      baseCacheKey: CACHE_KEY,
+      input: { emergencyFundBalance, emergencyFundTarget, emergencyFundTargetMonths, monthsCovered, avgMonthlyExpenses },
+      schema: adviceSchema,
       system: systemPrompt,
       prompt: userPrompt,
-      schema: adviceSchema,
+      force,
     });
-
-    const generatedAt = await setCachedAdvice(userId, `${CACHE_KEY}:${locale}`, object);
-
-    return NextResponse.json({ success: true, advice: object, cached: false, generatedAt });
   } catch (error) {
     if (error instanceof Error && error.message === 'UNAUTHENTICATED') {
       return NextResponse.json({ success: false, error: 'Non authentifié' }, { status: 401 });

@@ -1,4 +1,7 @@
-import { Landmark, LineChart, Building2, Info } from 'lucide-react';
+'use client';
+
+import { Landmark, LineChart, Building2, Info, BookOpen } from 'lucide-react';
+import { useLanguage } from './LanguageProvider';
 
 const BANKS = [
   { name: 'CIH Bank (Code30)', fees: 'Compte gratuit', highlight: 'Épargne & crédit immobilier compétitifs' },
@@ -21,8 +24,20 @@ const REAL_ESTATE = [
 ];
 
 export default function CoachBenchmarksTab() {
+  const { t } = useLanguage();
   return (
     <div className="space-y-6">
+      {/* Chiffres fixes maintenus à la main (pas d'appel IA) — badge distinct
+          du badge "Coach IA" affiché par les autres onglets pour ne pas
+          laisser croire que ces valeurs sont générées/personnalisées. */}
+      <div
+        className="flex items-center gap-1.5 text-[10px] text-subtle font-bold uppercase tracking-widest w-fit"
+        title={t('coach.staticContentNotice')}
+      >
+        <BookOpen className="w-3 h-3" />
+        {t('coach.staticContent')}
+      </div>
+
       <div className="bg-surface rounded-2xl border border-line p-8">
         <div className="flex items-center gap-3 mb-6">
           <Landmark className="w-5 h-5 text-blue-400" />

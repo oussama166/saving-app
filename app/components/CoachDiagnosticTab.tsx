@@ -1,9 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import { Gauge, Sparkles, TrendingUp, TrendingDown, Info } from 'lucide-react';
 import { useLanguage } from './LanguageProvider';
 import { tParams } from '@/lib/i18n';
+import { useCoachAdvice } from '../hooks/useCoachAdvice';
+import { diagnosticSchema } from '@/lib/coachSchemas';
+import CoachRegenerateButton from './CoachRegenerateButton';
+import type { BudgetMethodResult } from '@/lib/budgetMethods';
 
 interface BudgetDetail {
   categoryName: string;
@@ -14,129 +17,104 @@ interface BudgetDetail {
   usedPct: number;
 }
 
-interface Rule503020 {
-  needs: { amount: number; pct: number };
-  wants: { amount: number; pct: number };
-  savings: { amount: number; pct: number };
-}
-
 interface Props {
   budgetDetails: BudgetDetail[];
-  rule503020: Rule503020;
+  budgetMethodKey: string;
+  budgetMethodResult: BudgetMethodResult | null;
   emergencyFundMonths: number;
   healthScore: number;
-}
-
-interface Diagnostic {
-  profilLabel: string;
-  profilDesc: string;
-  pointFort: string;
-  pointFaible: string;
-  recommandation: string;
 }
 
 const formatCUR = (val: number) =>
   new Intl.NumberFormat('fr-MA', { style: 'currency', currency: 'MAD', maximumFractionDigits: 0 }).format(val);
 
-// Classification simple du profil dépensier à partir de la règle 50/30/20 —
-// utilisée uniquement en repli si le Coach IA est indisponible.
-function getSpenderProfile(rule: Rule503020, t: ReturnType<typeof useLanguage>['t']) {
-  if (rule.savings.pct >= 20) {
+// Classification simple du profil dépensier à partir des buckets réels de LA
+// méthode budgétaire choisie par l'utilisateur (voir lib/budgetMethods.ts) —
+// utilisée uniquement en repli si le Coach IA est indisponible. Générique par
+// rapport à n'importe quelle méthode "ratio" (503020, 702010, se payer en
+// premier, règle des 60%), plutôt que de supposer 50/30/20 comme avant.
+function getSpenderProfile(result: BudgetMethodResult | null, t: ReturnType<typeof useLanguage>['t']) {
+  if (!result) {
+    return {
+      emoji: '🔵',
+      label: t('coach.diagnostic.profileEquilibre'),
+      desc: t('coach.diagnostic.noRatioMethodDesc'),
+      color: 'text-blue-400 bg-blue-500/10 border-blue-500/20',
+    };
+  }
+
+  const savingsBucket = result.buckets.find((b) => b.key === 'savings');
+  if (savingsBucket && savingsBucket.actualPct >= savingsBucket.targetPct) {
     return {
       emoji: '🟢',
       label: t('coach.diagnostic.profileEpargnant'),
-      desc: tParams(t('coach.diagnostic.profileEpargnantDesc'), { pct: rule.savings.pct }),
+      desc: tParams(t('coach.diagnostic.profileEpargnantDesc'), { pct: savingsBucket.actualPct }),
       color: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20',
     };
   }
-  if (rule.wants.pct > 35) {
+
+  const overBuckets = result.buckets
+    .filter((b) => b.key !== 'savings' && b.actualPct > b.targetPct)
+    .sort((a, b) => b.actualPct - b.targetPct - (a.actualPct - a.targetPct));
+
+  if (overBuckets.length > 0) {
+    const worst = overBuckets[0];
+    const bucketLabel = t(worst.labelKey, worst.key);
     return {
       emoji: '🟠',
-      label: t('coach.diagnostic.profileLoisirs'),
-      desc: tParams(t('coach.diagnostic.profileLoisirsDesc'), { pct: rule.wants.pct }),
+      label: tParams(t('coach.diagnostic.profileOverBucketLabel'), { bucket: bucketLabel }),
+      desc: tParams(t('coach.diagnostic.profileOverBucketDesc'), {
+        bucket: bucketLabel,
+        pct: worst.actualPct,
+        target: worst.targetPct,
+      }),
       color: 'text-orange-400 bg-orange-500/10 border-orange-500/20',
     };
   }
-  if (rule.needs.pct > 60) {
-    return {
-      emoji: '🔴',
-      label: t('coach.diagnostic.profileCharges'),
-      desc: tParams(t('coach.diagnostic.profileChargesDesc'), { pct: rule.needs.pct }),
-      color: 'text-red-400 bg-red-500/10 border-red-500/20',
-    };
-  }
+
   return {
     emoji: '🔵',
     label: t('coach.diagnostic.profileEquilibre'),
-    desc: tParams(t('coach.diagnostic.profileEquilibreDesc'), {
-      needs: rule.needs.pct,
-      wants: rule.wants.pct,
-      savings: rule.savings.pct,
-    }),
+    desc: t('coach.diagnostic.profileBalancedGenericDesc'),
     color: 'text-blue-400 bg-blue-500/10 border-blue-500/20',
   };
 }
 
-export default function CoachDiagnosticTab({ budgetDetails, rule503020, emergencyFundMonths, healthScore }: Props) {
+export default function CoachDiagnosticTab({
+  budgetDetails,
+  budgetMethodKey,
+  budgetMethodResult,
+  emergencyFundMonths,
+  healthScore,
+}: Props) {
   const { t } = useLanguage();
-  const [diagnostic, setDiagnostic] = useState<Diagnostic | null>(null);
-  const [generatedAt, setGeneratedAt] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [failed, setFailed] = useState(false);
+  const { advice: diagnostic, loading, regenerating, failed, generatedAt, regenerate } = useCoachAdvice(
+    '/api/coach/diagnostic',
+    diagnosticSchema,
+    { budgetDetails, budgetMethodKey, budgetMethodResult, emergencyFundMonths, healthScore },
+  );
 
-  useEffect(() => {
-    let cancelled = false;
+  const complete = Boolean(
+    diagnostic?.profilLabel && diagnostic?.profilDesc && diagnostic?.pointFort && diagnostic?.pointFaible && diagnostic?.recommandation,
+  );
 
-    fetch('/api/coach/diagnostic', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        budgetDetails,
-        rule503020,
-        emergencyFundMonths,
-        healthScore,
-      }),
-    })
-      .then((res) => {
-        if (!res.ok) throw new Error('Request failed');
-        return res.json();
-      })
-      .then((data) => {
-        if (cancelled) return;
-        if (data.success && data.advice) {
-          setDiagnostic(data.advice);
-          if (data.generatedAt) setGeneratedAt(data.generatedAt);
-        } else {
-          setFailed(true);
-        }
-      })
-      .catch(() => {
-        if (!cancelled) setFailed(true);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const staticProfile = getSpenderProfile(rule503020, t);
+  const staticProfile = getSpenderProfile(budgetMethodResult, t);
   const badge = (
     <>
       {loading && (
-        <span className="ml-auto flex items-center gap-1.5 text-[10px] text-blue-400 font-bold uppercase tracking-widest">
+        <span className="flex items-center gap-1.5 text-[10px] text-blue-400 font-bold uppercase tracking-widest">
           <Sparkles className="w-3 h-3 animate-pulse" />
           {t('coach.analyzing')}
         </span>
       )}
-      {!loading && diagnostic && !failed && (
-        <span className="ml-auto flex items-center gap-1.5 text-[10px] text-emerald-400 font-bold uppercase tracking-widest">
-          <Sparkles className="w-3 h-3" />
-          {t('coach.aiCoach')}
-        </span>
+      {!loading && complete && !failed && (
+        <>
+          <span className="flex items-center gap-1.5 text-[10px] text-emerald-400 font-bold uppercase tracking-widest">
+            <Sparkles className="w-3 h-3" />
+            {t('coach.aiCoach')}
+          </span>
+          <CoachRegenerateButton onClick={regenerate} loading={regenerating} />
+        </>
       )}
     </>
   );
@@ -154,17 +132,17 @@ export default function CoachDiagnosticTab({ budgetDetails, rule503020, emergenc
     );
   }
 
-  if (diagnostic && !failed) {
+  if (complete && !failed) {
     return (
       <div className="space-y-6">
         <div className="p-8 border bg-surface rounded-2xl border-line">
           <div className="flex items-center gap-3 mb-4">
             <Gauge className="w-5 h-5 text-blue-400" />
             <h3 className="text-lg font-bold tracking-tight text-ink">{t('coach.diagnostic.profil')}</h3>
-            {badge}
+            <div className="ml-auto flex items-center gap-3">{badge}</div>
           </div>
-          <p className="mb-2 text-lg font-black text-ink">{diagnostic.profilLabel}</p>
-          <p className="text-[13px] text-muted leading-relaxed">{diagnostic.profilDesc}</p>
+          <p className="mb-2 text-lg font-black text-ink">{diagnostic?.profilLabel}</p>
+          <p className="text-[13px] text-muted leading-relaxed">{diagnostic?.profilDesc}</p>
         </div>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -175,7 +153,7 @@ export default function CoachDiagnosticTab({ budgetDetails, rule503020, emergenc
                 {t('coach.diagnostic.pointFort')}
               </span>
             </div>
-            <p className="text-[13px] text-body-soft leading-relaxed">{diagnostic.pointFort}</p>
+            <p className="text-[13px] text-body-soft leading-relaxed">{diagnostic?.pointFort}</p>
           </div>
           <div className="p-5 border rounded-2xl bg-red-500/10 border-red-500/20">
             <div className="flex items-center gap-2 mb-2">
@@ -184,7 +162,7 @@ export default function CoachDiagnosticTab({ budgetDetails, rule503020, emergenc
                 {t('coach.diagnostic.pointFaible')}
               </span>
             </div>
-            <p className="text-[13px] text-body-soft leading-relaxed">{diagnostic.pointFaible}</p>
+            <p className="text-[13px] text-body-soft leading-relaxed">{diagnostic?.pointFaible}</p>
           </div>
         </div>
 
@@ -196,7 +174,7 @@ export default function CoachDiagnosticTab({ budgetDetails, rule503020, emergenc
               {t('coach.diagnostic.scoreLabel')} {healthScore}%
             </span>
           </div>
-          <p className="text-[13px] text-muted leading-relaxed">{diagnostic.recommandation}</p>
+          <p className="text-[13px] text-muted leading-relaxed">{diagnostic?.recommandation}</p>
 
           {generatedAt && (
             <p className="text-[10px] text-faint italic pt-4 mt-4 border-t border-line-subtle">

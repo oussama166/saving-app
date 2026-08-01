@@ -99,6 +99,9 @@ export async function GET() {
     const spentByCategoryId = new Map<string, number>();
 
     for (const tx of monthTransactions) {
+      // "transfer" (virement entre comptes du foyer) est neutre — ni revenu,
+      // ni dépense, ni épargne, voir lib/transferEngine.ts.
+      if (tx.category.type === "transfer") continue;
       const amount = tx.amount * (fxRates[tx.account.currency] ?? 1);
       if (tx.category.type === "income") {
         income += amount;

@@ -4,6 +4,8 @@ import "./globals.css";
 import TopNav from "./components/TopNav";
 import EmailVerificationBanner from "./components/EmailVerificationBanner";
 import ServiceWorkerRegister from "./components/ServiceWorkerRegister";
+import DevEnvBadge from "./components/DevEnvBadge";
+import FinanceAgent from "./components/FinanceAgent";
 import { ThemeProvider, THEME_INIT_SCRIPT } from "./components/ThemeProvider";
 import { LanguageProvider } from "./components/LanguageProvider";
 import { getSession } from "@/lib/auth";
@@ -73,9 +75,11 @@ export default async function RootLayout({
             authenticated={Boolean(session)}
           >
             <ServiceWorkerRegister />
+            <DevEnvBadge />
             <TopNav />
             <EmailVerificationBanner />
             {children}
+            <FinanceAgent />
           </LanguageProvider>
         </ThemeProvider>
       </body>

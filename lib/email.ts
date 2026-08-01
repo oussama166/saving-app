@@ -9,23 +9,29 @@
 // warning et on renvoie false, sans jamais faire planter le flux appelant
 // (signup/login doivent réussir même si l'email ne part pas).
 
-const RESEND_URL = 'https://api.resend.com/emails';
+const RESEND_URL = "https://api.resend.com/emails";
 const FETCH_TIMEOUT_MS = 8000;
 
 // Expéditeur par défaut : le domaine de test Resend, utilisable sans
 // vérification de domaine — pratique pour démarrer. Une fois un domaine
 // vérifié sur resend.com, définir EMAIL_FROM dans .env (ex:
 // "WealthOS <no-reply@tondomaine.com>") pour l'utiliser à la place.
-const DEFAULT_FROM = 'WealthOS <onboarding@resend.dev>';
+const DEFAULT_FROM = "WealthOS <onboarding@resend.dev>";
 
 export function getSiteUrl(): string {
-  return process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000';
+  return process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
 }
 
-async function sendEmail(params: { to: string; subject: string; html: string }): Promise<boolean> {
+async function sendEmail(params: {
+  to: string;
+  subject: string;
+  html: string;
+}): Promise<boolean> {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) {
-    console.warn(`email: RESEND_API_KEY manquant dans .env — email "${params.subject}" à ${params.to} non envoyé.`);
+    console.warn(
+      `email: RESEND_API_KEY manquant dans .env — email "${params.subject}" à ${params.to} non envoyé.`,
+    );
     return false;
   }
 
@@ -34,10 +40,10 @@ async function sendEmail(params: { to: string; subject: string; html: string }):
 
   try {
     const res = await fetch(RESEND_URL, {
-      method: 'POST',
+      method: "POST",
       headers: {
         Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
       },
       body: JSON.stringify({
         from: process.env.EMAIL_FROM || DEFAULT_FROM,
@@ -49,14 +55,19 @@ async function sendEmail(params: { to: string; subject: string; html: string }):
     });
 
     if (!res.ok) {
-      const body = await res.text().catch(() => '');
-      console.warn(`email: Resend a répondu ${res.status} pour "${params.subject}" à ${params.to} — ${body}`);
+      const body = await res.text().catch(() => "");
+      console.warn(
+        `email: Resend a répondu ${res.status} pour "${params.subject}" à ${params.to} — ${body}`,
+      );
       return false;
     }
 
     return true;
   } catch (err) {
-    console.warn('email: erreur pendant l\'envoi via Resend —', err instanceof Error ? err.message : err);
+    console.warn(
+      "email: erreur pendant l'envoi via Resend —",
+      err instanceof Error ? err.message : err,
+    );
     return false;
   } finally {
     clearTimeout(timeout);
@@ -73,13 +84,16 @@ function wrapEmailHtml(title: string, bodyHtml: string): string {
   `;
 }
 
-export async function sendVerificationEmail(to: string, token: string): Promise<boolean> {
+export async function sendVerificationEmail(
+  to: string,
+  token: string,
+): Promise<boolean> {
   const link = `${getSiteUrl()}/api/auth/verify-email?token=${encodeURIComponent(token)}`;
   return sendEmail({
     to,
-    subject: 'Confirme ton adresse email — Wealth OS',
+    subject: "Confirme ton adresse email — Wealth OS",
     html: wrapEmailHtml(
-      'Confirme ton adresse email',
+      "Confirme ton adresse email",
       `
         <p style="font-size: 14px; line-height: 1.6;">
           Merci de t'être inscrit sur Wealth OS. Clique sur le bouton ci-dessous pour confirmer ton adresse email :
@@ -97,13 +111,21 @@ export async function sendVerificationEmail(to: string, token: string): Promise<
 
 export async function sendBudgetAlertEmail(
   to: string,
-  params: { categoryName: string; threshold: number; spent: number; budget: number; usedPct: number },
+  params: {
+    categoryName: string;
+    threshold: number;
+    spent: number;
+    budget: number;
+    usedPct: number;
+  },
 ): Promise<boolean> {
   const { categoryName, threshold, spent, budget, usedPct } = params;
   const isOver = threshold >= 100;
-  const title = isOver ? `Budget dépassé — ${categoryName}` : `Budget bientôt atteint — ${categoryName}`;
-  const fmt = (n: number) => `${Math.round(n).toLocaleString('fr-FR')} DH`;
-  const color = isOver ? '#ef4444' : '#f59e0b';
+  const title = isOver
+    ? `Budget dépassé — ${categoryName}`
+    : `Budget bientôt atteint — ${categoryName}`;
+  const fmt = (n: number) => `${Math.round(n).toLocaleString("fr-FR")} DH`;
+  const color = isOver ? "#ef4444" : "#f59e0b";
 
   return sendEmail({
     to,
@@ -135,17 +157,22 @@ export async function sendWeeklyDigestEmail(
     weekIncome: number;
     weekExpenses: number;
     topCategories: { name: string; amount: number }[];
-    budgetWarnings: { name: string; usedPct: number; spent: number; budget: number }[];
+    budgetWarnings: {
+      name: string;
+      usedPct: number;
+      spent: number;
+      budget: number;
+    }[];
     goalsCount: number;
     goalsProgressPct: number;
     weekGoalContributions: number;
   },
 ): Promise<boolean> {
-  const fmt = (n: number) => `${Math.round(n).toLocaleString('fr-FR')} DH`;
+  const fmt = (n: number) => `${Math.round(n).toLocaleString("fr-FR")} DH`;
 
   const topCategoriesHtml = data.topCategories.length
     ? `<ul style="padding-left: 18px; margin: 8px 0; font-size: 13px; line-height: 1.8;">
-        ${data.topCategories.map((c) => `<li>${c.name} — <strong>${fmt(c.amount)}</strong></li>`).join('')}
+        ${data.topCategories.map((c) => `<li>${c.name} — <strong>${fmt(c.amount)}</strong></li>`).join("")}
       </ul>`
     : `<p style="font-size: 13px; color: #64748b;">Aucune dépense cette semaine.</p>`;
 
@@ -154,17 +181,17 @@ export async function sendWeeklyDigestEmail(
         ${data.budgetWarnings
           .map(
             (w) =>
-              `<li style="color: ${w.usedPct >= 100 ? '#ef4444' : '#f59e0b'};">${w.name} — ${w.usedPct}% (${fmt(w.spent)} / ${fmt(w.budget)})</li>`,
+              `<li style="color: ${w.usedPct >= 100 ? "#ef4444" : "#f59e0b"};">${w.name} — ${w.usedPct}% (${fmt(w.spent)} / ${fmt(w.budget)})</li>`,
           )
-          .join('')}
+          .join("")}
       </ul>`
     : `<p style="font-size: 13px; color: #10b981;">Tous les budgets sont sous contrôle ce mois-ci. 👍</p>`;
 
   return sendEmail({
     to,
-    subject: 'Ton résumé de la semaine — Wealth OS',
+    subject: "Ton résumé de la semaine — Wealth OS",
     html: wrapEmailHtml(
-      'Ton résumé de la semaine',
+      "Ton résumé de la semaine",
       `
         <p style="font-size: 14px; line-height: 1.6;">
           Revenus : <strong>${fmt(data.weekIncome)}</strong> — Dépenses : <strong>${fmt(data.weekExpenses)}</strong>
@@ -181,9 +208,9 @@ export async function sendWeeklyDigestEmail(
             ? `<h2 style="font-size: 13px; font-weight: 700; margin-top: 20px;">Objectifs d'épargne</h2>
                <p style="font-size: 13px; line-height: 1.6;">
                  ${data.goalsCount} objectif(s) — <strong>${data.goalsProgressPct}%</strong> atteint au total.
-                 ${data.weekGoalContributions > 0 ? `Versé cette semaine : <strong>${fmt(data.weekGoalContributions)}</strong>.` : ''}
+                 ${data.weekGoalContributions > 0 ? `Versé cette semaine : <strong>${fmt(data.weekGoalContributions)}</strong>.` : ""}
                </p>`
-            : ''
+            : ""
         }
 
         <p style="margin: 24px 0;">
@@ -205,7 +232,7 @@ export async function sendHouseholdInviteEmail(
     to,
     subject: `${params.inviterName} t'invite à partager son budget sur Wealth OS`,
     html: wrapEmailHtml(
-      'Invitation à un foyer partagé',
+      "Invitation à un foyer partagé",
       `
         <p style="font-size: 14px; line-height: 1.6;">
           <strong>${params.inviterName}</strong> t'invite à rejoindre son foyer sur Wealth OS : une fois accepté,
@@ -225,13 +252,16 @@ export async function sendHouseholdInviteEmail(
   });
 }
 
-export async function sendPasswordResetEmail(to: string, token: string): Promise<boolean> {
+export async function sendPasswordResetEmail(
+  to: string,
+  token: string,
+): Promise<boolean> {
   const link = `${getSiteUrl()}/reset-password?token=${encodeURIComponent(token)}`;
   return sendEmail({
     to,
-    subject: 'Réinitialisation de ton mot de passe — Wealth OS',
+    subject: "Réinitialisation de ton mot de passe — Wealth OS",
     html: wrapEmailHtml(
-      'Réinitialiser ton mot de passe',
+      "Réinitialiser ton mot de passe",
       `
         <p style="font-size: 14px; line-height: 1.6;">
           Une demande de réinitialisation de mot de passe a été faite pour ce compte. Clique sur le bouton ci-dessous pour choisir un nouveau mot de passe :

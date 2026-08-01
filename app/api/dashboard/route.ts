@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getEnrichedPortfolioAssets } from "@/lib/portfolio";
-import { NEEDS_CATEGORIES } from "@/lib/financials";
+import { isEssentialCategory } from "@/lib/financials";
 import { requireSession } from "@/lib/auth";
 import { getHouseholdContext } from "@/lib/household";
 import { getRatesToMad } from "@/lib/exchangeRates";
 import { requireFeatureAccess } from "@/lib/features";
 import { resolveBudgetCycleStart } from "@/lib/budgetCycle";
+import { computeBudgetMethodResult, getBudgetMethodDef } from "@/lib/budgetMethods";
 
 export const dynamic = "force-dynamic";
 
@@ -83,6 +84,13 @@ export async function GET() {
     const expensesByCategoryMap: Record<string, number> = {};
 
     allTransactions.forEach((tx) => {
+      // Un virement entre deux comptes du foyer (lib/transferEngine.ts) crée
+      // deux lignes de catégorie "transfer" (une négative, une positive) —
+      // ni un revenu ni une dépense, ça doit rester neutre ici. Sans ce
+      // filtre, chaque virement gonflait à la fois le revenu (jambe créditée)
+      // ET les dépenses (jambe débitée), et "Transfer" apparaissait comme une
+      // catégorie de dépense dans le graphique et dans la règle 50/30/20.
+      if (tx.category.type === "transfer") return;
       const amount = tx.amount * (fxRates[tx.account.currency] ?? 1);
       if (amount > 0) {
         income += amount;
@@ -91,6 +99,28 @@ export async function GET() {
         expenses += absAmount;
         expensesByCategoryMap[tx.category.name] =
           (expensesByCategoryMap[tx.category.name] || 0) + absAmount;
+      }
+    });
+
+    // Totaux "essentiel / discrétionnaire / épargne" pour les méthodes en
+    // ratio (50/30/20, 70/20/10, se payer en premier, règle des 60%...) —
+    // calculés séparément de la boucle income/expenses ci-dessus (qui ne
+    // doit pas changer, elle alimente cashFlow/healthScore/rule503020
+    // existants) pour ne rien changer au comportement déjà en prod. Une
+    // catégorie "savings" a un montant positif (comme un revenu, voir
+    // convention de signe dans Transaction) donc comptée à part ici plutôt
+    // que dans essentialSpend/discretionarySpend.
+    let essentialSpend = 0;
+    let discretionarySpend = 0;
+    let savingsAmount = 0;
+    allTransactions.forEach((tx) => {
+      const amount = tx.amount * (fxRates[tx.account.currency] ?? 1);
+      if (tx.category.type === "savings") {
+        savingsAmount += Math.abs(amount);
+      } else if (tx.category.type === "expense" && amount < 0) {
+        const absAmount = Math.abs(amount);
+        if (isEssentialCategory(tx.category)) essentialSpend += absAmount;
+        else discretionarySpend += absAmount;
       }
     });
 
@@ -134,16 +164,18 @@ export async function GET() {
         };
       });
 
-    // 50/30/20 Rule
+    // 50/30/20 Rule — réutilise essentialSpend/discretionarySpend calculés
+    // juste au-dessus (basés sur isEssentialCategory + filtrés sur
+    // category.type === "expense", donc déjà cohérents avec le reste de
+    // l'app et déjà sans les virements). Avant, ce total repassait par
+    // expensesByCategoryMap avec un matching par NOM (NEEDS_CATEGORIES.has),
+    // qui ratait le reclassement essentiel/discrétionnaire fait sur Profil et
+    // comptait aussi les virements comme "Wants".
     const ruleTotals = {
-      Needs: 0,
-      Wants: 0,
+      Needs: essentialSpend,
+      Wants: discretionarySpend,
       Savings: cashFlow > 0 ? cashFlow : 0,
     };
-    Object.entries(expensesByCategoryMap).forEach(([name, amt]) => {
-      if (NEEDS_CATEGORIES.has(name)) ruleTotals.Needs += amt;
-      else ruleTotals.Wants += amt;
-    });
 
     // Dénominateur du split 50/30/20 : le revenu réel du mois si connu,
     // sinon le revenu de référence (page Profil) — jamais la somme des
@@ -168,6 +200,19 @@ export async function GET() {
         pct: Math.round((ruleTotals.Savings / totalBudget) * 100),
       },
     };
+
+    // Méthodologie de budget sélectionnée par l'utilisateur (page Profil) —
+    // rule503020 ci-dessus reste inchangé (consommé par la page Coach), ceci
+    // alimente la nouvelle carte BudgetMethodCard qui généralise
+    // Rule503020Card à 8 méthodologies (voir lib/budgetMethods.ts).
+    const budgetMethodKey = userSettings?.budgetMethod ?? "503020";
+    const budgetMethodDef = getBudgetMethodDef(budgetMethodKey);
+    const budgetMethodResult = computeBudgetMethodResult(budgetMethodKey, {
+      income: totalBudget,
+      essential: essentialSpend,
+      discretionary: discretionarySpend,
+      savings: savingsAmount,
+    });
 
     // Chart Data
     const chartData = {
@@ -210,6 +255,14 @@ export async function GET() {
         },
         budgetDetails,
         rule503020,
+        budgetMethod: budgetMethodKey,
+        budgetMethodKind: budgetMethodDef.kind,
+        budgetMethodResult,
+        budgetMethodTotals: {
+          essential: Math.round(essentialSpend),
+          discretionary: Math.round(discretionarySpend),
+          savings: Math.round(savingsAmount),
+        },
         chartData,
         totalCheckingBalance,
         totalSavingsLocked,

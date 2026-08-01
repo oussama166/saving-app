@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma';
 import type { HouseholdContext } from '@/lib/household';
 import { getRatesToMad } from '@/lib/exchangeRates';
 import { resolveBudgetCycleStart } from '@/lib/budgetCycle';
+import { buildMonthBuckets } from '@/lib/dateBuckets';
 
 // Petit utilitaire partagé : une Transaction est toujours dans la devise de
 // SON compte (Account.currency), jamais forcément MAD — voir
@@ -17,10 +18,12 @@ async function ratesForAccounts(transactions: { account: { currency: string } }[
   return getRatesToMad(currencies);
 }
 
-// Catégories "Besoins" (essentielles / charges fixes) — utilisé à la fois
-// pour la règle 50/30/20 (app/api/dashboard/route.ts) et pour le ratio de
-// charges fixes (getFinancialRatios). Reste en dur car le schéma n'a pas
-// (encore) de champ `budgetGroup` sur Category.
+// Catégories "Besoins" (essentielles / charges fixes) historiques — l'ajout
+// de Category.budgetGroup ('essential'|'discretionary') remplace maintenant
+// ce Set comme source de vérité (voir isEssentialCategory ci-dessous). Ce
+// Set ne reste que comme filet de secours pour d'éventuelles catégories dont
+// budgetGroup n'aurait pas encore été renseigné (migration de backfill
+// couvre déjà ces 5 noms, voir prisma/migrations/20260801010000_add_budget_methods).
 export const NEEDS_CATEGORIES = new Set([
   'Logement & Charges',
   'Alimentation & Restauration',
@@ -28,6 +31,20 @@ export const NEEDS_CATEGORIES = new Set([
   'Santé & Médical',
   'Éducation & Développement',
 ]);
+
+/**
+ * Une dépense est "essentielle" (par opposition à "discrétionnaire") si sa
+ * catégorie a explicitement budgetGroup = 'essential', sinon on retombe sur
+ * l'ancien matching par nom (NEEDS_CATEGORIES) pour ne rien casser tant que
+ * l'utilisateur n'a pas reclassé ses catégories personnalisées. Utilisé par
+ * les méthodes en ratio (50/30/20, 70/20/10, règle des 60%...), voir
+ * lib/budgetMethods.ts.
+ */
+export function isEssentialCategory(category: { name: string; budgetGroup?: string | null }): boolean {
+  if (category.budgetGroup === 'essential') return true;
+  if (category.budgetGroup === 'discretionary') return false;
+  return NEEDS_CATEGORIES.has(category.name);
+}
 
 /**
  * Moyenne glissante des dépenses réelles sur N mois (par défaut 3).
@@ -40,7 +57,10 @@ export async function getAverageMonthlyExpenses(ctx: HouseholdContext, reference
   const since = new Date(now.getFullYear(), now.getMonth() - months, 1);
 
   const transactions = await prisma.transaction.findMany({
-    where: { userId: { in: ctx.memberIds }, date: { gte: since }, amount: { lt: 0 } },
+    // category.type exclut les virements entre comptes du foyer (jambe
+    // sortante toujours négative, voir lib/transferEngine.ts) — sans ce
+    // filtre, un virement gonflait cette moyenne comme une vraie dépense.
+    where: { userId: { in: ctx.memberIds }, date: { gte: since }, amount: { lt: 0 }, category: { type: 'expense' } },
     include: { account: { select: { currency: true } } },
   });
 
@@ -141,6 +161,9 @@ export async function getFinancialRatios(ctx: HouseholdContext, referenceIncome:
   let totalExpenses = 0;
 
   for (const tx of transactions) {
+    // "transfer" (déplacement entre deux comptes du foyer, voir
+    // lib/transferEngine.ts) est neutre : ni revenu, ni charge, ni épargne.
+    if (tx.category.type === 'transfer') continue;
     const amount = toMad(tx.amount, tx.account.currency, rates);
     if (tx.category.type === 'income') {
       income += amount;
@@ -149,7 +172,7 @@ export async function getFinancialRatios(ctx: HouseholdContext, referenceIncome:
     } else {
       const abs = Math.abs(amount);
       totalExpenses += abs;
-      if (NEEDS_CATEGORIES.has(tx.category.name)) fixedCharges += abs;
+      if (isEssentialCategory(tx.category)) fixedCharges += abs;
     }
   }
 
@@ -184,15 +207,7 @@ export interface MonthlyAnalytics {
  * modèle de snapshot dédié pour l'instant.
  */
 export async function getMonthlyAnalytics(ctx: HouseholdContext, monthsCount = 6): Promise<MonthlyAnalytics[]> {
-  const now = new Date();
-  const months = Array.from({ length: monthsCount }, (_, i) => {
-    const offset = monthsCount - 1 - i;
-    const start = new Date(now.getFullYear(), now.getMonth() - offset, 1);
-    const end = new Date(now.getFullYear(), now.getMonth() - offset + 1, 1);
-    const key = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}`;
-    const label = start.toLocaleDateString('fr-FR', { month: 'short', year: 'numeric' });
-    return { key, label, start, end };
-  });
+  const months = buildMonthBuckets(monthsCount);
 
   const transactions = await prisma.transaction.findMany({
     where: { userId: { in: ctx.memberIds }, date: { gte: months[0].start } },
@@ -208,6 +223,8 @@ export async function getMonthlyAnalytics(ctx: HouseholdContext, monthsCount = 6
   );
 
   for (const tx of transactions) {
+    // "transfer" neutre — voir même filtre dans getFinancialRatios ci-dessus.
+    if (tx.category.type === 'transfer') continue;
     const bucketMonth = months.find((m) => tx.date >= m.start && tx.date < m.end);
     if (!bucketMonth) continue;
     const bucket = buckets.get(bucketMonth.key)!;
@@ -269,15 +286,7 @@ export interface CategoryTrend {
  * plutôt que sur un seul mois isolé.
  */
 export async function getTopCategoriesTrend(ctx: HouseholdContext, monthsCount = 6, topN = 5): Promise<CategoryTrend[]> {
-  const now = new Date();
-  const months = Array.from({ length: monthsCount }, (_, i) => {
-    const offset = monthsCount - 1 - i;
-    const start = new Date(now.getFullYear(), now.getMonth() - offset, 1);
-    const end = new Date(now.getFullYear(), now.getMonth() - offset + 1, 1);
-    const key = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}`;
-    const label = start.toLocaleDateString('fr-FR', { month: 'short', year: 'numeric' });
-    return { key, label, start, end };
-  });
+  const months = buildMonthBuckets(monthsCount);
 
   const transactions = await prisma.transaction.findMany({
     where: { userId: { in: ctx.memberIds }, date: { gte: months[0].start }, category: { type: 'expense' } },
@@ -380,15 +389,7 @@ export interface HealthSpendingPoint {
  * (au lieu d'un seul chiffre du mois en cours comme dans getHealthBudget).
  */
 export async function getHealthSpendingTrend(ctx: HouseholdContext, monthsCount = 6): Promise<HealthSpendingPoint[]> {
-  const now = new Date();
-  const months = Array.from({ length: monthsCount }, (_, i) => {
-    const offset = monthsCount - 1 - i;
-    const start = new Date(now.getFullYear(), now.getMonth() - offset, 1);
-    const end = new Date(now.getFullYear(), now.getMonth() - offset + 1, 1);
-    const key = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}`;
-    const label = start.toLocaleDateString('fr-FR', { month: 'short', year: 'numeric' });
-    return { key, label, start, end };
-  });
+  const months = buildMonthBuckets(monthsCount);
 
   const category = await prisma.category.findFirst({ where: { userId: ctx.budgetOwnerId, name: 'Santé & Médical' } });
   if (!category) return months.map((m) => ({ month: m.key, label: m.label, amount: 0 }));

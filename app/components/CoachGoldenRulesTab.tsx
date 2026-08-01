@@ -1,6 +1,7 @@
 'use client';
 
-import { Home, Car, Smartphone, UtensilsCrossed, CreditCard, ShieldCheck } from 'lucide-react';
+import { Home, Car, Smartphone, UtensilsCrossed, CreditCard, ShieldCheck, BookOpen } from 'lucide-react';
+import { useLanguage } from './LanguageProvider';
 
 interface Props {
   referenceIncome: number;
@@ -11,6 +12,7 @@ const formatCUR = (val: number) =>
   new Intl.NumberFormat('fr-MA', { style: 'currency', currency: 'MAD', maximumFractionDigits: 0 }).format(val);
 
 export default function CoachGoldenRulesTab({ referenceIncome, avgMonthlyExpenses }: Props) {
+  const { t } = useLanguage();
   const rules = [
     {
       icon: Home,
@@ -58,6 +60,18 @@ export default function CoachGoldenRulesTab({ referenceIncome, avgMonthlyExpense
 
   return (
     <div className="space-y-6">
+      {/* Ces règles sont des seuils fixes calculés côté client — aucun appel
+          IA n'entre en jeu ici (contrairement à l'onglet Diagnostic), d'où ce
+          badge distinct du badge "Coach IA" pour ne pas induire l'utilisateur
+          en erreur sur ce qui est réellement généré par IA dans cette page. */}
+      <div
+        className="flex items-center gap-1.5 text-[10px] text-subtle font-bold uppercase tracking-widest w-fit"
+        title={t('coach.staticContentNotice')}
+      >
+        <BookOpen className="w-3 h-3" />
+        {t('coach.staticContent')}
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
         {rules.map((r) => (
           <div key={r.title} className={`p-5 rounded-2xl border ${r.color} space-y-3`}>

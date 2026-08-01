@@ -3,9 +3,8 @@
 import { useState, useEffect } from "react";
 import TopMetrics from "./components/TopMetrics";
 import DetailedBudgetTable from "./components/DetailedBudgetTable";
-import Rule503020Card from "./components/Rule503020Card";
+import BudgetMethodCard from "./components/BudgetMethodCard";
 import Visualizations from "./components/Visualizations";
-import FinanceAgent from "./components/FinanceAgent";
 import InterestSimulator from "./components/InterestSimulator";
 import { Bell } from "lucide-react";
 import { useLanguage } from "./components/LanguageProvider";
@@ -41,6 +40,23 @@ interface DashboardData {
     wants: { amount: number; pct: number };
     savings: { amount: number; pct: number };
   };
+  budgetMethod: string;
+  budgetMethodKind: "ratio" | "allocation" | "journal";
+  budgetMethodResult: {
+    key: string;
+    kind: "ratio" | "allocation" | "journal";
+    totalBasis: number;
+    buckets: {
+      key: string;
+      labelKey: string;
+      targetPct: number;
+      targetAmount: number;
+      actualAmount: number;
+      actualPct: number;
+      subNoteKey?: string;
+    }[];
+  } | null;
+  budgetMethodTotals: { essential: number; discretionary: number; savings: number };
   chartData: {
     expensesByCategory: { name: string; value: number }[];
     budgetVsActual: { category: string; budget: number; actual: number }[];
@@ -126,7 +142,7 @@ function DashboardContent() {
 
   if (!data) return null;
 
-  const { metrics, budgetDetails, rule503020, chartData, safeToSpend } = data;
+  const { metrics, budgetDetails, budgetMethod, budgetMethodKind, budgetMethodResult, budgetMethodTotals, chartData, safeToSpend } = data;
 
   return (
     <main className="min-h-screen p-4 font-sans sm:p-6 bg-page text-body">
@@ -184,7 +200,13 @@ function DashboardContent() {
             <DetailedBudgetTable details={budgetDetails} />
           </div>
           <div className="space-y-8">
-            <Rule503020Card rule={rule503020} />
+            <BudgetMethodCard
+              method={budgetMethod}
+              kind={budgetMethodKind}
+              result={budgetMethodResult}
+              totals={budgetMethodTotals}
+              budgetDetails={budgetDetails}
+            />
             <div className="p-6 border bg-surface-alt/50 border-line rounded-2xl">
               <div className="flex items-center gap-2 mb-4">
                 <Bell className="w-4 h-4 text-orange-400" />
@@ -229,7 +251,6 @@ function DashboardContent() {
           <InterestSimulator />
         </section>
       </div>
-      <FinanceAgent />
     </main>
   );
 }
