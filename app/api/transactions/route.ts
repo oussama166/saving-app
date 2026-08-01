@@ -10,7 +10,10 @@ export async function POST(req: Request) {
   try {
     const { userId } = await requireSession();
     const body = await req.json();
-    const { date, type, categoryId, subCategory, paymentMethod, notes, amount } = body;
+    // `type` du formulaire volontairement ignoré ici — le signe du montant
+    // est TOUJOURS dérivé de category.type ci-dessous, jamais de ce champ
+    // (voir commentaire plus bas).
+    const { date, categoryId, subCategory, paymentMethod, notes, amount, accountId } = body;
     const ctx = await getHouseholdContext(userId);
 
     // Vérifie que la catégorie appartient bien au foyer (propriétaire budget)
@@ -21,11 +24,24 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: false, error: 'Catégorie invalide' }, { status: 400 });
     }
 
-    const adjustedAmount = type === 'expense' ? -Math.abs(Number(amount)) : Math.abs(Number(amount));
+    // Le signe du montant suit TOUJOURS le type de la catégorie choisie
+    // (jamais le champ "type" du formulaire, qui n'est même pas stocké sur
+    // la Transaction) — même règle que PATCH /api/transactions/[id], voir
+    // le commentaire là-bas pour l'historique du bug que ça évite.
+    const adjustedAmount = category.type === 'expense' ? -Math.abs(Number(amount)) : Math.abs(Number(amount));
 
-    let account = await prisma.account.findFirst({
-      where: { userId: { in: ctx.memberIds }, name: 'Main Checking' },
-    });
+    // Compte explicite (voir sélecteur ajouté à TransactionForm — permet de
+    // saisir directement sur l'Épargne, pas seulement le courant) — vérifié
+    // contre le foyer pour éviter qu'un client référence le compte d'un
+    // autre utilisateur. Sans accountId (anciens appelants), repli sur
+    // "Main Checking" auto-créé, comme avant.
+    let account = accountId
+      ? await prisma.account.findFirst({ where: { id: accountId, userId: { in: ctx.memberIds } } })
+      : await prisma.account.findFirst({ where: { userId: { in: ctx.memberIds }, name: 'Main Checking' } });
+
+    if (accountId && !account) {
+      return NextResponse.json({ success: false, error: 'Compte invalide' }, { status: 400 });
+    }
 
     if (!account) {
       account = await prisma.account.create({
@@ -59,7 +75,7 @@ export async function POST(req: Request) {
 
     // Après coup, jamais bloquant (voir lib/budgetAlerts.ts) — ne concerne
     // que les dépenses, une entrée revenu/épargne n'a pas de budget associé.
-    if (type === 'expense') {
+    if (category.type === 'expense') {
       await checkAndSendBudgetAlert(userId, categoryId, new Date(date));
     }
 
@@ -90,6 +106,7 @@ export async function GET(req: Request) {
       search: searchParams.get('search') || undefined,
       type,
       categoryId: searchParams.get('categoryId') || undefined,
+      accountId: searchParams.get('accountId') || undefined,
       dateFrom: searchParams.get('dateFrom') || undefined,
       dateTo: searchParams.get('dateTo') || undefined,
       sortBy,

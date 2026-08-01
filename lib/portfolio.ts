@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import yahooFinance from "yahoo-finance2";
 import type { HouseholdContext } from "@/lib/household";
+import { getRatesToMad } from "@/lib/exchangeRates";
 
 /**
  * Fetches all portfolio assets and enriches them with live market data
@@ -85,12 +86,24 @@ export async function getEnrichedPortfolioAssets(ctx: HouseholdContext) {
     }),
   );
 
+  // Chaque actif garde son costBasis/liveValue tels quels dans SA propre
+  // devise (quote.currency) pour le détail par ligne (voir
+  // PortfolioAssetsTable, cohérent : profit d'un actif comparé à son propre
+  // coût, même devise des deux côtés). Mais les totaux globalCostBasis/
+  // globalLiveValue/globalProfit — utilisés dans le patrimoine net du
+  // dashboard et le calcul de la Zakat — doivent être en MAD : sans
+  // conversion, un actif coté en USD/EUR était sommé comme s'il était déjà
+  // en MAD. On suppose que averageBuyPrice a été saisi dans la même devise
+  // que la cotation live (hypothèse raisonnable : l'utilisateur entre un
+  // prix d'achat "naturel" pour le titre, ex: 150 pour une action à 150 USD).
+  const distinctCurrencies = Array.from(new Set(enrichedAssets.map((a) => a.currency)));
+  const rates = await getRatesToMad(distinctCurrencies);
   const globalCostBasis = enrichedAssets.reduce(
-    (acc, curr) => acc + curr.costBasis,
+    (acc, curr) => acc + curr.costBasis * (rates[curr.currency] ?? 1),
     0,
   );
   const globalLiveValue = enrichedAssets.reduce(
-    (acc, curr) => acc + curr.liveValue,
+    (acc, curr) => acc + curr.liveValue * (rates[curr.currency] ?? 1),
     0,
   );
   const globalProfit = globalLiveValue - globalCostBasis;

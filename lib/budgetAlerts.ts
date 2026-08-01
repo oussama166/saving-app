@@ -3,6 +3,7 @@ import { sendBudgetAlertEmail } from "@/lib/email";
 import { formatYearMonth } from "@/lib/subscriptions";
 import { getHouseholdContext } from "@/lib/household";
 import { resolveBudgetCycleStart } from "@/lib/budgetCycle";
+import { getRatesToMad } from "@/lib/exchangeRates";
 
 // Paliers vérifiés du plus haut au plus bas : si une seule transaction fait
 // passer une catégorie de 50% à 120% d'un coup, on notifie uniquement le
@@ -54,9 +55,14 @@ export async function checkAndSendBudgetAlert(
     const cycleStart = await resolveBudgetCycleStart(ctx, txDate, userSettings);
     const monthExpenses = await prisma.transaction.findMany({
       where: { userId: { in: ctx.memberIds }, categoryId, date: { gte: cycleStart }, amount: { lt: 0 } },
-      select: { amount: true },
+      select: { amount: true, account: { select: { currency: true } } },
     });
-    const spent = monthExpenses.reduce((acc, t) => acc + Math.abs(t.amount), 0);
+    // Conversion en MAD avant de sommer — sinon une dépense sur un compte en
+    // devise étrangère fausse le seuil (même souci de principe que
+    // getHealthBudget dans lib/financials.ts, qui fait déjà cette conversion
+    // pour la même raison).
+    const rates = await getRatesToMad(monthExpenses.map((t) => t.account.currency));
+    const spent = monthExpenses.reduce((acc, t) => acc + Math.abs(t.amount * (rates[t.account.currency] ?? 1)), 0);
     const usedPct = (spent / budget) * 100;
 
     const yearMonth = formatYearMonth(txDate.getFullYear(), txDate.getMonth() + 1);

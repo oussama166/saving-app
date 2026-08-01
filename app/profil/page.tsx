@@ -13,12 +13,15 @@ import {
 import ProfileAllocationEditor, {
   AllocationRow,
 } from "../components/ProfileAllocationEditor";
+import BudgetMethodSelector from "../components/BudgetMethodSelector";
 import RealBudgetOptimizer from "../components/RealBudgetOptimizer";
 import WebhookTokenCard from "../components/WebhookTokenCard";
 import AccountSecurityCard from "../components/AccountSecurityCard";
 import TwoFactorCard from "../components/TwoFactorCard";
 import HouseholdCard from "../components/HouseholdCard";
 import AccountsCard from "../components/AccountsCard";
+import TransferCard from "../components/TransferCard";
+import RecurringTransfersCard from "../components/RecurringTransfersCard";
 import FeatureGate from "../components/FeatureGate";
 import FeatureDisabledInlineCard from "../components/FeatureDisabledInlineCard";
 
@@ -47,6 +50,7 @@ export default function ProfilPage() {
 function ProfilPageContent() {
   const [referenceIncome, setReferenceIncome] = useState(10000);
   const [budgetCycleStartDay, setBudgetCycleStartDay] = useState(1);
+  const [budgetMethod, setBudgetMethod] = useState("503020");
   const [allocations, setAllocations] = useState<AllocationRow[]>([]);
   const [updatedAt, setUpdatedAt] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -85,12 +89,15 @@ function ProfilPageContent() {
         if (result.success) {
           setReferenceIncome(result.data.referenceIncome);
           setBudgetCycleStartDay(result.data.budgetCycleStartDay ?? 1);
+          setBudgetMethod(result.data.budgetMethod ?? "503020");
           setAllocations(
             result.data.categories.map(
-              (c: { id: string; name: string; budgetPct: number }) => ({
+              (c: { id: string; name: string; type: string; budgetPct: number; budgetGroup: string | null }) => ({
                 id: c.id,
                 name: c.name,
+                type: c.type,
                 budgetPct: c.budgetPct,
+                budgetGroup: c.budgetGroup,
               }),
             ),
           );
@@ -113,6 +120,33 @@ function ProfilPageContent() {
     setAllocations((prev) =>
       prev.map((a) => (a.id === id ? { ...a, budgetPct: pct } : a)),
     );
+  };
+
+  const handleBudgetGroupChange = (id: string, group: "essential" | "discretionary") => {
+    setSaved(false);
+    setAllocations((prev) => prev.map((a) => (a.id === id ? { ...a, budgetGroup: group } : a)));
+  };
+
+  // Le choix de méthode se sauvegarde immédiatement (pas besoin d'attendre le
+  // bouton "Enregistrer" de l'éditeur d'allocations, qui reste bloqué tant
+  // que la somme des % n'est pas à 100 — la méthode, elle, n'a pas cette
+  // contrainte) en renvoyant les allocations déjà chargées telles quelles.
+  const handleBudgetMethodChange = async (key: string) => {
+    setBudgetMethod(key);
+    try {
+      await fetch("/api/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          referenceIncome,
+          budgetCycleStartDay,
+          budgetMethod: key,
+          allocations: allocations.map((a) => ({ id: a.id, budgetPct: a.budgetPct, budgetGroup: a.budgetGroup ?? null })),
+        }),
+      });
+    } catch (err) {
+      console.error("Budget method save error:", err);
+    }
   };
 
   const handleApplyReal = (
@@ -196,9 +230,11 @@ function ProfilPageContent() {
         body: JSON.stringify({
           referenceIncome,
           budgetCycleStartDay,
+          budgetMethod,
           allocations: allocations.map((a) => ({
             id: a.id,
             budgetPct: a.budgetPct,
+            budgetGroup: a.budgetGroup ?? null,
           })),
         }),
       });
@@ -226,8 +262,8 @@ function ProfilPageContent() {
               Paramétrage &amp; Profil Intelligent
             </h1>
             <p className="text-subtle text-sm mt-0.5">
-              Adaptez la théorie financière du 50/30/20 à la réalité concrète de
-              votre vie à Tanger.
+              Choisissez la méthodologie de budget qui vous parle, et adaptez-la à la
+              réalité concrète de votre vie à Tanger.
             </p>
           </div>
         </div>
@@ -242,26 +278,30 @@ function ProfilPageContent() {
             message={subfeatureMessage("profile.budget_allocation")}
           />
         ) : (
-          <div className="grid items-start grid-cols-1 gap-8 lg:grid-cols-2">
-            <ProfileAllocationEditor
-              referenceIncome={referenceIncome}
-              onReferenceIncomeChange={(v) => {
-                setSaved(false);
-                setReferenceIncome(v);
-              }}
-              budgetCycleStartDay={budgetCycleStartDay}
-              onBudgetCycleStartDayChange={(v) => {
-                setSaved(false);
-                setBudgetCycleStartDay(v);
-              }}
-              allocations={allocations}
-              onAllocationChange={handleAllocationChange}
-              onSave={handleSave}
-              saving={saving}
-              saved={saved}
-            />
-            <RealBudgetOptimizer onApply={handleApplyReal} />
-          </div>
+          <>
+            <BudgetMethodSelector value={budgetMethod} onChange={handleBudgetMethodChange} />
+            <div className="grid items-start grid-cols-1 gap-8 lg:grid-cols-2">
+              <ProfileAllocationEditor
+                referenceIncome={referenceIncome}
+                onReferenceIncomeChange={(v) => {
+                  setSaved(false);
+                  setReferenceIncome(v);
+                }}
+                budgetCycleStartDay={budgetCycleStartDay}
+                onBudgetCycleStartDayChange={(v) => {
+                  setSaved(false);
+                  setBudgetCycleStartDay(v);
+                }}
+                allocations={allocations}
+                onAllocationChange={handleAllocationChange}
+                onBudgetGroupChange={handleBudgetGroupChange}
+                onSave={handleSave}
+                saving={saving}
+                saved={saved}
+              />
+              <RealBudgetOptimizer onApply={handleApplyReal} />
+            </div>
+          </>
         )}
 
         {!isSubfeatureAllowed("profile.export_excel") ? (
@@ -369,7 +409,14 @@ function ProfilPageContent() {
         )}
 
         {isSubfeatureAllowed("profile.accounts") ? (
-          <AccountsCard />
+          <>
+            <AccountsCard />
+            {/* Même sous-fonctionnalité que AccountsCard : le virement entre
+                comptes (ponctuel et récurrent) fait partie de la gestion des
+                comptes, pas une capacité distincte à activer séparément. */}
+            <TransferCard />
+            <RecurringTransfersCard />
+          </>
         ) : (
           <FeatureDisabledInlineCard
             featureName="Comptes bancaires (multi-devises)"
@@ -389,7 +436,7 @@ function ProfilPageContent() {
         )}
 
         <p className="text-center text-[11px] text-faint pt-4">
-          Système conçu pour épargne · Règle 50/30/20 enrichie
+          Système conçu pour épargne · 8 méthodologies de budget disponibles
           {updatedAt &&
             ` · Dernière mise à jour : ${new Date(updatedAt).toLocaleDateString("fr-FR")}`}
         </p>

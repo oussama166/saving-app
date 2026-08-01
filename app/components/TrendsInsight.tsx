@@ -1,89 +1,59 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import { Compass, Sparkles } from 'lucide-react';
 import type { MonthlyAnalytics, CategoryTrend } from '@/lib/financials';
 import { useLanguage } from './LanguageProvider';
 import { tParams } from '@/lib/i18n';
+import { useCoachAdvice } from '../hooks/useCoachAdvice';
+import { trendsInsightSchema } from '@/lib/coachSchemas';
+import CoachRegenerateButton from './CoachRegenerateButton';
 
 interface Props {
   monthly: MonthlyAnalytics[];
   topCategories: CategoryTrend[];
 }
 
-interface Insight {
-  synthese: string;
-  pointAttention: string;
-  recommandation: string;
-}
-
 export default function TrendsInsight({ monthly, topCategories }: Props) {
   const { t } = useLanguage();
-  const [insight, setInsight] = useState<Insight | null>(null);
-  const [generatedAt, setGeneratedAt] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [failed, setFailed] = useState(false);
+  const { advice: insight, loading, regenerating, failed, generatedAt, regenerate } = useCoachAdvice(
+    '/api/coach/trends-insight',
+    trendsInsightSchema,
+    {
+      monthly: monthly.map((m) => ({
+        label: m.label,
+        income: m.income,
+        expenses: m.expenses,
+        savings: m.savings,
+        savingsRatePct: m.savingsRatePct,
+      })),
+      topCategories: topCategories.map((c) => ({ name: c.name, total: c.total, trendPct: c.trendPct })),
+    },
+  );
 
-  useEffect(() => {
-    let cancelled = false;
-
-    fetch('/api/coach/trends-insight', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        monthly: monthly.map((m) => ({
-          label: m.label,
-          income: m.income,
-          expenses: m.expenses,
-          savings: m.savings,
-          savingsRatePct: m.savingsRatePct,
-        })),
-        topCategories: topCategories.map((c) => ({ name: c.name, total: c.total, trendPct: c.trendPct })),
-      }),
-    })
-      .then((res) => {
-        if (!res.ok) throw new Error('Request failed');
-        return res.json();
-      })
-      .then((data) => {
-        if (cancelled) return;
-        if (data.success && data.advice) {
-          setInsight(data.advice);
-          if (data.generatedAt) setGeneratedAt(data.generatedAt);
-        } else {
-          setFailed(true);
-        }
-      })
-      .catch(() => {
-        if (!cancelled) setFailed(true);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const complete = Boolean(insight?.synthese && insight?.pointAttention && insight?.recommandation);
 
   return (
     <div className="bg-surface rounded-xl border border-line p-6">
       <div className="flex items-center gap-3 mb-6">
         <Compass className="w-6 h-6 text-blue-400" />
         <h3 className="text-lg font-bold text-body">{t('coach.trends.title')}</h3>
-        {loading && (
-          <span className="ml-auto flex items-center gap-1.5 text-[10px] text-blue-400 font-bold uppercase tracking-widest">
-            <Sparkles className="w-3 h-3 animate-pulse" />
-            {t('coach.analyzing')}
-          </span>
-        )}
-        {!loading && insight && !failed && (
-          <span className="ml-auto flex items-center gap-1.5 text-[10px] text-emerald-400 font-bold uppercase tracking-widest">
-            <Sparkles className="w-3 h-3" />
-            {t('coach.aiCoach')}
-          </span>
-        )}
+        <div className="ml-auto flex items-center gap-3">
+          {loading && (
+            <span className="flex items-center gap-1.5 text-[10px] text-blue-400 font-bold uppercase tracking-widest">
+              <Sparkles className="w-3 h-3 animate-pulse" />
+              {t('coach.analyzing')}
+            </span>
+          )}
+          {!loading && complete && !failed && (
+            <>
+              <span className="flex items-center gap-1.5 text-[10px] text-emerald-400 font-bold uppercase tracking-widest">
+                <Sparkles className="w-3 h-3" />
+                {t('coach.aiCoach')}
+              </span>
+              <CoachRegenerateButton onClick={regenerate} loading={regenerating} />
+            </>
+          )}
+        </div>
       </div>
 
       {loading ? (
@@ -92,16 +62,16 @@ export default function TrendsInsight({ monthly, topCategories }: Props) {
           <div className="h-3 bg-surface-alt rounded w-5/6" />
           <div className="h-3 bg-surface-alt rounded w-4/6" />
         </div>
-      ) : insight && !failed ? (
+      ) : complete && !failed ? (
         <div className="space-y-4 text-[13px] leading-relaxed text-muted">
           <p>
-            <span className="font-bold text-body">{t('coach.trends.tendance')}</span> {insight.synthese}
+            <span className="font-bold text-body">{t('coach.trends.tendance')}</span> {insight?.synthese}
           </p>
           <p>
-            <span className="font-bold text-body">{t('coach.trends.pointAttention')}</span> {insight.pointAttention}
+            <span className="font-bold text-body">{t('coach.trends.pointAttention')}</span> {insight?.pointAttention}
           </p>
           <p>
-            <span className="font-bold text-body">{t('coach.trends.recommandation')}</span> {insight.recommandation}
+            <span className="font-bold text-body">{t('coach.trends.recommandation')}</span> {insight?.recommandation}
           </p>
           {generatedAt && (
             <p className="text-[10px] text-faint italic pt-1">

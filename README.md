@@ -1,36 +1,222 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# WealthOS (Tanger Wealth OS)
 
-## Getting Started
+Application personnelle de gestion de patrimoine — comptes multi-devises, budget, portefeuille (actions/crypto/OPCVM), objectifs d'épargne, dettes, santé, zakat, abonnements récurrents, et un Coach IA basé à Tanger. Pensée à l'origine pour un usage personnel/foyer, avec un vrai système multi-utilisateurs (foyer partagé à 2), un panel admin, et une architecture prête pour un déploiement gratuit (Vercel + Turso).
 
-First, run the development server:
+Langue de l'interface : français, anglais, espagnol, arabe (`fr`/`en`/`es`/`ar`, LTR pour les 4).
+
+## Sommaire
+
+- [Stack technique](#stack-technique)
+- [Fonctionnalités](#fonctionnalités)
+- [Démarrage local](#démarrage-local)
+- [Variables d'environnement](#variables-denvironnement)
+- [Base de données & migrations](#base-de-données--migrations)
+- [Déploiement (prod / preprod)](#déploiement-prod--preprod)
+- [Scripts](#scripts)
+- [Structure du dépôt](#structure-du-dépôt)
+- [Concepts clés de l'architecture](#concepts-clés-de-larchitecture)
+- [Tâches planifiées (cron externe)](#tâches-planifiées-cron-externe)
+- [Sécurité](#sécurité)
+
+## Stack technique
+
+| Domaine | Choix |
+| --- | --- |
+| Framework | Next.js 16 (App Router, Turbopack), React 19 |
+| Langage | TypeScript |
+| Base de données | SQLite — fichier local (`dev.db`) en dev, [Turso](https://turso.tech) (libSQL hébergé) en prod/preprod |
+| ORM | Prisma 7 + `@prisma/adapter-libsql` (un seul code path local/hébergé) |
+| Style | Tailwind CSS 4, thème clair/sombre piloté par une classe `.dark`, design tokens sémantiques (`bg-surface`, `text-body`, `border-line`...) |
+| IA | Vercel AI SDK (`ai`, `@ai-sdk/react`) + Google Gemini (`@ai-sdk/google`) |
+| Auth | Sessions cookie signées (JWT via `jose`), mots de passe `bcryptjs`, 2FA TOTP (`otplib`) |
+| Email | [Resend](https://resend.com) |
+| Autres | `recharts` (graphiques), `exceljs`/`pdfkit` (exports), `yahoo-finance2` (cours bourse/crypto), `googleapis` (export Google Sheets) |
+
+## Fonctionnalités
+
+**Finances du quotidien**
+- Saisie manuelle, import CSV (mapping de colonnes par banque), scan de reçu par OCR, historique filtrable/éditable.
+- Comptes multi-devises avec conversion automatique en MAD (taux mis en cache, `lib/exchangeRates.ts`).
+- Virements entre comptes, y compris récurrents (règles automatiques + cron).
+- 8 méthodologies de budget au choix (50/30/20, 70/20/10, base zéro, enveloppes, se payer en premier, règle des 60 %, Kakeibo, personnalisé) — voir `lib/budgetMethods.ts`.
+- Cycle budgétaire calé sur le jour de paie plutôt que le 1ᵉʳ du mois (optionnel).
+
+**Patrimoine**
+- Portefeuille (actions, crypto, OPCVM) avec cours en direct (`yahoo-finance2`) et calcul de plus/moins-value, conversion multi-devises.
+- Objectifs d'épargne avec contributions et allocation automatique.
+- Suivi de dettes/prêts et de leurs remboursements.
+- Zakat (calcul sur le patrimoine).
+
+**Santé & abonnements**
+- Budget santé, remboursements CNSS/mutuelle, dossiers médicaux.
+- Abonnements récurrents (détection, historique de changement de plan, stats admin).
+
+**Coach IA**
+- Diagnostic mensuel personnalisé (basé sur la méthode budgétaire réellement choisie par l'utilisateur), conseils Tanger (banques/bourse marocaine), analyse de tendances, prévention santé, stratégie fonds d'urgence — réponses **streamées** (`streamObject`), mises en cache 7 jours avec invalidation automatique si les données changent, bouton "régénérer" manuel.
+- Règles d'or et benchmarks Maroc : contenu de référence fixe, explicitement distingué du contenu généré par IA.
+- Chat flottant (agent financier) : voit tous les comptes du foyer, répond en MAD, historique persistant en base, disponible sur toutes les pages authentifiées.
+
+**Foyer partagé**
+- Jusqu'à 2 comptes liés (couple/famille) : visibilité élargie sur les données financières, un seul jeu de catégories/budget pour le foyer (`lib/household.ts`).
+
+**Sécurité & comptes**
+- 2FA (TOTP + codes de récupération), politique de mot de passe, vérification d'email, réinitialisation de mot de passe.
+- Panel admin séparé (auth distincte) : utilisateurs, abonnements, feature flags, journal d'audit.
+- Feature flags par section (et par sous-section) activables/désactivables globalement ou par utilisateur (`lib/features.ts`, `/admin/features`).
+
+**Intégrations & automatisations**
+- Webhooks entrants (Apple Pay via Shortcut iOS, salaire, paiement d'abonnement, import/synchro d'abonnements), chacun protégé par un token dédié.
+- Digest hebdomadaire par email, archivage planifié, export Google Sheets, export PDF de bilan.
+- Bandeau de développement (dev only) affichant la base de données réellement connectée (local/preprod/prod) — évite de confondre les environnements.
+
+## Démarrage local
+
+Prérequis : Node.js 20+, npm.
 
 ```bash
+git clone <url-du-dépôt>
+cd saving
+npm install
+cp .env.example .env
+# remplis au moins AUTH_SECRET, ADMIN_AUTH_SECRET, RESEND_API_KEY,
+# GOOGLE_GENERATIVE_AI_API_KEY (voir la section suivante)
+npx prisma generate
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Sans `TURSO_DATABASE_URL` dans `.env`, l'app utilise automatiquement un fichier SQLite local `dev.db` (créé au premier lancement/migration) — aucune base distante nécessaire pour développer.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Créer le premier compte admin (accès `/admin/login`) :
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm run create-admin
+```
 
-## Learn More
+## Variables d'environnement
 
-To learn more about Next.js, take a look at the following resources:
+Voir `.env.example` pour le détail commenté. Résumé :
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+| Variable | Obligatoire | Rôle |
+| --- | --- | --- |
+| `TURSO_DATABASE_URL` / `TURSO_AUTH_TOKEN` | Non en local | Base Turso distante (prod/preprod) — absent = fichier `dev.db` local |
+| `AUTH_SECRET` | Oui | Signature des sessions utilisateur (JWT) |
+| `ADMIN_AUTH_SECRET` | Oui | Signature des sessions admin — **distinct** de `AUTH_SECRET` |
+| `RESEND_API_KEY` | Oui | Envoi d'emails transactionnels |
+| `EMAIL_FROM` | Non | Expéditeur des emails (défaut : `onboarding@resend.dev`) |
+| `NEXT_PUBLIC_SITE_URL` | Oui | URL publique de l'app (liens dans les emails) |
+| `GOOGLE_GENERATIVE_AI_API_KEY` | Oui pour le Coach IA | Clé Gemini (modèle utilisé par `lib/aiProvider.ts`) |
+| `OPENROUTER_API_KEY` | Non | Présent dans l'env mais non branché actuellement (voir note ci-dessous) |
+| `GEOAPIFY_API_KEY` | Non | Suggestion de catégorie par géolocalisation |
+| `BACKUP_SECRET` / `BACKUP_ARCHIVE_MONTHS` | Non | Archivage planifié (cron externe) |
+| `WEEKLY_DIGEST_SECRET` | Non | Digest hebdomadaire par email (cron externe) |
+| `RECURRING_TRANSFERS_SECRET` | Non | Exécution des virements récurrents (cron externe quotidien) |
+| `GOOGLE_SHEETS_CLIENT_EMAIL` / `GOOGLE_SHEETS_PRIVATE_KEY` / `GOOGLE_SHEETS_SPREADSHEET_ID` | Non | Export Google Sheets |
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+> Note : `lib/aiProvider.ts` utilise uniquement Gemini (`coachModel`) pour toutes les fonctionnalités IA (Coach IA + chat flottant). `OPENROUTER_API_KEY` figure dans `.env.example` mais n'est pas câblée dans le code actuel.
 
-## Deploy on Vercel
+## Base de données & migrations
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Le schéma vit dans `prisma/schema.prisma`, les migrations dans `prisma/migrations/*/migration.sql` (SQL écrit à la main, pas de `prisma migrate dev` généré automatiquement — Turso ne supporte pas le workflow Prisma Migrate standard).
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+**En local** : `npx prisma migrate deploy` (ou laisser Next.js régénérer le client via `npm run dev`/`npm run build`, qui inclut `prisma generate`).
+
+**Sur Turso** (preprod ou prod) : pas de client Prisma direct contre Turso pour les migrations — on applique le SQL brut via le CLI Turso.
+
+```bash
+# Nouvelle base vide : applique toutes les migrations dans l'ordre
+./scripts/apply-turso-migrations.sh <nom-de-la-base>
+
+# Base déjà à jour sur les migrations précédentes : applique seulement la nouvelle
+turso db shell <nom-de-la-base> < prisma/migrations/<horodatage_nom>/migration.sql
+```
+
+Vérification après coup :
+
+```bash
+turso db shell <nom-de-la-base> "SELECT name FROM sqlite_master WHERE type='table';"
+```
+
+Workflow pour toute évolution de schéma : modifier `prisma/schema.prisma`, écrire à la main le `migration.sql` correspondant (nom `AAAAMMJJHHMMSS_description`), l'appliquer en local, puis sur chaque base Turso concernée (preprod avant tout, prod avant/au déploiement).
+
+## Déploiement (prod / preprod)
+
+Le guide complet est dans [`DEPLOYMENT.md`](./DEPLOYMENT.md) (création de la base Turso, variables Vercel, cron externes, limites du plan gratuit). Résumé de l'architecture :
+
+- **Prod** : Vercel (build = `prisma generate && next build`) + base Turso `wealthos-prod`. Les variables d'environnement Vercel sont gérées indépendamment du `.env` local.
+- **Preprod** : base Turso séparée (ex. `wealthos-preprod`) utilisée en pointant `TURSO_DATABASE_URL`/`TURSO_AUTH_TOKEN` du `.env` local dessus — permet de développer/tester contre une base distante réaliste sans jamais toucher aux données de prod.
+- **Local** : sans ces deux variables, fichier `dev.db` isolé, aucun risque de toucher une base distante par erreur. Le bandeau de développement (coin haut-droit, dev only) affiche en permanence quelle base est réellement connectée.
+
+## Scripts
+
+| Commande | Effet |
+| --- | --- |
+| `npm run dev` | Serveur de dev (port 3000) |
+| `npm run dev1` | Serveur de dev sur le port 3001 (deuxième instance, ex. pour tester en parallèle) |
+| `npm run build` | `prisma generate` + build de production |
+| `npm run start` | Lance le build de production |
+| `npm run lint` | ESLint |
+| `npm run create-admin` | Crée un compte admin (base pointée par `TURSO_DATABASE_URL`/`TURSO_AUTH_TOKEN`, sinon `dev.db`) |
+| `./scripts/apply-turso-migrations.sh <db>` | Applique les migrations Prisma sur une base Turso |
+
+## Structure du dépôt
+
+```
+app/
+  api/                  Routes API (Next.js Route Handlers), une par domaine métier
+    admin/              Endpoints du panel admin (auth séparée)
+    auth/                Inscription, connexion, 2FA, reset password, vérif email
+    chat/                Chat flottant + historique persistant
+    coach/               5 routes Coach IA (diagnostic, conseils Tanger, tendances, santé, fonds d'urgence)
+    cron/                Endpoints déclenchés par un cron externe (digest, virements récurrents)
+    webhook/             Entrées externes (Apple Pay, salaire, abonnements)
+    ...
+  admin/                 Pages du panel admin
+  components/            Composants partagés (cartes, formulaires, nav, providers...)
+  hooks/                 Hooks React partagés (ex. useCoachAdvice)
+  <page>/page.tsx         Une page par domaine (dashboard = app/page.tsx, saisie, portfolio, objectifs, analyse, sante, zakat, abonnements, dettes, profil, coach)
+lib/                      Logique métier et utilitaires côté serveur (pas de composants React)
+prisma/
+  schema.prisma           Schéma de données complet
+  migrations/              Migrations SQL, une par évolution de schéma
+scripts/                  Scripts opérationnels (admin, migrations Turso)
+DEPLOYMENT.md              Guide de déploiement détaillé (Vercel + Turso)
+```
+
+## Concepts clés de l'architecture
+
+**Scoping foyer (`lib/household.ts`)** — Deux notions distinctes utilisées dans presque tout le code serveur :
+- `memberIds` : élargit la *lecture* (et les cibles de modification/suppression) à tous les membres du foyer pour tout ce qui reste attribué à qui l'a créé (comptes, transactions, objectifs, abonnements, dettes...).
+- `budgetOwnerId` : propriétaire canonique du budget (`Category`, `UserSettings`) — un seul jeu de catégories/pourcentages pour tout le foyer plutôt que deux configurations concurrentes.
+
+Sans foyer (cas par défaut), les deux valeurs retombent sur l'utilisateur lui-même.
+
+**Convention de signe des transactions** — `Transaction.amount` est toujours signé (négatif = dépense, positif = revenu/épargne), et ce signe est **systématiquement dérivé côté serveur** de `category.type`, jamais fait confiance à une valeur envoyée par le client. `category.type` peut valoir `income` / `expense` / `savings` / `transfer` — le type `transfer` (virements entre comptes) est exclu de tous les agrégats revenus/dépenses pour ne pas les fausser.
+
+**Feature flags (`lib/features.ts`)** — Chaque page/section a une clé stable dans `FEATURE_REGISTRY`, activable/désactivable globalement (ou par utilisateur via `FeatureAccessGrant`) depuis `/admin/features`. Les entrées avec `parentKey` sont des sous-fonctionnalités (un bloc précis dans une page qui reste par ailleurs accessible) plutôt que des pages entières.
+
+**Cycle budgétaire hybride (`lib/budgetCycle.ts`)** — Par défaut calé sur le mois calendaire ; si `UserSettings.budgetCycleStartDay` est configuré, cherche la vraie transaction de salaire dans une fenêtre de tolérance de 7 jours autour du jour de paie plutôt que d'imposer une date fixe.
+
+**Multi-devises (`lib/exchangeRates.ts`)** — Chaque compte a sa devise ; toute agrégation multi-comptes convertit d'abord en MAD via des taux mis en cache (`ExchangeRateCache`). Les appels réseau de conversion ne se font jamais à l'intérieur d'une transaction Prisma interactive.
+
+**Coach IA (`lib/coachHandler.ts`, `lib/coachSchemas.ts`)** — Helper partagé par les 5 routes `/api/coach/*` : vérifie un cache (`AiAdviceCache`, TTL 7 jours, clé incluant un hash des données d'entrée pour une invalidation automatique), sinon appelle `streamObject` (Gemini) et streame la réponse au client via `experimental_useObject` (`@ai-sdk/react`).
+
+**Base de données (`lib/prisma.ts`)** — Un seul adaptateur (`@prisma/adapter-libsql`) pour les deux environnements : fichier local si `TURSO_DATABASE_URL` est absent, base Turso distante sinon. Pas de branche de code séparée entre dev et prod.
+
+**i18n (`lib/i18n.ts`)** — Dictionnaires plats par clé (`t(locale, key, fallback?)` côté serveur, `useLanguage()` côté client), 4 locales tenues à parité stricte (même nombre de clés). Mise en page LTR pour les 4, y compris l'arabe.
+
+## Tâches planifiées (cron externe)
+
+Le plan gratuit Vercel ne garantit pas de cron interne fiable en continu — ces routes sont donc pensées pour être appelées par un service de cron externe (ex. [cron-job.org](https://cron-job.org)), chacune protégée par un header secret dédié :
+
+| Route | Fréquence conseillée | Header |
+| --- | --- | --- |
+| `POST /api/backup/archive` | Mensuelle | `x-backup-secret` |
+| `POST /api/cron/weekly-digest` | Hebdomadaire (ex. lundi 8h) | `x-cron-secret` |
+| `POST /api/cron/recurring-transfers` | Quotidienne | `x-recurring-transfers-secret` |
+
+## Sécurité
+
+- Auth utilisateur et auth admin totalement séparées : tables, secrets de session (`AUTH_SECRET` vs `ADMIN_AUTH_SECRET`), cookies et routes distinctes — un email identique côté `User` et côté `Admin` n'entraîne aucun conflit.
+- 2FA TOTP optionnel avec codes de récupération hashés (jamais stockés en clair après leur affichage unique).
+- Chaque webhook entrant (Apple Pay, salaire, abonnements) est protégé par un token dédié, distinct du cookie de session.
+- `dev.db` (données financières réelles en local) est exclu du suivi git — voir `.gitignore`.

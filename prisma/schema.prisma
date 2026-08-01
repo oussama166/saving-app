@@ -68,6 +68,63 @@ model User {
   // lib/features.ts et Feature ci-dessous) — accordées individuellement par
   // un admin.
   featureAccessGrants FeatureAccessGrant[]
+
+  recurringTransfers RecurringTransfer[]
+  kakeiboEntries     KakeiboEntry[]
+  agentChatMessages  AgentChatMessage[]
+}
+
+// Règle de virement automatique récurrent entre deux comptes du même foyer
+// (ex: 1000 MAD du courant vers l'épargne chaque jour de paie) — voir
+// lib/recurringTransfers.ts pour l'exécution (déclenchée par un cron externe,
+// app/api/cron/recurring-transfers/route.ts) et lib/transferEngine.ts pour le
+// débit/crédit réellement effectué (même moteur que le virement manuel,
+// app/api/transfer/route.ts).
+model RecurringTransfer {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id])
+  fromAccountId String
+  toAccountId   String
+  amount        Float
+  // Jour du mois (1-28, jamais 29-31 pour éviter les mois plus courts) où le
+  // virement doit s'exécuter — par défaut pré-rempli avec le jour de paie
+  // déjà configuré dans UserSettings.budgetCycleStartDay si réglé, mais reste
+  // indépendant (l'utilisateur peut vouloir virer à une autre date que sa
+  // paie).
+  dayOfMonth    Int
+  active        Boolean  @default(true)
+  lastRunAt     DateTime?
+  // "YYYY-MM" du dernier mois où ce virement a déjà été exécuté — empêche une
+  // double exécution si le cron externe tourne plusieurs fois le même jour
+  // (préférable à une comparaison sur lastRunAt seul, plus fragile autour des
+  // fuseaux horaires).
+  lastRunCycle  String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+// Journal Kakeibo (méthode budgétaire japonaise) — une entrée par mois et par
+// propriétaire budget (budgetOwnerId, comme UserSettings/Category : un seul
+// journal partagé pour tout le foyer). Les 4 questions de réflexion sont le
+// cœur de la méthode Kakeibo, en plus des totaux essentiel/discrétionnaire/
+// épargne déjà calculables depuis les Transaction existantes (pas dupliqués
+// ici, voir lib/budgetMethods.ts).
+model KakeiboEntry {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id])
+  monthKey     String // "2026-08"
+  // Combien d'argent avez-vous ? / Combien aimeriez-vous économiser ? /
+  // Combien dépensez-vous réellement ? / Comment pouvez-vous vous améliorer ?
+  reflection1  String?
+  reflection2  String?
+  reflection3  String?
+  reflection4  String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([userId, monthKey])
 }
 
 // Mémorise le mapping de colonnes d'un format de CSV bancaire déjà vu (voir
@@ -158,6 +215,10 @@ model UserSettings {
   // transactions de revenu, prend le dessus (couvre le cas d'une paie
   // parfois un peu plus tôt, parfois un peu plus tard).
   budgetCycleStartDay       Int      @default(1)
+  // Méthodologie de budgétisation choisie (page Profil) — voir
+  // lib/budgetMethods.ts pour le registre complet. "503020" reproduit le
+  // comportement historique (seule méthode qui existait jusqu'ici).
+  budgetMethod              String   @default("503020")
   updatedAt                 DateTime @updatedAt
 }
 
@@ -200,6 +261,12 @@ model Category {
   type            String // income, expense, savings
   order           Int              @default(0)
   budgetPct       Float            @default(0) // % du revenu de référence (page Profil)
+  // Groupe utilisé par les méthodes de budget en pourcentages (50/30/20,
+  // 70/20/10...) — remplace l'ancien Set NEEDS_CATEGORIES codé en dur dans
+  // lib/financials.ts. "essential" | "discretionary" | null (null = pas
+  // encore classée, voir lib/budgetMethods.ts pour le fallback par nom sur
+  // les catégories historiques qui n'ont pas encore été mises à jour).
+  budgetGroup     String?
   subCategories   SubCategory[]
   transactions    Transaction[]
   categoryArchive CategoryArchive?
@@ -391,6 +458,23 @@ model SubCategory {
 // consommation de tokens Gemini : une entrée par bloc de conseil (`key`) et
 // par utilisateur, régénérée seulement quand elle dépasse le TTL défini côté
 // route (ex: 7 jours), pas à chaque chargement de page.
+// Historique persistant du chat flottant (FinanceAgent, voir
+// app/components/FinanceAgent.tsx + app/api/chat/route.ts) — sans ce modèle,
+// la conversation était perdue à chaque rechargement de page (useChat() sans
+// aucune persistance). `parts` stocke le JSON des parties du message
+// (texte/reasoning) tel que rendu par le SDK, pour pouvoir réhydrater
+// useChat({ messages }) fidèlement au rechargement.
+model AgentChatMessage {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  role      String // 'user' | 'assistant'
+  parts     String // JSON.stringify(UIMessage['parts'])
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+}
+
 model AiAdviceCache {
   id          String   @id @default(cuid())
   userId      String

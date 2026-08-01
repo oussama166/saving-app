@@ -5,6 +5,10 @@ export interface TransactionFilters {
   search?: string;
   type?: 'income' | 'expense' | 'savings';
   categoryId?: string;
+  // Filtre par compte (voir sélecteur ajouté à HistoryTable) — utile dès
+  // qu'un foyer a plus d'un compte (courant/épargne/...) pour isoler les
+  // mouvements de l'un d'eux.
+  accountId?: string;
   dateFrom?: string;
   dateTo?: string;
   sortBy?: 'date' | 'amount';
@@ -39,6 +43,7 @@ export async function getTransactionsPage(memberIds: string[], filters: Transact
     search,
     type,
     categoryId,
+    accountId,
     dateFrom,
     dateTo,
     sortBy = 'date',
@@ -51,6 +56,7 @@ export async function getTransactionsPage(memberIds: string[], filters: Transact
     userId: { in: memberIds },
     ...(search ? { merchant: { contains: search } } : {}),
     ...(categoryId ? { categoryId } : {}),
+    ...(accountId ? { accountId } : {}),
     ...(type ? { category: { type } } : {}),
     ...(dateFrom || dateTo
       ? {
@@ -82,9 +88,12 @@ export async function getTransactionsPage(memberIds: string[], filters: Transact
 
   const summary: TransactionSummary = { count: forSummary.length, totalIncome: 0, totalExpense: 0, totalSavings: 0, net: 0 };
   for (const tx of forSummary) {
+    // "transfer" (virement entre comptes du foyer) est neutre — ni revenu,
+    // ni dépense, ni épargne, voir lib/transferEngine.ts. Sans ce filtre,
+    // chaque virement gonflait totalExpense de son montant.
     if (tx.category.type === 'income') summary.totalIncome += tx.amount;
     else if (tx.category.type === 'savings') summary.totalSavings += Math.abs(tx.amount);
-    else summary.totalExpense += Math.abs(tx.amount);
+    else if (tx.category.type === 'expense') summary.totalExpense += Math.abs(tx.amount);
   }
   summary.net = summary.totalIncome - summary.totalExpense - summary.totalSavings;
 

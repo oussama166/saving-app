@@ -59,6 +59,7 @@ const fr: Dict = {
   // Commun
   "common.save": "Enregistrer",
   "common.cancel": "Annuler",
+  "common.edit": "Modifier",
   "common.delete": "Supprimer",
   "common.export": "Exporter CSV",
   "common.exporting": "Export...",
@@ -75,11 +76,13 @@ const fr: Dict = {
   "common.method": "Méthode",
   "common.description": "Description",
   "common.account": "Compte",
+  "common.accounts": "Comptes",
   "common.action": "Action",
   "common.total": "Total",
   "common.net": "Net",
   "common.all": "Tous",
   "common.allCategories": "Toutes catégories",
+  "common.allAccounts": "Tous comptes",
   "common.page": "Page",
   "common.of": "sur",
   "common.income": "Revenu",
@@ -187,8 +190,10 @@ const fr: Dict = {
   "historique.submit": "Valider Flux",
   "historique.noTransactions": "Aucune transaction trouvée.",
   "historique.deleteConfirm": "Supprimer la transaction",
+  "historique.editError": "Erreur lors de la modification.",
 
   // Formulaire de saisie
+  "form.account": "Compte",
   "form.amount": "Montant (DH)",
   "form.notesPlaceholder": "Description de la transaction...",
   "form.noCategoryOfType": "Aucune catégorie de ce type",
@@ -208,9 +213,47 @@ const fr: Dict = {
   "payment.applePay": "Apple Pay",
   "payment.bmceDirect": "BMCE DIRECT",
 
+  // Types de compte (bandeau de soldes Saisie + virements)
+  "account.type.checking": "Compte courant",
+  "account.type.savings": "Épargne",
+  "account.type.investment": "Investissement",
+
+  // Virement entre comptes (Profil > Comptes) — voir app/components/TransferCard.tsx
+  "transfer.title": "Virement entre comptes",
+  "transfer.subtitle": "Déplace de l'argent d'un compte vers un autre (ex: courant → épargne) — sans quitter l'appli.",
+  "transfer.from": "Depuis",
+  "transfer.to": "Vers",
+  "transfer.amount": "Montant",
+  "transfer.submit": "Virer",
+  "transfer.success": "Virement effectué.",
+  "transfer.errorSameAccount": "Choisis deux comptes différents.",
+  "transfer.errorInsufficientFunds": "Solde insuffisant sur le compte source.",
+  "transfer.errorGeneric": "Erreur lors du virement.",
+  "transfer.needTwoAccounts": "Crée au moins deux comptes pour pouvoir faire un virement.",
+
+  // Virements automatiques récurrents (Profil > Comptes) — voir
+  // app/components/RecurringTransfersCard.tsx + lib/recurringTransfers.ts
+  "recurringTransfer.title": "Virements automatiques",
+  "recurringTransfer.subtitle":
+    "Programme un virement qui se répète chaque mois (ex: 1000 DH vers l'épargne à chaque jour de paie).",
+  "recurringTransfer.add": "Programmer",
+  "recurringTransfer.dayOfMonth": "Jour du mois",
+  "recurringTransfer.dayOfMonthHint": "1 à 28",
+  "recurringTransfer.everyMonthOn": "Le {{day}} de chaque mois",
+  "recurringTransfer.active": "Actif",
+  "recurringTransfer.paused": "En pause",
+  "recurringTransfer.lastRunLabel": "Dernier virement",
+  "recurringTransfer.neverRun": "Jamais encore exécuté",
+  "recurringTransfer.deleteConfirm": "Supprimer ce virement automatique ?",
+  "recurringTransfer.errorGeneric": "Erreur lors de l'enregistrement.",
+  "recurringTransfer.needTwoAccounts": "Crée au moins deux comptes pour programmer un virement automatique.",
+  "recurringTransfer.empty": "Aucun virement automatique programmé.",
+
   "saisie.dbTitle": "Base de données transactions",
   "saisie.dbSubtitle": "Flux financier & Archivage",
   "saisie.historyAudit": "Historique & Audit",
+  "saisie.spentToday": "Dépensé aujourd'hui",
+  "saisie.spentThisWeek": "Dépensé cette semaine",
 
   // Coach IA — libellés partagés
   "coach.analyzing": "Analyse IA...",
@@ -219,6 +262,18 @@ const fr: Dict = {
   "coach.weeklyRefresh": "actualisée une fois par semaine.",
   "coach.fallbackNotice":
     "Coach IA indisponible pour le moment — analyse de repli basée sur des règles simples.",
+  "coach.regenerate": "Régénérer",
+  "coach.regenerating": "Régénération...",
+  "coach.staticContent": "Contenu de référence",
+  "coach.staticContentNotice": "Contenu fixe, non généré par l'IA.",
+
+  // Chat flottant (FinanceAgent)
+  "financeAgent.title": "Agent Financier",
+  "financeAgent.subtitle": "Analyse financière assistée par IA",
+  "financeAgent.emptyState": "Posez-moi une question sur vos finances !",
+  "financeAgent.placeholder": "Comment va mon budget ?",
+  "financeAgent.send": "Envoyer",
+  "financeAgent.error": "Erreur :",
 
   // Coach IA — Conseils Financiers (Tanger)
   "coach.tanger.title": "Conseils Financiers",
@@ -318,6 +373,13 @@ const fr: Dict = {
     "Aucune catégorie en dépassement et fonds d'urgence solide ({{months}} mois). Continuez sur cette lancée et envisagez d'augmenter vos versements d'investissement.",
   "coach.diagnostic.aiFallbackNotice":
     "Coach IA indisponible pour le moment — diagnostic de repli basé sur des règles simples (seuils sur vos catégories budgétaires).",
+  "coach.diagnostic.profileOverBucketLabel": "{{bucket}} en Dépassement",
+  "coach.diagnostic.profileOverBucketDesc":
+    "Le poste \"{{bucket}}\" représente {{pct}}% de vos revenus, au-dessus de la cible de {{target}}% pour votre méthode budgétaire.",
+  "coach.diagnostic.profileBalancedGenericDesc":
+    "Votre répartition suit d'assez près les cibles de votre méthode budgétaire ce mois-ci.",
+  "coach.diagnostic.noRatioMethodDesc":
+    "Votre méthode budgétaire ne définit pas de répartition cible en % — référez-vous au détail par catégorie ci-dessous.",
   // Santé
   "health.title": "Santé",
   "health.title.sub": "Suivez votre budget santé et vos remboursements CNSS.",
@@ -356,6 +418,44 @@ const fr: Dict = {
   "health.card6.form.date": "Date du soin",
   "health.card6.form.transaction": "Créer la transaction liée",
   "health.card6.form.submit": "Ajouter",
+
+  "common.saved": "Enregistré",
+
+  "budgetMethod.selector.title": "Méthodologie de Budget",
+  "budgetMethod.selector.subtitle": "Choisissez l'approche qui correspond à votre façon de gérer votre argent — vous pouvez en changer à tout moment.",
+  "budgetMethod.card.changeMethod": "Changer",
+  "budgetMethod.bucket.needs": "Besoins",
+  "budgetMethod.bucket.wants": "Envies",
+  "budgetMethod.bucket.savings": "Épargne",
+  "budgetMethod.bucket.free": "Libre",
+  "budgetMethod.bucket.committed": "Engagé",
+  "budgetMethod.bucket.flexible": "Flexible",
+  "budgetMethod.503020.label": "Règle du 50/30/20",
+  "budgetMethod.503020.description": "50% besoins, 30% envies, 20% épargne — l'équilibre classique, un bon point de départ.",
+  "budgetMethod.702010.label": "Règle du 70/20/10",
+  "budgetMethod.702010.description": "70% besoins, 20% envies, 10% épargne — pour un revenu plus serré ou une charge de vie élevée.",
+  "budgetMethod.payYourselfFirst.label": "Se Payer en Premier",
+  "budgetMethod.payYourselfFirst.description": "Réservez d'abord un % fixe à l'épargne dès que le revenu tombe, le reste s'organise librement.",
+  "budgetMethod.60solution.label": "Règle des 60%",
+  "budgetMethod.60solution.description": "60% de charges engagées, 40% répartis librement (retraite, imprévus, plaisir) — simple à suivre au quotidien.",
+  "budgetMethod.60solution.subNote": "Repère indicatif à l'intérieur des 40% flexibles : ~10% retraite, ~10% épargne long terme, ~10% imprévus, ~10% plaisir.",
+  "budgetMethod.zeroBased.label": "Budget Base Zéro",
+  "budgetMethod.zeroBased.description": "Chaque dirham a une destination précise — le total alloué doit toujours atteindre 100% du revenu.",
+  "budgetMethod.envelope.label": "Système des Enveloppes",
+  "budgetMethod.envelope.description": "Chaque catégorie est une enveloppe avec un plafond strict — la dépasser signifie qu'elle est vide.",
+  "budgetMethod.custom.label": "Pourcentages Personnalisés",
+  "budgetMethod.custom.description": "Répartition entièrement libre par catégorie, sans grille théorique imposée.",
+  "budgetMethod.kakeibo.label": "Kakeibo",
+  "budgetMethod.kakeibo.description": "Méthode japonaise de réflexion mensuelle : combien vous avez, combien vous voulez épargner, combien vous dépensez, comment vous améliorer.",
+  "budgetMethod.allocation.totalAllocated": "Total alloué",
+  "budgetMethod.allocation.overBudget": "Catégories dépassées",
+  "budgetMethod.allocation.envelopeFrame": "Chaque enveloppe ci-dessous a un plafond — la dépasser la vide pour le reste du mois.",
+  "budgetMethod.allocation.zeroBasedFrame": "Le total alloué doit rester à 100% : chaque dirham du revenu a une destination définie.",
+  "budgetMethod.allocation.customFrame": "Répartition libre, sans règle théorique imposée — ajustez selon vos priorités.",
+  "kakeibo.q1": "Combien d'argent avez-vous ?",
+  "kakeibo.q2": "Combien aimeriez-vous économiser ?",
+  "kakeibo.q3": "Combien dépensez-vous réellement ?",
+  "kakeibo.q4": "Comment pouvez-vous vous améliorer ?",
 };
 
 const en: Dict = {
@@ -384,6 +484,7 @@ const en: Dict = {
 
   "common.save": "Save",
   "common.cancel": "Cancel",
+  "common.edit": "Edit",
   "common.delete": "Delete",
   "common.export": "Export CSV",
   "common.exporting": "Exporting...",
@@ -400,11 +501,13 @@ const en: Dict = {
   "common.method": "Method",
   "common.description": "Description",
   "common.account": "Account",
+  "common.accounts": "Accounts",
   "common.action": "Action",
   "common.total": "Total",
   "common.net": "Net",
   "common.all": "All",
   "common.allCategories": "All categories",
+  "common.allAccounts": "All accounts",
   "common.page": "Page",
   "common.of": "of",
   "common.income": "Income",
@@ -504,7 +607,9 @@ const en: Dict = {
   "historique.submit": "Submit Entry",
   "historique.noTransactions": "No transactions found.",
   "historique.deleteConfirm": "Delete transaction",
+  "historique.editError": "Error while editing.",
 
+  "form.account": "Account",
   "form.amount": "Amount (DH)",
   "form.notesPlaceholder": "Transaction description...",
   "form.noCategoryOfType": "No category of this type",
@@ -523,9 +628,45 @@ const en: Dict = {
   "payment.applePay": "Apple Pay",
   "payment.bmceDirect": "BMCE DIRECT",
 
+  // Transfer between accounts (Profil > Comptes) — see app/components/TransferCard.tsx
+  // Account types (Saisie balances banner + transfers)
+  "account.type.checking": "Checking",
+  "account.type.savings": "Savings",
+  "account.type.investment": "Investment",
+
+  "transfer.title": "Transfer between accounts",
+  "transfer.subtitle": "Move money from one account to another (e.g. checking → savings) — without leaving the app.",
+  "transfer.from": "From",
+  "transfer.to": "To",
+  "transfer.amount": "Amount",
+  "transfer.submit": "Transfer",
+  "transfer.success": "Transfer completed.",
+  "transfer.errorSameAccount": "Choose two different accounts.",
+  "transfer.errorInsufficientFunds": "Insufficient balance on the source account.",
+  "transfer.errorGeneric": "Error while transferring.",
+  "transfer.needTwoAccounts": "Create at least two accounts to make a transfer.",
+
+  // Recurring automatic transfers (Profil > Comptes)
+  "recurringTransfer.title": "Automatic transfers",
+  "recurringTransfer.subtitle": "Schedule a transfer that repeats every month (e.g. 1000 DH to savings on each payday).",
+  "recurringTransfer.add": "Schedule",
+  "recurringTransfer.dayOfMonth": "Day of month",
+  "recurringTransfer.dayOfMonthHint": "1 to 28",
+  "recurringTransfer.everyMonthOn": "On the {{day}} of every month",
+  "recurringTransfer.active": "Active",
+  "recurringTransfer.paused": "Paused",
+  "recurringTransfer.lastRunLabel": "Last transfer",
+  "recurringTransfer.neverRun": "Never run yet",
+  "recurringTransfer.deleteConfirm": "Delete this automatic transfer?",
+  "recurringTransfer.errorGeneric": "Error while saving.",
+  "recurringTransfer.needTwoAccounts": "Create at least two accounts to schedule an automatic transfer.",
+  "recurringTransfer.empty": "No automatic transfer scheduled.",
+
   "saisie.dbTitle": "Transactions Database",
   "saisie.dbSubtitle": "Financial Flow & Archiving",
   "saisie.historyAudit": "History & Audit",
+  "saisie.spentToday": "Spent today",
+  "saisie.spentThisWeek": "Spent this week",
 
   "coach.analyzing": "AI analyzing...",
   "coach.aiCoach": "AI Coach",
@@ -533,6 +674,17 @@ const en: Dict = {
   "coach.weeklyRefresh": "refreshed once a week.",
   "coach.fallbackNotice":
     "AI Coach unavailable right now — fallback analysis based on simple rules.",
+  "coach.regenerate": "Regenerate",
+  "coach.regenerating": "Regenerating...",
+  "coach.staticContent": "Reference content",
+  "coach.staticContentNotice": "Fixed content, not AI-generated.",
+
+  "financeAgent.title": "Finance Agent",
+  "financeAgent.subtitle": "AI-powered financial insights",
+  "financeAgent.emptyState": "Ask me anything about your finances!",
+  "financeAgent.placeholder": "How's my budget doing?",
+  "financeAgent.send": "Send",
+  "financeAgent.error": "Error:",
 
   "coach.tanger.title": "Financial Advice",
   "coach.tanger.banques": "Banking & Savings",
@@ -627,6 +779,13 @@ const en: Dict = {
     "No category is over budget and the emergency fund is solid ({{months}} months). Keep it up and consider increasing your investment contributions.",
   "coach.diagnostic.aiFallbackNotice":
     "AI Coach unavailable right now — fallback diagnosis based on simple rules (thresholds on your budget categories).",
+  "coach.diagnostic.profileOverBucketLabel": "{{bucket}} Over Target",
+  "coach.diagnostic.profileOverBucketDesc":
+    'Your "{{bucket}}" bucket is {{pct}}% of income, above the {{target}}% target for your budgeting method.',
+  "coach.diagnostic.profileBalancedGenericDesc":
+    "Your split stays fairly close to your budgeting method's targets this month.",
+  "coach.diagnostic.noRatioMethodDesc":
+    "Your budgeting method doesn't define a global % split — see the per-category detail below.",
 
   // Health
   "health.title": "Health",
@@ -667,6 +826,44 @@ const en: Dict = {
   "health.card6.form.date": "Care Date",
   "health.card6.form.transaction": "Create linked transaction",
   "health.card6.form.submit": "Add",
+
+  "common.saved": "Saved",
+
+  "budgetMethod.selector.title": "Budget Methodology",
+  "budgetMethod.selector.subtitle": "Pick the approach that matches how you manage money — you can switch anytime.",
+  "budgetMethod.card.changeMethod": "Change",
+  "budgetMethod.bucket.needs": "Needs",
+  "budgetMethod.bucket.wants": "Wants",
+  "budgetMethod.bucket.savings": "Savings",
+  "budgetMethod.bucket.free": "Free",
+  "budgetMethod.bucket.committed": "Committed",
+  "budgetMethod.bucket.flexible": "Flexible",
+  "budgetMethod.503020.label": "50/30/20 Rule",
+  "budgetMethod.503020.description": "50% needs, 30% wants, 20% savings — the classic balance, a solid starting point.",
+  "budgetMethod.702010.label": "70/20/10 Rule",
+  "budgetMethod.702010.description": "70% needs, 20% wants, 10% savings — for a tighter income or higher cost of living.",
+  "budgetMethod.payYourselfFirst.label": "Pay Yourself First",
+  "budgetMethod.payYourselfFirst.description": "Set aside a fixed % for savings the moment income arrives, the rest is yours to organize freely.",
+  "budgetMethod.60solution.label": "60% Solution",
+  "budgetMethod.60solution.description": "60% committed expenses, 40% split freely (retirement, emergencies, fun) — simple to track day to day.",
+  "budgetMethod.60solution.subNote": "Indicative guide within the 40% flexible share: ~10% retirement, ~10% long-term savings, ~10% emergencies, ~10% fun.",
+  "budgetMethod.zeroBased.label": "Zero-Based Budget",
+  "budgetMethod.zeroBased.description": "Every dirham has a purpose — the total allocated must always reach 100% of income.",
+  "budgetMethod.envelope.label": "Envelope System",
+  "budgetMethod.envelope.description": "Each category is an envelope with a hard cap — going over means it's empty.",
+  "budgetMethod.custom.label": "Custom Percentages",
+  "budgetMethod.custom.description": "Fully free allocation per category, no theoretical grid imposed.",
+  "budgetMethod.kakeibo.label": "Kakeibo",
+  "budgetMethod.kakeibo.description": "Japanese monthly reflection method: how much you have, how much you'd like to save, how much you actually spend, how to improve.",
+  "budgetMethod.allocation.totalAllocated": "Total allocated",
+  "budgetMethod.allocation.overBudget": "Categories over budget",
+  "budgetMethod.allocation.envelopeFrame": "Each envelope below has a hard cap — going over empties it for the rest of the month.",
+  "budgetMethod.allocation.zeroBasedFrame": "The total allocated must stay at 100%: every dirham of income has a defined purpose.",
+  "budgetMethod.allocation.customFrame": "Free allocation, no theoretical rule imposed — adjust to your priorities.",
+  "kakeibo.q1": "How much money do you have?",
+  "kakeibo.q2": "How much would you like to save?",
+  "kakeibo.q3": "How much are you actually spending?",
+  "kakeibo.q4": "How can you improve?",
 };
 
 const es: Dict = {
@@ -695,6 +892,7 @@ const es: Dict = {
 
   "common.save": "Guardar",
   "common.cancel": "Cancelar",
+  "common.edit": "Editar",
   "common.delete": "Eliminar",
   "common.export": "Exportar CSV",
   "common.exporting": "Exportando...",
@@ -711,11 +909,13 @@ const es: Dict = {
   "common.method": "Método",
   "common.description": "Descripción",
   "common.account": "Cuenta",
+  "common.accounts": "Cuentas",
   "common.action": "Acción",
   "common.total": "Total",
   "common.net": "Neto",
   "common.all": "Todos",
   "common.allCategories": "Todas las categorías",
+  "common.allAccounts": "Todas las cuentas",
   "common.page": "Página",
   "common.of": "de",
   "common.income": "Ingreso",
@@ -821,7 +1021,9 @@ const es: Dict = {
   "historique.submit": "Validar Movimiento",
   "historique.noTransactions": "No se encontraron transacciones.",
   "historique.deleteConfirm": "Eliminar transacción",
+  "historique.editError": "Error al modificar.",
 
+  "form.account": "Cuenta",
   "form.amount": "Importe (DH)",
   "form.notesPlaceholder": "Descripción de la transacción...",
   "form.noCategoryOfType": "Sin categoría de este tipo",
@@ -840,9 +1042,46 @@ const es: Dict = {
   "payment.applePay": "Apple Pay",
   "payment.bmceDirect": "BMCE DIRECT",
 
+  // Transferencia entre cuentas (Perfil > Cuentas) — ver app/components/TransferCard.tsx
+  // Tipos de cuenta (banner de saldos Saisie + transferencias)
+  "account.type.checking": "Cuenta corriente",
+  "account.type.savings": "Ahorro",
+  "account.type.investment": "Inversión",
+
+  "transfer.title": "Transferencia entre cuentas",
+  "transfer.subtitle": "Mueve dinero de una cuenta a otra (ej: corriente → ahorro) — sin salir de la app.",
+  "transfer.from": "Desde",
+  "transfer.to": "Hacia",
+  "transfer.amount": "Importe",
+  "transfer.submit": "Transferir",
+  "transfer.success": "Transferencia realizada.",
+  "transfer.errorSameAccount": "Elige dos cuentas diferentes.",
+  "transfer.errorInsufficientFunds": "Saldo insuficiente en la cuenta de origen.",
+  "transfer.errorGeneric": "Error al transferir.",
+  "transfer.needTwoAccounts": "Crea al menos dos cuentas para poder transferir.",
+
+  // Transferencias automáticas recurrentes (Perfil > Cuentas)
+  "recurringTransfer.title": "Transferencias automáticas",
+  "recurringTransfer.subtitle":
+    "Programa una transferencia que se repite cada mes (ej: 1000 DH al ahorro en cada día de pago).",
+  "recurringTransfer.add": "Programar",
+  "recurringTransfer.dayOfMonth": "Día del mes",
+  "recurringTransfer.dayOfMonthHint": "1 a 28",
+  "recurringTransfer.everyMonthOn": "El {{day}} de cada mes",
+  "recurringTransfer.active": "Activa",
+  "recurringTransfer.paused": "En pausa",
+  "recurringTransfer.lastRunLabel": "Última transferencia",
+  "recurringTransfer.neverRun": "Aún no ejecutada",
+  "recurringTransfer.deleteConfirm": "¿Eliminar esta transferencia automática?",
+  "recurringTransfer.errorGeneric": "Error al guardar.",
+  "recurringTransfer.needTwoAccounts": "Crea al menos dos cuentas para programar una transferencia automática.",
+  "recurringTransfer.empty": "Ninguna transferencia automática programada.",
+
   "saisie.dbTitle": "Base de Datos de Transacciones",
   "saisie.dbSubtitle": "Flujo Financiero y Archivo",
   "saisie.historyAudit": "Historial y Auditoría",
+  "saisie.spentToday": "Gastado hoy",
+  "saisie.spentThisWeek": "Gastado esta semana",
 
   "coach.analyzing": "Analizando con IA...",
   "coach.aiCoach": "Coach IA",
@@ -850,6 +1089,17 @@ const es: Dict = {
   "coach.weeklyRefresh": "actualizado una vez por semana.",
   "coach.fallbackNotice":
     "Coach IA no disponible por el momento — análisis alternativo basado en reglas simples.",
+  "coach.regenerate": "Regenerar",
+  "coach.regenerating": "Regenerando...",
+  "coach.staticContent": "Contenido de referencia",
+  "coach.staticContentNotice": "Contenido fijo, no generado por IA.",
+
+  "financeAgent.title": "Agente Financiero",
+  "financeAgent.subtitle": "Análisis financiero impulsado por IA",
+  "financeAgent.emptyState": "¡Pregúntame lo que quieras sobre tus finanzas!",
+  "financeAgent.placeholder": "¿Cómo va mi presupuesto?",
+  "financeAgent.send": "Enviar",
+  "financeAgent.error": "Error:",
 
   "coach.tanger.title": "Consejos Financieros",
   "coach.tanger.banques": "Bancos y Ahorro",
@@ -945,6 +1195,13 @@ const es: Dict = {
     "Ninguna categoría excedida y fondo de emergencia sólido ({{months}} meses). Sigue así y considera aumentar tus aportes de inversión.",
   "coach.diagnostic.aiFallbackNotice":
     "Coach IA no disponible por el momento — diagnóstico alternativo basado en reglas simples (umbrales en tus categorías de presupuesto).",
+  "coach.diagnostic.profileOverBucketLabel": "{{bucket}} por Encima del Objetivo",
+  "coach.diagnostic.profileOverBucketDesc":
+    'La partida "{{bucket}}" representa el {{pct}}% de tus ingresos, por encima del objetivo del {{target}}% de tu método.',
+  "coach.diagnostic.profileBalancedGenericDesc":
+    "Tu reparto se mantiene bastante cerca de los objetivos de tu método presupuestario este mes.",
+  "coach.diagnostic.noRatioMethodDesc":
+    "Tu método presupuestario no define un reparto global en % — consulta el detalle por categoría abajo.",
 
   // Salud
   "health.title": "Salud",
@@ -985,6 +1242,44 @@ const es: Dict = {
   "health.card6.form.date": "Fecha de la Atención",
   "health.card6.form.transaction": "Crear transacción vinculada",
   "health.card6.form.submit": "Agregar",
+
+  "common.saved": "Guardado",
+
+  "budgetMethod.selector.title": "Metodología de Presupuesto",
+  "budgetMethod.selector.subtitle": "Elige el enfoque que se ajuste a tu forma de gestionar el dinero — puedes cambiarlo en cualquier momento.",
+  "budgetMethod.card.changeMethod": "Cambiar",
+  "budgetMethod.bucket.needs": "Necesidades",
+  "budgetMethod.bucket.wants": "Deseos",
+  "budgetMethod.bucket.savings": "Ahorro",
+  "budgetMethod.bucket.free": "Libre",
+  "budgetMethod.bucket.committed": "Comprometido",
+  "budgetMethod.bucket.flexible": "Flexible",
+  "budgetMethod.503020.label": "Regla del 50/30/20",
+  "budgetMethod.503020.description": "50% necesidades, 30% deseos, 20% ahorro — el equilibrio clásico, un buen punto de partida.",
+  "budgetMethod.702010.label": "Regla del 70/20/10",
+  "budgetMethod.702010.description": "70% necesidades, 20% deseos, 10% ahorro — para un ingreso más ajustado o un coste de vida elevado.",
+  "budgetMethod.payYourselfFirst.label": "Págate a Ti Primero",
+  "budgetMethod.payYourselfFirst.description": "Reserva primero un % fijo para el ahorro en cuanto llega el ingreso, el resto se organiza libremente.",
+  "budgetMethod.60solution.label": "Regla del 60%",
+  "budgetMethod.60solution.description": "60% de gastos comprometidos, 40% repartido libremente (jubilación, imprevistos, ocio) — fácil de seguir día a día.",
+  "budgetMethod.60solution.subNote": "Guía indicativa dentro del 40% flexible: ~10% jubilación, ~10% ahorro a largo plazo, ~10% imprevistos, ~10% ocio.",
+  "budgetMethod.zeroBased.label": "Presupuesto Base Cero",
+  "budgetMethod.zeroBased.description": "Cada dirham tiene un destino preciso — el total asignado debe alcanzar siempre el 100% del ingreso.",
+  "budgetMethod.envelope.label": "Sistema de Sobres",
+  "budgetMethod.envelope.description": "Cada categoría es un sobre con un tope estricto — superarlo significa que está vacío.",
+  "budgetMethod.custom.label": "Porcentajes Personalizados",
+  "budgetMethod.custom.description": "Reparto totalmente libre por categoría, sin ninguna cuadrícula teórica impuesta.",
+  "budgetMethod.kakeibo.label": "Kakeibo",
+  "budgetMethod.kakeibo.description": "Método japonés de reflexión mensual: cuánto dinero tienes, cuánto te gustaría ahorrar, cuánto gastas realmente, cómo mejorar.",
+  "budgetMethod.allocation.totalAllocated": "Total asignado",
+  "budgetMethod.allocation.overBudget": "Categorías superadas",
+  "budgetMethod.allocation.envelopeFrame": "Cada sobre de abajo tiene un tope estricto — superarlo lo vacía para el resto del mes.",
+  "budgetMethod.allocation.zeroBasedFrame": "El total asignado debe mantenerse en 100%: cada dirham del ingreso tiene un destino definido.",
+  "budgetMethod.allocation.customFrame": "Reparto libre, sin regla teórica impuesta — ajústalo según tus prioridades.",
+  "kakeibo.q1": "¿Cuánto dinero tienes?",
+  "kakeibo.q2": "¿Cuánto te gustaría ahorrar?",
+  "kakeibo.q3": "¿Cuánto gastas realmente?",
+  "kakeibo.q4": "¿Cómo puedes mejorar?",
 };
 
 const ar: Dict = {
@@ -1013,6 +1308,7 @@ const ar: Dict = {
 
   "common.save": "حفظ",
   "common.cancel": "إلغاء",
+  "common.edit": "تعديل",
   "common.delete": "حذف",
   "common.export": "تصدير CSV",
   "common.exporting": "جارٍ التصدير...",
@@ -1029,11 +1325,13 @@ const ar: Dict = {
   "common.method": "طريقة الدفع",
   "common.description": "الوصف",
   "common.account": "الحساب",
+  "common.accounts": "الحسابات",
   "common.action": "إجراء",
   "common.total": "الإجمالي",
   "common.net": "الصافي",
   "common.all": "الكل",
   "common.allCategories": "كل الفئات",
+  "common.allAccounts": "كل الحسابات",
   "common.page": "صفحة",
   "common.of": "من",
   "common.income": "دخل",
@@ -1135,7 +1433,9 @@ const ar: Dict = {
   "historique.submit": "تأكيد العملية",
   "historique.noTransactions": "لم يتم العثور على معاملات.",
   "historique.deleteConfirm": "حذف المعاملة",
+  "historique.editError": "خطأ أثناء التعديل.",
 
+  "form.account": "الحساب",
   "form.amount": "المبلغ (درهم)",
   "form.notesPlaceholder": "وصف المعاملة...",
   "form.noCategoryOfType": "لا توجد فئة من هذا النوع",
@@ -1154,9 +1454,45 @@ const ar: Dict = {
   "payment.applePay": "Apple Pay",
   "payment.bmceDirect": "BMCE DIRECT",
 
+  // التحويل بين الحسابات (الملف الشخصي > الحسابات) — انظر app/components/TransferCard.tsx
+  // أنواع الحسابات (شريط الأرصدة في الإدخال + التحويلات)
+  "account.type.checking": "حساب جاري",
+  "account.type.savings": "توفير",
+  "account.type.investment": "استثمار",
+
+  "transfer.title": "تحويل بين الحسابات",
+  "transfer.subtitle": "انقل الأموال من حساب إلى آخر (مثلاً: الحساب الجاري ← التوفير) — دون مغادرة التطبيق.",
+  "transfer.from": "من",
+  "transfer.to": "إلى",
+  "transfer.amount": "المبلغ",
+  "transfer.submit": "تحويل",
+  "transfer.success": "تم التحويل بنجاح.",
+  "transfer.errorSameAccount": "اختر حسابين مختلفين.",
+  "transfer.errorInsufficientFunds": "الرصيد غير كافٍ في الحساب المصدر.",
+  "transfer.errorGeneric": "خطأ أثناء التحويل.",
+  "transfer.needTwoAccounts": "أنشئ حسابين على الأقل لإجراء تحويل.",
+
+  // التحويلات التلقائية المتكررة (الملف الشخصي > الحسابات)
+  "recurringTransfer.title": "تحويلات تلقائية",
+  "recurringTransfer.subtitle": "برمج تحويلاً يتكرر كل شهر (مثلاً: 1000 درهم إلى التوفير في كل يوم أداء الراتب).",
+  "recurringTransfer.add": "برمجة",
+  "recurringTransfer.dayOfMonth": "يوم الشهر",
+  "recurringTransfer.dayOfMonthHint": "من 1 إلى 28",
+  "recurringTransfer.everyMonthOn": "يوم {{day}} من كل شهر",
+  "recurringTransfer.active": "نشط",
+  "recurringTransfer.paused": "متوقف مؤقتاً",
+  "recurringTransfer.lastRunLabel": "آخر تحويل",
+  "recurringTransfer.neverRun": "لم يُنفذ بعد",
+  "recurringTransfer.deleteConfirm": "حذف هذا التحويل التلقائي؟",
+  "recurringTransfer.errorGeneric": "خطأ أثناء الحفظ.",
+  "recurringTransfer.needTwoAccounts": "أنشئ حسابين على الأقل لبرمجة تحويل تلقائي.",
+  "recurringTransfer.empty": "لا يوجد تحويل تلقائي مبرمج.",
+
   "saisie.dbTitle": "قاعدة بيانات المعاملات",
   "saisie.dbSubtitle": "التدفق المالي والأرشفة",
   "saisie.historyAudit": "السجل والتدقيق",
+  "saisie.spentToday": "أُنفق اليوم",
+  "saisie.spentThisWeek": "أُنفق هذا الأسبوع",
 
   "coach.analyzing": "جارٍ التحليل بالذكاء الاصطناعي...",
   "coach.aiCoach": "المدرب الذكي",
@@ -1164,6 +1500,17 @@ const ar: Dict = {
   "coach.weeklyRefresh": "يُحدَّث مرة واحدة أسبوعيًا.",
   "coach.fallbackNotice":
     "المدرب الذكي غير متاح حاليًا — تحليل احتياطي مبني على قواعد بسيطة.",
+  "coach.regenerate": "إعادة التوليد",
+  "coach.regenerating": "جارٍ إعادة التوليد...",
+  "coach.staticContent": "محتوى مرجعي",
+  "coach.staticContentNotice": "محتوى ثابت، غير مُنشأ بالذكاء الاصطناعي.",
+
+  "financeAgent.title": "المساعد المالي",
+  "financeAgent.subtitle": "تحليل مالي مدعوم بالذكاء الاصطناعي",
+  "financeAgent.emptyState": "اسألني أي شيء عن أموالك!",
+  "financeAgent.placeholder": "كيف حال ميزانيتي؟",
+  "financeAgent.send": "إرسال",
+  "financeAgent.error": "خطأ:",
 
   "coach.tanger.title": "نصائح مالية",
   "coach.tanger.banques": "البنوك والادخار",
@@ -1257,6 +1604,13 @@ const ar: Dict = {
     "لا توجد فئة تجاوزت ميزانيتها وصندوق الطوارئ متين ({{months}} أشهر). واصل على هذا النهج وفكّر في زيادة مساهماتك الاستثمارية.",
   "coach.diagnostic.aiFallbackNotice":
     "المدرب الذكي غير متاح حاليًا — تشخيص احتياطي مبني على قواعد بسيطة (عتبات على فئات ميزانيتك).",
+  "coach.diagnostic.profileOverBucketLabel": "تجاوز في {{bucket}}",
+  "coach.diagnostic.profileOverBucketDesc":
+    "يمثل بند \"{{bucket}}\" {{pct}}% من دخلك، وهو أعلى من هدف {{target}}% لطريقتك في الميزانية.",
+  "coach.diagnostic.profileBalancedGenericDesc":
+    "توزيعك يبقى قريبًا جدًا من أهداف طريقتك في الميزانية هذا الشهر.",
+  "coach.diagnostic.noRatioMethodDesc":
+    "طريقتك في الميزانية لا تحدد توزيعًا عامًا بالنسبة المئوية — راجع التفاصيل حسب الفئة أدناه.",
 
   // الصحة
   "health.title": "الصحة",
@@ -1296,6 +1650,44 @@ const ar: Dict = {
   "health.card6.form.date": "تاريخ الرعاية الصحية",
   "health.card6.form.transaction": "إنشاء معاملة مرتبطة",
   "health.card6.form.submit": "إضافة",
+
+  "common.saved": "تم الحفظ",
+
+  "budgetMethod.selector.title": "منهجية الميزانية",
+  "budgetMethod.selector.subtitle": "اختر الأسلوب الذي يناسب طريقتك في إدارة المال — يمكنك تغييره في أي وقت.",
+  "budgetMethod.card.changeMethod": "تغيير",
+  "budgetMethod.bucket.needs": "الاحتياجات",
+  "budgetMethod.bucket.wants": "الرغبات",
+  "budgetMethod.bucket.savings": "الادخار",
+  "budgetMethod.bucket.free": "حر",
+  "budgetMethod.bucket.committed": "ملتزم به",
+  "budgetMethod.bucket.flexible": "مرن",
+  "budgetMethod.503020.label": "قاعدة 50/30/20",
+  "budgetMethod.503020.description": "50% احتياجات، 30% رغبات، 20% ادخار — التوازن الكلاسيكي، نقطة انطلاق جيدة.",
+  "budgetMethod.702010.label": "قاعدة 70/20/10",
+  "budgetMethod.702010.description": "70% احتياجات، 20% رغبات، 10% ادخار — لدخل أضيق أو تكلفة معيشة أعلى.",
+  "budgetMethod.payYourselfFirst.label": "ادفع لنفسك أولاً",
+  "budgetMethod.payYourselfFirst.description": "خصص أولاً نسبة ثابتة للادخار فور وصول الدخل، والباقي ينظَّم بحرية.",
+  "budgetMethod.60solution.label": "قاعدة الـ60%",
+  "budgetMethod.60solution.description": "60% نفقات ملتزم بها، و40% موزعة بحرية (تقاعد، طوارئ، متعة) — سهلة المتابعة يوميًا.",
+  "budgetMethod.60solution.subNote": "مؤشر إرشادي ضمن نسبة الـ40% المرنة: ~10% تقاعد، ~10% ادخار طويل الأمد، ~10% طوارئ، ~10% متعة.",
+  "budgetMethod.zeroBased.label": "ميزانية القاعدة الصفرية",
+  "budgetMethod.zeroBased.description": "لكل درهم وجهة محددة — يجب أن يصل إجمالي المخصص دائمًا إلى 100% من الدخل.",
+  "budgetMethod.envelope.label": "نظام المظاريف",
+  "budgetMethod.envelope.description": "كل فئة هي مظروف بسقف صارم — تجاوزه يعني أنه فارغ.",
+  "budgetMethod.custom.label": "نسب مخصصة",
+  "budgetMethod.custom.description": "توزيع حر تمامًا لكل فئة، دون أي إطار نظري مفروض.",
+  "budgetMethod.kakeibo.label": "كاكيبو",
+  "budgetMethod.kakeibo.description": "طريقة يابانية للتأمل الشهري: كم المال المتوفر لديك، كم تريد أن تدخر، كم تنفق فعليًا، وكيف يمكنك التحسّن.",
+  "budgetMethod.allocation.totalAllocated": "الإجمالي المخصص",
+  "budgetMethod.allocation.overBudget": "الفئات المتجاوزة",
+  "budgetMethod.allocation.envelopeFrame": "لكل مظروف أدناه سقف صارم — تجاوزه يفرغه لبقية الشهر.",
+  "budgetMethod.allocation.zeroBasedFrame": "يجب أن يبقى الإجمالي المخصص عند 100%: لكل درهم من الدخل وجهة محددة.",
+  "budgetMethod.allocation.customFrame": "توزيع حر، دون قاعدة نظرية مفروضة — عدّله حسب أولوياتك.",
+  "kakeibo.q1": "كم المال المتوفر لديك؟",
+  "kakeibo.q2": "كم تريد أن تدخر؟",
+  "kakeibo.q3": "كم تنفق فعليًا؟",
+  "kakeibo.q4": "كيف يمكنك التحسّن؟",
 };
 
 const dictionaries: Record<Locale, Dict> = { fr, en, es, ar };

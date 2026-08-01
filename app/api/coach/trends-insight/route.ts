@@ -1,25 +1,11 @@
-import { generateObject } from 'ai';
 import { NextResponse } from 'next/server';
-import { z } from 'zod';
-import { coachModel } from '@/lib/aiProvider';
-import { getCachedAdvice, setCachedAdvice } from '@/lib/aiCache';
+import { streamCoachAdvice } from '@/lib/coachHandler';
+import { trendsInsightSchema as insightSchema } from '@/lib/coachSchemas';
 import { requireSession } from '@/lib/auth';
 import { getUserLocale } from '@/lib/getLocale';
 import { aiLanguageInstruction } from '@/lib/i18n';
 
 const CACHE_KEY = 'trends-insight';
-
-const insightSchema = z.object({
-  synthese: z
-    .string()
-    .describe('1-2 phrases: tendance générale des dépenses et de l\'épargne sur la période observée.'),
-  pointAttention: z
-    .string()
-    .describe('1 phrase: le point le plus préoccupant (catégorie qui dérape, mois en dérapage, baisse du taux d\'épargne...).'),
-  recommandation: z
-    .string()
-    .describe('1 phrase: action concrète et chiffrée à prendre ce mois-ci pour corriger ou consolider la tendance.'),
-});
 
 interface MonthlyPoint {
   label: string;
@@ -39,31 +25,16 @@ export async function POST(req: Request) {
   try {
     const { userId } = await requireSession();
     const locale = await getUserLocale(userId);
-    const { monthly, topCategories } = (await req.json()) as {
+    const { monthly, topCategories, force } = (await req.json()) as {
       monthly: MonthlyPoint[];
       topCategories: CategoryPoint[];
+      force?: boolean;
     };
 
     if (!Array.isArray(monthly) || monthly.length === 0) {
       return NextResponse.json({ success: false, error: 'Données mensuelles invalides' }, { status: 400 });
     }
 
-    // 1. Cache hebdomadaire — évite un appel LLM à chaque chargement de page.
-    const cached = await getCachedAdvice<{ synthese: string; pointAttention: string; recommandation: string }>(
-      userId,
-      `${CACHE_KEY}:${locale}`,
-    );
-
-    if (cached) {
-      return NextResponse.json({
-        success: true,
-        advice: cached.content,
-        cached: true,
-        generatedAt: cached.generatedAt,
-      });
-    }
-
-    // 2. Cache absent ou périmé (> 7 jours) — on régénère.
     const systemPrompt = `Tu es un conseiller financier basé à Tanger, Maroc, spécialisé en analyse de tendances budgétaires. Style: ultra concis, chiffré, jamais générique. ${aiLanguageInstruction(locale)}`;
 
     const monthlyLines = monthly
@@ -88,16 +59,16 @@ ${categoryLines}
 
 Donne une synthèse de la tendance générale, le point d'attention le plus important, et une recommandation concrète pour ce mois-ci, chacun en UNE phrase courte.`;
 
-    const { object } = await generateObject({
-      model: coachModel,
+    return await streamCoachAdvice({
+      userId,
+      locale,
+      baseCacheKey: CACHE_KEY,
+      input: { monthly, topCategories },
+      schema: insightSchema,
       system: systemPrompt,
       prompt: userPrompt,
-      schema: insightSchema,
+      force,
     });
-
-    const generatedAt = await setCachedAdvice(userId, `${CACHE_KEY}:${locale}`, object);
-
-    return NextResponse.json({ success: true, advice: object, cached: false, generatedAt });
   } catch (error) {
     if (error instanceof Error && error.message === 'UNAUTHENTICATED') {
       return NextResponse.json({ success: false, error: 'Non authentifié' }, { status: 401 });

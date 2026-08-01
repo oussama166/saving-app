@@ -1,8 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { Sparkles } from "lucide-react";
 import { useLanguage } from "./LanguageProvider";
+import { useCoachAdvice } from "../hooks/useCoachAdvice";
+import { tangerAdviceSchema, type TangerAdvice } from "@/lib/coachSchemas";
+import CoachRegenerateButton from "./CoachRegenerateButton";
 
 interface Props {
   referenceIncome: number;
@@ -10,13 +12,6 @@ interface Props {
   portfolioValue: number;
   totalGoalsTarget: number;
   totalGoalsSaved: number;
-}
-
-interface Advice {
-  banques: string;
-  investissementMaroc: string;
-  investissementInternational: string;
-  erreursFatales: string;
 }
 
 export default function TangerFinancialAdvice({
@@ -27,89 +22,44 @@ export default function TangerFinancialAdvice({
   totalGoalsSaved,
 }: Props) {
   const { t } = useLanguage();
-  const [advice, setAdvice] = useState<Advice | null>(null);
-  const [generatedAt, setGeneratedAt] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [failed, setFailed] = useState(false);
+  const { advice, loading, regenerating, failed, generatedAt, regenerate } = useCoachAdvice(
+    "/api/coach/tanger-advice",
+    tangerAdviceSchema,
+    { referenceIncome, emergencyFundBalance, portfolioValue, totalGoalsTarget, totalGoalsSaved },
+  );
 
-  const BLOCK_META = [
-    { key: "banques" as const, emoji: "🏦", title: t("coach.tanger.banques") },
-    {
-      key: "investissementMaroc" as const,
-      emoji: "📈",
-      title: t("coach.tanger.investMaroc"),
-    },
-    {
-      key: "investissementInternational" as const,
-      emoji: "🌍",
-      title: t("coach.tanger.investIntl"),
-    },
-    { key: "erreursFatales" as const, emoji: "⚠️", title: t("coach.tanger.erreurs") },
+  const BLOCK_META: { key: keyof TangerAdvice; emoji: string; title: string }[] = [
+    { key: "banques", emoji: "🏦", title: t("coach.tanger.banques") },
+    { key: "investissementMaroc", emoji: "📈", title: t("coach.tanger.investMaroc") },
+    { key: "investissementInternational", emoji: "🌍", title: t("coach.tanger.investIntl") },
+    { key: "erreursFatales", emoji: "⚠️", title: t("coach.tanger.erreurs") },
   ];
 
-  useEffect(() => {
-    let cancelled = false;
-
-    fetch("/api/coach/tanger-advice", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        referenceIncome,
-        emergencyFundBalance,
-        portfolioValue,
-        totalGoalsTarget,
-        totalGoalsSaved,
-      }),
-    })
-      .then((res) => {
-        if (!res.ok) throw new Error("Request failed");
-        return res.json();
-      })
-      .then((data) => {
-        if (cancelled) return;
-        if (data.success && data.advice) {
-          setAdvice(data.advice);
-          if (data.generatedAt) setGeneratedAt(data.generatedAt);
-        } else {
-          setFailed(true);
-        }
-      })
-      .catch(() => {
-        if (!cancelled) setFailed(true);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    referenceIncome,
-    emergencyFundBalance,
-    portfolioValue,
-    totalGoalsTarget,
-    totalGoalsSaved,
-  ]);
+  const complete = Boolean(
+    advice?.banques && advice?.investissementMaroc && advice?.investissementInternational && advice?.erreursFatales,
+  );
 
   return (
     <div className="bg-surface rounded-2xl border border-line p-8">
       <div className="flex items-center gap-3 mb-6">
-        <h2 className="text-xl font-bold text-ink tracking-tight">
-          {t("coach.tanger.title")}
-        </h2>
-        {loading && (
-          <span className="ml-auto flex items-center gap-1.5 text-[10px] text-blue-400 font-bold uppercase tracking-widest">
-            <Sparkles className="w-3 h-3 animate-pulse" />
-            {t("coach.analyzing")}
-          </span>
-        )}
-        {!loading && advice && !failed && (
-          <span className="ml-auto flex items-center gap-1.5 text-[10px] text-emerald-400 font-bold uppercase tracking-widest">
-            <Sparkles className="w-3 h-3" />
-            {t("coach.aiCoach")}
-          </span>
-        )}
+        <h2 className="text-xl font-bold text-ink tracking-tight">{t("coach.tanger.title")}</h2>
+        <div className="ml-auto flex items-center gap-3">
+          {loading && (
+            <span className="flex items-center gap-1.5 text-[10px] text-blue-400 font-bold uppercase tracking-widest">
+              <Sparkles className="w-3 h-3 animate-pulse" />
+              {t("coach.analyzing")}
+            </span>
+          )}
+          {!loading && complete && !failed && (
+            <>
+              <span className="flex items-center gap-1.5 text-[10px] text-emerald-400 font-bold uppercase tracking-widest">
+                <Sparkles className="w-3 h-3" />
+                {t("coach.aiCoach")}
+              </span>
+              <CoachRegenerateButton onClick={regenerate} loading={regenerating} />
+            </>
+          )}
+        </div>
       </div>
 
       {loading ? (
@@ -122,7 +72,7 @@ export default function TangerFinancialAdvice({
             </div>
           ))}
         </div>
-      ) : advice && !failed ? (
+      ) : complete && !failed ? (
         <>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {BLOCK_META.map((b) => (
@@ -130,9 +80,7 @@ export default function TangerFinancialAdvice({
                 <p className="text-sm font-bold text-body">
                   {b.emoji} {b.title}
                 </p>
-                <p className="text-[13px] text-muted leading-relaxed">
-                  {advice[b.key]}
-                </p>
+                <p className="text-[13px] text-muted leading-relaxed">{advice?.[b.key]}</p>
               </div>
             ))}
           </div>
