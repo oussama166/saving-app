@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import TopMetrics from "./components/TopMetrics";
 import DetailedBudgetTable from "./components/DetailedBudgetTable";
 import BudgetMethodCard from "./components/BudgetMethodCard";
+import DailyBudgetWidget from "./components/DailyBudgetWidget";
 import Visualizations from "./components/Visualizations";
 import InterestSimulator from "./components/InterestSimulator";
 import { Bell } from "lucide-react";
@@ -200,6 +201,7 @@ function DashboardContent() {
             <DetailedBudgetTable details={budgetDetails} />
           </div>
           <div className="space-y-8">
+            <DailyBudgetWidget />
             <BudgetMethodCard
               method={budgetMethod}
               kind={budgetMethodKind}

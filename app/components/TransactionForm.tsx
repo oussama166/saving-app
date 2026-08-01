@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, Check } from 'lucide-react';
+import { Plus, Check, AlertTriangle } from 'lucide-react';
 import { useLanguage } from './LanguageProvider';
+import { tParams } from '@/lib/i18n';
 
 interface SubCategory {
   id: string;
@@ -75,6 +76,36 @@ export default function TransactionForm({
 
   const [loading, setLoading] = useState(false);
 
+  // Budget sécuritaire du jour (voir lib/billCalendar.ts) — chargé une fois
+  // au montage depuis la version allégée de l'API calendrier, uniquement
+  // pour avertir (jamais bloquer) si la dépense en cours de saisie dépasse
+  // ce qui reste du jour. Reste `null` si la fonctionnalité Calendrier est
+  // désactivée ou si l'appel échoue : aucun avertissement n'est alors
+  // affiché, silencieusement.
+  const [todayBudget, setTodayBudget] = useState<{ remainingTodayMad: number } | null>(null);
+
+  const loadTodayBudget = useCallback(() => {
+    fetch('/api/calendar/today')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((result) => {
+        if (result?.success) {
+          setTodayBudget({ remainingTodayMad: result.data.remainingTodayMad });
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    loadTodayBudget();
+  }, [loadTodayBudget]);
+
+  const amountNum = Number(formData.amount);
+  const overBudgetToday =
+    todayBudget !== null &&
+    formData.type === 'expense' &&
+    amountNum > 0 &&
+    amountNum > todayBudget.remainingTodayMad;
+
   useEffect(() => {
     if (!prefill) return;
     // setState différé dans un microtask plutôt qu'appelé de façon
@@ -129,6 +160,7 @@ export default function TransactionForm({
           subCategory: '',
         });
         router.refresh();
+        loadTodayBudget();
         if (onSuccess) onSuccess();
       }
     } catch (error) {
@@ -298,6 +330,13 @@ export default function TransactionForm({
             </button>
           </div>
         </div>
+
+        {overBudgetToday && (
+          <div className="flex items-center gap-2 p-3 rounded-xl border bg-orange-500/10 border-orange-500/20 text-orange-400 text-[11px] font-bold">
+            <AlertTriangle className="w-4 h-4 shrink-0" />
+            {tParams(t('saisie.overBudgetWarning'), { remaining: Math.round(todayBudget?.remainingTodayMad ?? 0) })}
+          </div>
+        )}
       </form>
     </div>
   );
