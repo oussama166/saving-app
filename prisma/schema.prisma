@@ -72,6 +72,7 @@ model User {
   recurringTransfers RecurringTransfer[]
   kakeiboEntries     KakeiboEntry[]
   agentChatMessages  AgentChatMessage[]
+  bills              Bill[]
 }
 
 // Règle de virement automatique récurrent entre deux comptes du même foyer
@@ -273,8 +274,36 @@ model Category {
   subscriptions   Subscription[]
   savingsGoals    SavingsGoal[]
   budgetAlertsSent BudgetAlertSent[]
+  bills           Bill[]
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
+}
+
+// Échéance ajoutée manuellement par l'utilisateur pour le calendrier des
+// paiements (voir lib/billCalendar.ts, app/calendrier) — distincte de
+// Subscription/Debt/RecurringTransfer qui ont chacune déjà leur propre
+// échéancier automatisé ; ce modèle couvre tout ce qui n'est pas encore
+// suivi ailleurs (loyer, facture ponctuelle non liée à un abonnement...).
+model Bill {
+  id         String    @id @default(cuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id])
+  name       String
+  amount     Float // toujours en MAD (pas de compte/devise associé, à la différence de Transaction)
+  dayOfMonth Int // 1-28, jour du mois où la facture est due
+  // Optionnel : permet la détection automatique de paiement en cherchant une
+  // Transaction correspondante dans cette catégorie autour de la date
+  // d'échéance (voir lib/billCalendar.ts). Sans catégorie liée, seul le
+  // bouton "marquer payé" manuel (ci-dessous) peut faire passer le statut à
+  // "payé".
+  categoryId String?
+  category   Category? @relation(fields: [categoryId], references: [id])
+  isActive   Boolean   @default(true)
+  // "YYYY-MM" du dernier mois marqué payé manuellement — complète la
+  // détection automatique par transaction (voir POST /api/bills/[id]/mark-paid).
+  manuallyPaidYearMonth String?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
 }
 
 // Somme cumulée des transactions archivées (exportées vers Google Sheets puis

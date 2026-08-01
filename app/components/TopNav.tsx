@@ -18,6 +18,7 @@ import {
   ChevronDown,
   CreditCard,
   Gem,
+  CalendarDays,
 } from "lucide-react";
 import Link from "next/link";
 import ThemeToggle from "./ThemeToggle";
@@ -60,6 +61,11 @@ const navLinks = [
     icon: <CreditCard className="w-4 h-4" />,
     href: "/dettes",
   },
+  {
+    key: "nav.calendrier",
+    icon: <CalendarDays className="w-4 h-4" />,
+    href: "/calendrier",
+  },
   { key: "nav.profil", icon: <User className="w-4 h-4" />, href: "/profil" },
 ];
 
@@ -93,6 +99,7 @@ const desktopNav: DesktopNavEntry[] = [
       { key: "nav.objectifs", icon: <Target className="w-4 h-4" />, href: "/objectifs" },
       { key: "nav.abonnements", icon: <Repeat className="w-4 h-4" />, href: "/abonnements" },
       { key: "nav.dettes", icon: <CreditCard className="w-4 h-4" />, href: "/dettes" },
+      { key: "nav.calendrier", icon: <CalendarDays className="w-4 h-4" />, href: "/calendrier" },
     ],
   },
   {

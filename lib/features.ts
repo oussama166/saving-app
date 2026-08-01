@@ -30,6 +30,7 @@ export const FEATURE_REGISTRY: FeatureDefinition[] = [
   { key: 'zakat', name: 'Zakat', description: 'Calcul de la zakat sur le patrimoine.' },
   { key: 'subscriptions', name: 'Abonnements', description: 'Abonnements récurrents (Netflix, Spotify...).' },
   { key: 'debts', name: 'Dettes & Prêts', description: 'Suivi des dettes et remboursements.' },
+  { key: 'calendar', name: 'Calendrier', description: "Calendrier des paiements (abonnements, dettes, virements, factures) et projection de solde jusqu'à la prochaine paie." },
   { key: 'profile', name: 'Profil & Réglages', description: 'Réglages, sécurité (2FA), foyer partagé, comptes, export de rapports.' },
 
   // Sous-fonctionnalités de "Profil & Réglages" — chacune activable/

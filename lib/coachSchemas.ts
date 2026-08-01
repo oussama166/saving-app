@@ -85,3 +85,18 @@ export const emergencyFundSchema = z.object({
     .describe('2 à 3 placements ou banques marocaines courts (5-10 mots chacun), adaptés au montant en jeu.'),
 });
 export type EmergencyFundAdvice = z.infer<typeof emergencyFundSchema>;
+
+export const calendarOutlookSchema = z.object({
+  synthese: z
+    .string()
+    .describe(
+      '1-2 phrases: lecture rapide de la situation avant la prochaine paie (marge confortable, tendue, ou risque de découvert), en reprenant le budget journalier sécuritaire donné.',
+    ),
+  pointAttention: z
+    .string()
+    .describe("1 phrase: l'échéance ou le jour le plus à risque d'ici la prochaine paie (montant et date), ou l'absence de risque particulier."),
+  recommandation: z
+    .string()
+    .describe('1-2 phrases: action concrète à prendre pour tenir le budget journalier sécuritaire jusqu\'à la paie.'),
+});
+export type CalendarOutlookAdvice = z.infer<typeof calendarOutlookSchema>;
