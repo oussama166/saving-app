@@ -28,6 +28,37 @@ export interface TransactionSummary {
 const MAX_LIMIT = 500;
 
 /**
+ * Construction du `where` Prisma à partir des filtres de l'historique —
+ * extrait de getTransactionsPage pour être réutilisé tel quel par
+ * DELETE /api/transactions/bulk (suppression groupée "tout ce qui correspond
+ * au filtre courant"), afin que les deux routes appliquent EXACTEMENT les
+ * mêmes critères (pas de risque de divergence qui supprimerait autre chose
+ * que ce que l'utilisateur voit à l'écran).
+ */
+export function buildTransactionWhere(
+  memberIds: string[],
+  filters: Pick<TransactionFilters, 'search' | 'type' | 'categoryId' | 'accountId' | 'dateFrom' | 'dateTo'>,
+): Prisma.TransactionWhereInput {
+  const { search, type, categoryId, accountId, dateFrom, dateTo } = filters;
+
+  return {
+    userId: { in: memberIds },
+    ...(search ? { merchant: { contains: search } } : {}),
+    ...(categoryId ? { categoryId } : {}),
+    ...(accountId ? { accountId } : {}),
+    ...(type ? { category: { type } } : {}),
+    ...(dateFrom || dateTo
+      ? {
+          date: {
+            ...(dateFrom ? { gte: new Date(dateFrom) } : {}),
+            ...(dateTo ? { lte: new Date(`${dateTo}T23:59:59.999`) } : {}),
+          },
+        }
+      : {}),
+  };
+}
+
+/**
  * Requête paginée/filtrée sur les transactions d'un utilisateur, partagée
  * entre GET /api/transactions (filtres dynamiques côté client) et le premier
  * rendu SSR de app/saisie/page.tsx, pour ne pas dupliquer la logique de
@@ -52,21 +83,7 @@ export async function getTransactionsPage(memberIds: string[], filters: Transact
     offset = 0,
   } = filters;
 
-  const where: Prisma.TransactionWhereInput = {
-    userId: { in: memberIds },
-    ...(search ? { merchant: { contains: search } } : {}),
-    ...(categoryId ? { categoryId } : {}),
-    ...(accountId ? { accountId } : {}),
-    ...(type ? { category: { type } } : {}),
-    ...(dateFrom || dateTo
-      ? {
-          date: {
-            ...(dateFrom ? { gte: new Date(dateFrom) } : {}),
-            ...(dateTo ? { lte: new Date(`${dateTo}T23:59:59.999`) } : {}),
-          },
-        }
-      : {}),
-  };
+  const where = buildTransactionWhere(memberIds, { search, type, categoryId, accountId, dateFrom, dateTo });
 
   const safeLimit = Math.min(Math.max(limit, 1), MAX_LIMIT);
   const safeOffset = Math.max(offset, 0);

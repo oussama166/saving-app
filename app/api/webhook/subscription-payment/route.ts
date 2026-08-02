@@ -98,7 +98,10 @@ export async function POST(req: Request) {
       );
 
     if (!subscription) {
-      const cleanedNote = cleanedSearchName !== searchName ? ` (nettoyé en "${cleanedSearchName}")` : "";
+      const cleanedNote =
+        cleanedSearchName !== searchName
+          ? ` (nettoyé en "${cleanedSearchName}")`
+          : "";
       return NextResponse.json(
         {
           error: `Aucun abonnement actif ne correspond à "${searchName}"${cleanedNote}. Crée-le d'abord sur la page Abonnements, ou vérifie l'orthographe.`,
@@ -132,7 +135,10 @@ export async function POST(req: Request) {
     // (sinon on ne fait que reprendre le prix déjà connu, rien à détecter).
     // Logique partagée avec /api/webhook/subscriptions-import — voir
     // lib/subscriptionPlanChange.ts pour le détail (tolérance, catalogue).
-    const detectedPlanChange = parsedAmount !== null ? detectPlanChange(subscription, parsedAmount) : null;
+    const detectedPlanChange =
+      parsedAmount !== null
+        ? detectPlanChange(subscription, parsedAmount)
+        : null;
 
     // $transaction([...]) (forme batch) plutôt que la forme interactive
     // `async (tx) => {...}` : plus fiable contre l'adapter libSQL/Turso à
@@ -197,6 +203,10 @@ export async function POST(req: Request) {
     return NextResponse.json({
       success: true,
       transaction,
+      userId: userId,
+      name: searchName,
+      amount: parsedAmount,
+      date: chargeDate.toISOString(),
       subscription: detectedPlanChange?.newName ?? subscription.name,
       ...(detectedPlanChange
         ? {

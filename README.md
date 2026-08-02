@@ -1,6 +1,6 @@
-# WealthOS (Tanger Wealth OS)
+# WealthOS (Wealth OS)
 
-Application personnelle de gestion de patrimoine — comptes multi-devises, budget, portefeuille (actions/crypto/OPCVM), objectifs d'épargne, dettes, santé, zakat, abonnements récurrents, et un Coach IA basé à Tanger. Pensée à l'origine pour un usage personnel/foyer, avec un vrai système multi-utilisateurs (foyer partagé à 2), un panel admin, et une architecture prête pour un déploiement gratuit (Vercel + Turso).
+Application personnelle de gestion de patrimoine — comptes multi-devises, budget, portefeuille (actions/crypto/OPCVM), objectifs d'épargne, dettes, santé, zakat, abonnements récurrents, et un Coach IA basé. Pensée à l'origine pour un usage personnel/foyer, avec un vrai système multi-utilisateurs (foyer partagé à 2), un panel admin, et une architecture prête pour un déploiement gratuit (Vercel + Turso).
 
 Langue de l'interface : français, anglais, espagnol, arabe (`fr`/`en`/`es`/`ar`, LTR pour les 4).
 
@@ -20,21 +20,22 @@ Langue de l'interface : français, anglais, espagnol, arabe (`fr`/`en`/`es`/`ar`
 
 ## Stack technique
 
-| Domaine | Choix |
-| --- | --- |
-| Framework | Next.js 16 (App Router, Turbopack), React 19 |
-| Langage | TypeScript |
-| Base de données | SQLite — fichier local (`dev.db`) en dev, [Turso](https://turso.tech) (libSQL hébergé) en prod/preprod |
-| ORM | Prisma 7 + `@prisma/adapter-libsql` (un seul code path local/hébergé) |
-| Style | Tailwind CSS 4, thème clair/sombre piloté par une classe `.dark`, design tokens sémantiques (`bg-surface`, `text-body`, `border-line`...) |
-| IA | Vercel AI SDK (`ai`, `@ai-sdk/react`) + Google Gemini (`@ai-sdk/google`) |
-| Auth | Sessions cookie signées (JWT via `jose`), mots de passe `bcryptjs`, 2FA TOTP (`otplib`) |
-| Email | [Resend](https://resend.com) |
-| Autres | `recharts` (graphiques), `exceljs`/`pdfkit` (exports), `yahoo-finance2` (cours bourse/crypto), `googleapis` (export Google Sheets) |
+| Domaine         | Choix                                                                                                                                     |
+| --------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| Framework       | Next.js 16 (App Router, Turbopack), React 19                                                                                              |
+| Langage         | TypeScript                                                                                                                                |
+| Base de données | SQLite — fichier local (`dev.db`) en dev, [Turso](https://turso.tech) (libSQL hébergé) en prod/preprod                                    |
+| ORM             | Prisma 7 + `@prisma/adapter-libsql` (un seul code path local/hébergé)                                                                     |
+| Style           | Tailwind CSS 4, thème clair/sombre piloté par une classe `.dark`, design tokens sémantiques (`bg-surface`, `text-body`, `border-line`...) |
+| IA              | Vercel AI SDK (`ai`, `@ai-sdk/react`) + Google Gemini (`@ai-sdk/google`)                                                                  |
+| Auth            | Sessions cookie signées (JWT via `jose`), mots de passe `bcryptjs`, 2FA TOTP (`otplib`)                                                   |
+| Email           | [Resend](https://resend.com)                                                                                                              |
+| Autres          | `recharts` (graphiques), `exceljs`/`pdfkit` (exports), `yahoo-finance2` (cours bourse/crypto), `googleapis` (export Google Sheets)        |
 
 ## Fonctionnalités
 
 **Finances du quotidien**
+
 - Saisie manuelle, import CSV (mapping de colonnes par banque), scan de reçu par OCR, historique filtrable/éditable.
 - Comptes multi-devises avec conversion automatique en MAD (taux mis en cache, `lib/exchangeRates.ts`).
 - Virements entre comptes, y compris récurrents (règles automatiques + cron).
@@ -42,29 +43,35 @@ Langue de l'interface : français, anglais, espagnol, arabe (`fr`/`en`/`es`/`ar`
 - Cycle budgétaire calé sur le jour de paie plutôt que le 1ᵉʳ du mois (optionnel).
 
 **Patrimoine**
+
 - Portefeuille (actions, crypto, OPCVM) avec cours en direct (`yahoo-finance2`) et calcul de plus/moins-value, conversion multi-devises.
 - Objectifs d'épargne avec contributions et allocation automatique.
 - Suivi de dettes/prêts et de leurs remboursements.
 - Zakat (calcul sur le patrimoine).
 
 **Santé & abonnements**
+
 - Budget santé, remboursements CNSS/mutuelle, dossiers médicaux.
 - Abonnements récurrents (détection, historique de changement de plan, stats admin).
 
 **Coach IA**
+
 - Diagnostic mensuel personnalisé (basé sur la méthode budgétaire réellement choisie par l'utilisateur), conseils Tanger (banques/bourse marocaine), analyse de tendances, prévention santé, stratégie fonds d'urgence — réponses **streamées** (`streamObject`), mises en cache 7 jours avec invalidation automatique si les données changent, bouton "régénérer" manuel.
 - Règles d'or et benchmarks Maroc : contenu de référence fixe, explicitement distingué du contenu généré par IA.
 - Chat flottant (agent financier) : voit tous les comptes du foyer, répond en MAD, historique persistant en base, disponible sur toutes les pages authentifiées.
 
 **Foyer partagé**
+
 - Jusqu'à 2 comptes liés (couple/famille) : visibilité élargie sur les données financières, un seul jeu de catégories/budget pour le foyer (`lib/household.ts`).
 
 **Sécurité & comptes**
+
 - 2FA (TOTP + codes de récupération), politique de mot de passe, vérification d'email, réinitialisation de mot de passe.
 - Panel admin séparé (auth distincte) : utilisateurs, abonnements, feature flags, journal d'audit.
 - Feature flags par section (et par sous-section) activables/désactivables globalement ou par utilisateur (`lib/features.ts`, `/admin/features`).
 
 **Intégrations & automatisations**
+
 - Webhooks entrants (Apple Pay via Shortcut iOS, salaire, paiement d'abonnement, import/synchro d'abonnements), chacun protégé par un token dédié.
 - Digest hebdomadaire par email, archivage planifié, export Google Sheets, export PDF de bilan.
 - Bandeau de développement (dev only) affichant la base de données réellement connectée (local/preprod/prod) — évite de confondre les environnements.
@@ -96,21 +103,22 @@ npm run create-admin
 
 Voir `.env.example` pour le détail commenté. Résumé :
 
-| Variable | Obligatoire | Rôle |
-| --- | --- | --- |
-| `TURSO_DATABASE_URL` / `TURSO_AUTH_TOKEN` | Non en local | Base Turso distante (prod/preprod) — absent = fichier `dev.db` local |
-| `AUTH_SECRET` | Oui | Signature des sessions utilisateur (JWT) |
-| `ADMIN_AUTH_SECRET` | Oui | Signature des sessions admin — **distinct** de `AUTH_SECRET` |
-| `RESEND_API_KEY` | Oui | Envoi d'emails transactionnels |
-| `EMAIL_FROM` | Non | Expéditeur des emails (défaut : `onboarding@resend.dev`) |
-| `NEXT_PUBLIC_SITE_URL` | Oui | URL publique de l'app (liens dans les emails) |
-| `GOOGLE_GENERATIVE_AI_API_KEY` | Oui pour le Coach IA | Clé Gemini (modèle utilisé par `lib/aiProvider.ts`) |
-| `OPENROUTER_API_KEY` | Non | Présent dans l'env mais non branché actuellement (voir note ci-dessous) |
-| `GEOAPIFY_API_KEY` | Non | Suggestion de catégorie par géolocalisation |
-| `BACKUP_SECRET` / `BACKUP_ARCHIVE_MONTHS` | Non | Archivage planifié (cron externe) |
-| `WEEKLY_DIGEST_SECRET` | Non | Digest hebdomadaire par email (cron externe) |
-| `RECURRING_TRANSFERS_SECRET` | Non | Exécution des virements récurrents (cron externe quotidien) |
-| `GOOGLE_SHEETS_CLIENT_EMAIL` / `GOOGLE_SHEETS_PRIVATE_KEY` / `GOOGLE_SHEETS_SPREADSHEET_ID` | Non | Export Google Sheets |
+| Variable                                                                                    | Obligatoire          | Rôle                                                                      |
+| ------------------------------------------------------------------------------------------- | -------------------- | ------------------------------------------------------------------------- |
+| `TURSO_DATABASE_URL` / `TURSO_AUTH_TOKEN`                                                   | Non en local         | Base Turso distante (prod/preprod) — absent = fichier `dev.db` local      |
+| `AUTH_SECRET`                                                                               | Oui                  | Signature des sessions utilisateur (JWT)                                  |
+| `ADMIN_AUTH_SECRET`                                                                         | Oui                  | Signature des sessions admin — **distinct** de `AUTH_SECRET`              |
+| `RESEND_API_KEY`                                                                            | Oui                  | Envoi d'emails transactionnels                                            |
+| `EMAIL_FROM`                                                                                | Non                  | Expéditeur des emails (défaut : `onboarding@resend.dev`)                  |
+| `NEXT_PUBLIC_SITE_URL`                                                                      | Oui                  | URL publique de l'app (liens dans les emails)                             |
+| `GOOGLE_GENERATIVE_AI_API_KEY`                                                              | Oui pour le Coach IA | Clé Gemini (modèle utilisé par `lib/aiProvider.ts`)                       |
+| `OPENROUTER_API_KEY`                                                                        | Non                  | Présent dans l'env mais non branché actuellement (voir note ci-dessous)   |
+| `GEOAPIFY_API_KEY`                                                                          | Non                  | Suggestion de catégorie par géolocalisation                               |
+| `BACKUP_SECRET` / `BACKUP_ARCHIVE_MONTHS`                                                   | Non                  | Archivage planifié (cron externe)                                         |
+| `WEEKLY_DIGEST_SECRET`                                                                      | Non                  | Digest hebdomadaire par email (cron externe)                              |
+| `RECURRING_TRANSFERS_SECRET`                                                                | Non                  | Exécution des virements récurrents (cron externe quotidien)               |
+| `SUBSCRIPTION_REMINDERS_SECRET`                                                             | Non                  | Rappel email 2-5j avant prélèvement d'abonnement (cron externe quotidien) |
+| `GOOGLE_SHEETS_CLIENT_EMAIL` / `GOOGLE_SHEETS_PRIVATE_KEY` / `GOOGLE_SHEETS_SPREADSHEET_ID` | Non                  | Export Google Sheets                                                      |
 
 > Note : `lib/aiProvider.ts` utilise uniquement Gemini (`coachModel`) pour toutes les fonctionnalités IA (Coach IA + chat flottant). `OPENROUTER_API_KEY` figure dans `.env.example` mais n'est pas câblée dans le code actuel.
 
@@ -148,15 +156,15 @@ Le guide complet est dans [`DEPLOYMENT.md`](./DEPLOYMENT.md) (création de la ba
 
 ## Scripts
 
-| Commande | Effet |
-| --- | --- |
-| `npm run dev` | Serveur de dev (port 3000) |
-| `npm run dev1` | Serveur de dev sur le port 3001 (deuxième instance, ex. pour tester en parallèle) |
-| `npm run build` | `prisma generate` + build de production |
-| `npm run start` | Lance le build de production |
-| `npm run lint` | ESLint |
-| `npm run create-admin` | Crée un compte admin (base pointée par `TURSO_DATABASE_URL`/`TURSO_AUTH_TOKEN`, sinon `dev.db`) |
-| `./scripts/apply-turso-migrations.sh <db>` | Applique les migrations Prisma sur une base Turso |
+| Commande                                   | Effet                                                                                           |
+| ------------------------------------------ | ----------------------------------------------------------------------------------------------- |
+| `npm run dev`                              | Serveur de dev (port 3000)                                                                      |
+| `npm run dev1`                             | Serveur de dev sur le port 3001 (deuxième instance, ex. pour tester en parallèle)               |
+| `npm run build`                            | `prisma generate` + build de production                                                         |
+| `npm run start`                            | Lance le build de production                                                                    |
+| `npm run lint`                             | ESLint                                                                                          |
+| `npm run create-admin`                     | Crée un compte admin (base pointée par `TURSO_DATABASE_URL`/`TURSO_AUTH_TOKEN`, sinon `dev.db`) |
+| `./scripts/apply-turso-migrations.sh <db>` | Applique les migrations Prisma sur une base Turso                                               |
 
 ## Structure du dépôt
 
@@ -167,7 +175,7 @@ app/
     auth/                Inscription, connexion, 2FA, reset password, vérif email
     chat/                Chat flottant + historique persistant
     coach/               5 routes Coach IA (diagnostic, conseils Tanger, tendances, santé, fonds d'urgence)
-    cron/                Endpoints déclenchés par un cron externe (digest, virements récurrents)
+    cron/                Endpoints déclenchés par un cron externe (digest, virements récurrents, rappels abonnements)
     webhook/             Entrées externes (Apple Pay, salaire, abonnements)
     ...
   admin/                 Pages du panel admin
@@ -185,7 +193,8 @@ DEPLOYMENT.md              Guide de déploiement détaillé (Vercel + Turso)
 ## Concepts clés de l'architecture
 
 **Scoping foyer (`lib/household.ts`)** — Deux notions distinctes utilisées dans presque tout le code serveur :
-- `memberIds` : élargit la *lecture* (et les cibles de modification/suppression) à tous les membres du foyer pour tout ce qui reste attribué à qui l'a créé (comptes, transactions, objectifs, abonnements, dettes...).
+
+- `memberIds` : élargit la _lecture_ (et les cibles de modification/suppression) à tous les membres du foyer pour tout ce qui reste attribué à qui l'a créé (comptes, transactions, objectifs, abonnements, dettes...).
 - `budgetOwnerId` : propriétaire canonique du budget (`Category`, `UserSettings`) — un seul jeu de catégories/pourcentages pour tout le foyer plutôt que deux configurations concurrentes.
 
 Sans foyer (cas par défaut), les deux valeurs retombent sur l'utilisateur lui-même.
@@ -208,11 +217,12 @@ Sans foyer (cas par défaut), les deux valeurs retombent sur l'utilisateur lui-m
 
 Le plan gratuit Vercel ne garantit pas de cron interne fiable en continu — ces routes sont donc pensées pour être appelées par un service de cron externe (ex. [cron-job.org](https://cron-job.org)), chacune protégée par un header secret dédié :
 
-| Route | Fréquence conseillée | Header |
-| --- | --- | --- |
-| `POST /api/backup/archive` | Mensuelle | `x-backup-secret` |
-| `POST /api/cron/weekly-digest` | Hebdomadaire (ex. lundi 8h) | `x-cron-secret` |
-| `POST /api/cron/recurring-transfers` | Quotidienne | `x-recurring-transfers-secret` |
+| Route                                   | Fréquence conseillée        | Header                         |
+| --------------------------------------- | --------------------------- | ------------------------------ |
+| `POST /api/backup/archive`              | Mensuelle                   | `x-backup-secret`              |
+| `POST /api/cron/weekly-digest`          | Hebdomadaire (ex. lundi 8h) | `x-cron-secret`                |
+| `POST /api/cron/recurring-transfers`    | Quotidienne                 | `x-recurring-transfers-secret` |
+| `POST /api/cron/subscription-reminders` | Quotidienne                 | `x-cron-secret`                |
 
 ## Sécurité
 

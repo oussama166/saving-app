@@ -1,7 +1,7 @@
 'use client';
 
 import { Fragment, useEffect, useRef, useState } from 'react';
-import { Trash2, Pencil, Check, Search, Download, X, ArrowUp, ArrowDown, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Trash2, Pencil, Check, Search, Download, X, ArrowUp, ArrowDown, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 import { useLanguage } from './LanguageProvider';
 
 interface Transaction {
@@ -97,6 +97,12 @@ export default function HistoryTable({
   const [loading, setLoading] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+  // Sélection manuelle via cases à cocher (indépendante du bouton "Supprimer
+  // les résultats", qui lui supprime TOUT ce qui correspond au filtre sans
+  // avoir besoin de cocher ligne par ligne) — réinitialisée à chaque
+  // changement de filtre/page puisque les ids affichés changent.
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   // Édition en ligne — remplace les cellules de la ligne par des champs le
   // temps de la correction, plutôt qu'un modal séparé (voir PATCH
@@ -167,6 +173,7 @@ export default function HistoryTable({
     params.set('offset', String(offset));
 
     setLoading(true);
+    setSelectedIds(new Set());
     fetch(`/api/transactions?${params.toString()}`, { signal: controller.signal })
       .then((res) => res.json())
       .then((result) => {
@@ -200,6 +207,12 @@ export default function HistoryTable({
       const res = await fetch(`/api/transactions/${tx.id}`, { method: 'DELETE' });
       if (res.ok) {
         setTransactions((prev) => prev.filter((t) => t.id !== tx.id));
+        setSelectedIds((prev) => {
+          if (!prev.has(tx.id)) return prev;
+          const next = new Set(prev);
+          next.delete(tx.id);
+          return next;
+        });
         setTotal((prev) => Math.max(prev - 1, 0));
         setSummary((prev) => {
           const next = { ...prev, count: Math.max(prev.count - 1, 0) };
@@ -214,6 +227,123 @@ export default function HistoryTable({
       console.error('Delete Error:', error);
     } finally {
       setDeletingId(null);
+    }
+  };
+
+  // Suppression groupée de TOUT ce qui correspond au filtre actif (voir
+  // DELETE /api/transactions/bulk) — utile pour nettoyer d'un coup des
+  // dizaines de transactions de test (ex: abonnements de test ajoutés
+  // plusieurs fois puis supprimés côté /abonnements, dont les dépenses
+  // restaient orphelines dans l'historique) sans les supprimer une par une.
+  // Réutilise EXACTEMENT les mêmes filtres que la liste affichée à l'écran —
+  // la route refuse d'ailleurs tout appel sans filtre actif, en garde-fou
+  // supplémentaire côté serveur.
+  const handleBulkDelete = async () => {
+    if (!hasActiveFilters || total === 0) return;
+    if (!confirm(`${t('historique.bulkDeleteConfirm')} (${total})`)) return;
+
+    setBulkDeleting(true);
+    try {
+      const params = new URLSearchParams();
+      if (search) params.set('search', search);
+      if (type) params.set('type', type);
+      if (categoryId) params.set('categoryId', categoryId);
+      if (accountId) params.set('accountId', accountId);
+      if (dateFrom) params.set('dateFrom', dateFrom);
+      if (dateTo) params.set('dateTo', dateTo);
+
+      const res = await fetch(`/api/transactions/bulk?${params.toString()}`, { method: 'DELETE' });
+      const result = await res.json();
+      if (!result.success) return;
+
+      // Refetch avec les mêmes filtres (l'effet de chargement ne se
+      // redéclenche pas tout seul puisqu'aucune dépendance n'a changé) — le
+      // filtre reste actif, l'utilisateur voit "0 résultat" en confirmation
+      // visuelle que le nettoyage a bien eu lieu.
+      setOffset(0);
+      params.set('sortBy', sortBy);
+      params.set('sortDir', sortDir);
+      params.set('limit', String(PAGE_SIZE));
+      params.set('offset', '0');
+      const listRes = await fetch(`/api/transactions?${params.toString()}`);
+      const listResult = await listRes.json();
+      if (listResult.success) {
+        setTransactions(listResult.data);
+        setTotal(listResult.total);
+        setSummary(listResult.summary);
+      }
+    } catch (error) {
+      console.error('Bulk delete error:', error);
+    } finally {
+      setBulkDeleting(false);
+    }
+  };
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const allOnPageSelected = transactions.length > 0 && transactions.every((tx) => selectedIds.has(tx.id));
+
+  const toggleSelectAllOnPage = () => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (allOnPageSelected) {
+        transactions.forEach((tx) => next.delete(tx.id));
+      } else {
+        transactions.forEach((tx) => next.add(tx.id));
+      }
+      return next;
+    });
+  };
+
+  // Suppression d'une sélection manuelle (cases à cocher) — même route que
+  // handleBulkDelete mais en mode { ids } plutôt que filtre, donc utilisable
+  // même sans filtre actif (ex: repérer visuellement 3 lignes de test parmi
+  // des résultats non filtrés et ne supprimer que celles-là).
+  const handleDeleteSelected = async () => {
+    if (selectedIds.size === 0) return;
+    if (!confirm(`${t('historique.deleteSelectedConfirm')} (${selectedIds.size})`)) return;
+
+    setBulkDeleting(true);
+    try {
+      const res = await fetch('/api/transactions/bulk', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: Array.from(selectedIds) }),
+      });
+      const result = await res.json();
+      if (!result.success) return;
+
+      setSelectedIds(new Set());
+
+      const params = new URLSearchParams();
+      if (search) params.set('search', search);
+      if (type) params.set('type', type);
+      if (categoryId) params.set('categoryId', categoryId);
+      if (accountId) params.set('accountId', accountId);
+      if (dateFrom) params.set('dateFrom', dateFrom);
+      if (dateTo) params.set('dateTo', dateTo);
+      params.set('sortBy', sortBy);
+      params.set('sortDir', sortDir);
+      params.set('limit', String(PAGE_SIZE));
+      params.set('offset', String(offset));
+      const listRes = await fetch(`/api/transactions?${params.toString()}`);
+      const listResult = await listRes.json();
+      if (listResult.success) {
+        setTransactions(listResult.data);
+        setTotal(listResult.total);
+        setSummary(listResult.summary);
+      }
+    } catch (error) {
+      console.error('Delete selected error:', error);
+    } finally {
+      setBulkDeleting(false);
     }
   };
 
@@ -406,7 +536,7 @@ export default function HistoryTable({
   // Colonne "Compte" affichée seulement si le foyer a plus d'un compte (voir
   // <th>/<td> conditionnels ci-dessous) — les colSpan de la ligne vide et du
   // pied de tableau doivent suivre le même total de colonnes.
-  const columnCount = accounts.length > 1 ? 9 : 8;
+  const columnCount = accounts.length > 1 ? 10 : 9;
   const summaryMiddleColSpan = accounts.length > 1 ? 5 : 4;
 
   return (
@@ -504,6 +634,28 @@ export default function HistoryTable({
               {t('common.reset')}
             </button>
           )}
+
+          {hasActiveFilters && total > 0 && (
+            <button
+              onClick={handleBulkDelete}
+              disabled={bulkDeleting}
+              className="flex items-center gap-1 text-[11px] font-bold text-red-400 hover:text-red-300 disabled:opacity-40 transition-colors"
+            >
+              {bulkDeleting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
+              {t('historique.bulkDeleteButton')} ({total})
+            </button>
+          )}
+
+          {selectedIds.size > 0 && (
+            <button
+              onClick={handleDeleteSelected}
+              disabled={bulkDeleting}
+              className="flex items-center gap-1 text-[11px] font-bold text-red-400 hover:text-red-300 disabled:opacity-40 transition-colors"
+            >
+              {bulkDeleting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
+              {t('historique.deleteSelectedButton')} ({selectedIds.size})
+            </button>
+          )}
         </div>
 
         <div className="flex items-center gap-1.5">
@@ -535,6 +687,14 @@ export default function HistoryTable({
         <table className="w-full text-left text-[11px]">
           <thead>
             <tr className="text-subtle bg-surface-deep/50">
+              <th className="py-3 px-5 border-b border-line-subtle w-8">
+                <input
+                  type="checkbox"
+                  checked={allOnPageSelected}
+                  onChange={toggleSelectAllOnPage}
+                  aria-label={t('historique.deleteSelectedButton')}
+                />
+              </th>
               <th
                 onClick={() => toggleSort('date')}
                 className="py-3 px-5 font-bold uppercase tracking-wider border-b border-line-subtle cursor-pointer select-none hover:text-body"
@@ -586,6 +746,7 @@ export default function HistoryTable({
                 return (
                   <Fragment key={tx.id}>
                     <tr className="bg-blue-500/5 ring-1 ring-inset ring-blue-500/20">
+                      <td className="py-2 px-5" />
                       <td className="py-2 px-5">
                         <input
                           type="date"
@@ -724,6 +885,14 @@ export default function HistoryTable({
 
               return (
                 <tr key={tx.id} className="hover:bg-surface-alt/30 transition-colors group">
+                  <td className="py-3 px-5">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(tx.id)}
+                      onChange={() => toggleSelect(tx.id)}
+                      aria-label={t('historique.deleteSelectedButton')}
+                    />
+                  </td>
                   <td className="py-3 px-5 text-muted font-medium">{formatDate(tx.date)}</td>
                   <td className="py-3 px-5">{typeBadge(tx.category.type)}</td>
                   <td className="py-3 px-5">
@@ -776,6 +945,7 @@ export default function HistoryTable({
           {transactions.length > 0 && (
             <tfoot>
               <tr className="bg-surface-deep/50 border-t border-line-subtle">
+                <td className="py-3 px-5" />
                 <td colSpan={2} className="py-3 px-5 text-[10px] font-bold uppercase text-subtle">
                   {t('common.total')} ({summary.count})
                 </td>

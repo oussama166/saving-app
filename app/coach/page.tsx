@@ -6,6 +6,10 @@ import CoachDiagnosticTab from '../components/CoachDiagnosticTab';
 import CoachGoldenRulesTab from '../components/CoachGoldenRulesTab';
 import CoachBenchmarksTab from '../components/CoachBenchmarksTab';
 import InterestSimulator from '../components/InterestSimulator';
+import GoalSimulator from '../components/GoalSimulator';
+import DebtPayoffSimulator from '../components/DebtPayoffSimulator';
+import RetirementSimulator from '../components/RetirementSimulator';
+import BigPurchaseSimulator from '../components/BigPurchaseSimulator';
 import FeatureGate from '../components/FeatureGate';
 import type { BudgetMethodResult } from '@/lib/budgetMethods';
 
@@ -29,6 +33,7 @@ interface DashboardData {
   // (lib/budgetMethods.ts) — désormais alimenté par la méthode réelle.
   budgetMethod: string;
   budgetMethodResult: BudgetMethodResult | null;
+  budgetMethodTotals: { essential: number; discretionary: number; savings: number };
   referenceIncome: number;
   avgMonthlyExpenses: number;
 }
@@ -118,9 +123,23 @@ function CoachPageContent() {
               />
             )}
 
-            {tab === 'simulations' && <InterestSimulator />}
+            {tab === 'simulations' && (
+              <div className="space-y-6">
+                <InterestSimulator />
+                <GoalSimulator />
+                <DebtPayoffSimulator />
+                <RetirementSimulator initialCapital={data?.metrics.portfolioValue ?? 0} />
+                <BigPurchaseSimulator referenceIncome={data?.referenceIncome ?? 10000} />
+              </div>
+            )}
 
-            {tab === 'benchmarks' && <CoachBenchmarksTab />}
+            {tab === 'benchmarks' && (
+              <CoachBenchmarksTab
+                referenceIncome={data?.referenceIncome ?? 0}
+                avgMonthlyExpenses={data?.avgMonthlyExpenses ?? 0}
+                monthlySavings={data?.budgetMethodTotals.savings ?? 0}
+              />
+            )}
           </div>
         )}
       </div>

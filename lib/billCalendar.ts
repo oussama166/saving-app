@@ -17,7 +17,7 @@ import type { HouseholdContext } from '@/lib/household';
 // compte — même logique que category.type === 'transfer' exclu des agrégats
 // revenus/dépenses ailleurs dans l'app (lib/financials.ts).
 
-export type CalendarSourceType = 'subscription' | 'debt' | 'recurringTransfer' | 'bill';
+export type CalendarSourceType = 'subscription' | 'debt' | 'recurringTransfer' | 'bill' | 'savingsGoal';
 export type CalendarStatus = 'paid' | 'upcoming' | 'late';
 
 export interface CalendarEvent {
@@ -104,6 +104,23 @@ export function estimateNextPayday(payDay: number, referenceDate: Date = new Dat
   return dueDateFor(year, month0 + 1, payDay);
 }
 
+/**
+ * Prochaine occurrence (>= from, from inclus) d'un jour du mois donné —
+ * utilisé par l'export .ics (DTSTART de chaque événement récurrent). Diffère
+ * légèrement d'estimateNextPayday : ici "aujourd'hui" compte comme une
+ * occurrence valide si le jour correspond, alors qu'estimateNextPayday
+ * avance toujours au mois suivant quand on est LE jour de paie (puisque la
+ * paie du jour est déjà réputée reçue).
+ */
+export function nextOccurrenceDate(dayOfMonth: number, from: Date = new Date()): Date {
+  const today = atMidnight(from);
+  const thisMonth = dueDateFor(today.getFullYear(), today.getMonth() + 1, dayOfMonth);
+  if (thisMonth >= today) return thisMonth;
+  const nextMonth0 = today.getMonth() === 11 ? 0 : today.getMonth() + 1;
+  const nextYear = today.getMonth() === 11 ? today.getFullYear() + 1 : today.getFullYear();
+  return dueDateFor(nextYear, nextMonth0 + 1, dayOfMonth);
+}
+
 /** Événements calendrier de toutes les sources pour un (année, mois) donné. */
 export async function getMonthEvents(ctx: HouseholdContext, year: number, month1to12: number): Promise<CalendarEvent[]> {
   const currentYM = formatYearMonth(year, month1to12);
@@ -122,6 +139,10 @@ export async function getMonthEvents(ctx: HouseholdContext, year: number, month1
   });
   const transfers = await prisma.recurringTransfer.findMany({ where: { userId: { in: ctx.memberIds }, active: true } });
   const bills = await prisma.bill.findMany({ where: { userId: { in: ctx.memberIds }, isActive: true } });
+  const savingsGoals = await prisma.savingsGoal.findMany({
+    where: { userId: { in: ctx.memberIds }, autoContribute: true, monthlyContribution: { gt: 0 } },
+    include: { account: { select: { type: true, currency: true } } },
+  });
 
   // RecurringTransfer n'a pas de relation Prisma déclarée vers Account (juste
   // fromAccountId/toAccountId en texte, voir schema.prisma) — on résout les
@@ -137,6 +158,9 @@ export async function getMonthEvents(ctx: HouseholdContext, year: number, month1
   const currencies: string[] = [
     ...subscriptions.map((s: { account: { currency: string } }) => s.account.currency),
     ...transferAccounts.map((a) => a.currency),
+    ...savingsGoals
+      .filter((g: { account: { currency: string } | null }) => g.account)
+      .map((g: { account: { currency: string } | null }) => (g.account as { currency: string }).currency),
   ];
   const rates = await getRatesToMad(currencies);
 
@@ -220,6 +244,25 @@ export async function getMonthEvents(ctx: HouseholdContext, year: number, month1
     });
   }
 
+  for (const goal of savingsGoals) {
+    const dueDate = dueDateFor(year, month1to12, goal.contributionDay);
+    const paid = goal.lastContributedYearMonth === currentYM;
+    events.push({
+      id: `savingsGoal:${goal.id}`,
+      sourceType: 'savingsGoal',
+      sourceId: goal.id,
+      name: goal.name,
+      amountMad: goal.monthlyContribution * (rates[goal.account?.currency ?? 'MAD'] ?? 1),
+      dueDate,
+      status: computeStatus(dueDate, paid, today),
+      // Ne réduit le solde "dépensable" (comptes courants) que si le
+      // versement automatique part effectivement d'un compte courant — s'il
+      // part déjà d'un compte épargne, cet argent n'était de toute façon pas
+      // compté dans startBalanceMad (voir computeBalanceProjection).
+      affectsBalance: goal.account?.type === 'checking',
+    });
+  }
+
   return events.sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime());
 }
 
@@ -237,7 +280,21 @@ export async function getMonthEvents(ctx: HouseholdContext, year: number, month1
  * artificiellement le budget journalier avec de l'argent qui n'est pas censé
  * être dépensé au jour le jour.
  */
-export async function computeBalanceProjection(ctx: HouseholdContext, payDay: number): Promise<BalanceProjection> {
+export interface SimulatedExpense {
+  amountMad: number;
+  dueDate: Date;
+  name?: string;
+}
+
+export async function computeBalanceProjection(
+  ctx: HouseholdContext,
+  payDay: number,
+  // Dépense(s) hypothétique(s) pour le simulateur "et si" (jamais persistée
+  // en base) — mergée(s) dans les événements qui affectent le solde, comme
+  // une échéance normale. Vide par défaut : ne change rien au comportement
+  // existant.
+  extraEvents: SimulatedExpense[] = [],
+): Promise<BalanceProjection> {
   const [checkingAccounts, savingsGoals] = await Promise.all([
     prisma.account.findMany({ where: { userId: { in: ctx.memberIds }, type: 'checking' } }),
     prisma.savingsGoal.findMany({ where: { userId: { in: ctx.memberIds } }, select: { currentAmount: true } }),
@@ -272,36 +329,72 @@ export async function computeBalanceProjection(ctx: HouseholdContext, payDay: nu
   );
   const allEvents = eventsByMonth.flat();
 
-  const relevantEvents = allEvents.filter(
-    (e) => e.affectsBalance && e.status !== 'paid' && e.dueDate >= today && e.dueDate <= nextPayday,
-  );
+  const simulatedEvents: CalendarEvent[] = extraEvents
+    .filter((e) => atMidnight(e.dueDate) >= today && atMidnight(e.dueDate) <= nextPayday)
+    .map((e, i) => ({
+      id: `simulated:${i}`,
+      sourceType: 'bill' as CalendarSourceType,
+      sourceId: `simulated-${i}`,
+      name: e.name ?? 'Dépense simulée',
+      amountMad: e.amountMad,
+      dueDate: atMidnight(e.dueDate),
+      status: 'upcoming' as CalendarStatus,
+      affectsBalance: true,
+    }));
+
+  const relevantEvents = allEvents
+    .filter((e) => e.affectsBalance && e.status !== 'paid' && e.dueDate >= today && e.dueDate <= nextPayday)
+    .concat(simulatedEvents);
 
   // Scénario jour par jour : à chaque jour D, le budget dépense sécuritaire
-  // de CE jour est recalculé à partir du solde disponible au début de D
-  // (donc APRÈS les échéances des jours précédents, AVANT celles de D) moins
-  // les échéances qui restent encore à payer entre D et la paie incluse, le
-  // tout réparti sur le nombre de jours restants à partir de D. Le premier
-  // point du tableau (aujourd'hui) redonne exactement l'ancien calcul global
-  // (une seule moyenne) — les jours suivants affinent ce chiffre au fur et à
-  // mesure que des échéances passent, plutôt que d'étaler une moyenne fixe
-  // sur toute la période. Purement déterministe — sert d'input chiffré à la
-  // route Coach IA (/api/coach/calendar-outlook), qui ne fait QUE commenter
-  // ces chiffres, jamais les recalculer elle-même.
+  // de CE jour est recalculé à partir d'un "pot" disponible pour le lissage
+  // (simulatedPot) moins les échéances qui restent encore à payer entre D et
+  // la paie incluse, réparti sur le nombre de jours restants à partir de D.
+  //
+  // simulatedPot est DIFFÉRENT du solde réel projeté (balanceMad, qui ne
+  // bouge qu'avec les vraies échéances) : il suppose EN PLUS que le foyer a
+  // dépensé, chaque jour précédent, exactement le montant recommandé ce
+  // jour-là (previousRate). Sans cette hypothèse, le solde réel resterait
+  // identique d'un jour à l'autre tant qu'aucune échéance ne tombe, alors que
+  // le nombre de jours restants, lui, diminue chaque jour — ce qui ferait
+  // artificiellement GONFLER le budget affiché à l'approche de la paie (ex:
+  // 350 DH/jour au début du mois, 9000 DH/jour la veille de la paie), alors
+  // que la promesse du budget journalier est justement de rester stable si
+  // on suit la recommandation. Avec ce lissage, le budget ne varie que
+  // lorsqu'une VRAIE échéance change le montant disponible — il ne grimpe
+  // jamais tout seul avec le temps qui passe.
+  //
+  // Le premier point du tableau (aujourd'hui) redonne exactement l'ancien
+  // calcul global (une seule moyenne, aucune hypothèse de dépense passée
+  // puisqu'il n'y a pas de "veille" à aujourd'hui). Purement déterministe —
+  // sert d'input chiffré à la route Coach IA (/api/coach/calendar-outlook),
+  // qui ne fait QUE commenter ces chiffres, jamais les recalculer elle-même.
   const points: ProjectionPoint[] = [];
   let runningBalance = startBalanceMad;
+  let simulatedPot = startBalanceMad;
+  let previousRate = 0;
   for (let cursor = new Date(today); cursor <= nextPayday; cursor = addDays(cursor, 1)) {
-    const balanceBeforeToday = runningBalance;
-    const eventsToday = relevantEvents.filter((e) => isSameDay(e.dueDate, cursor));
-    for (const e of eventsToday) runningBalance -= e.amountMad;
+    if (!isSameDay(cursor, today)) {
+      simulatedPot -= previousRate;
+    }
 
+    const eventsToday = relevantEvents.filter((e) => isSameDay(e.dueDate, cursor));
+    for (const e of eventsToday) {
+      runningBalance -= e.amountMad;
+      simulatedPot -= e.amountMad;
+    }
+
+    // Strictement APRÈS cursor : les échéances DU jour cursor ont déjà été
+    // retirées du pot ci-dessus.
     const committedFromCursor = relevantEvents
-      .filter((e) => atMidnight(e.dueDate) >= cursor)
+      .filter((e) => atMidnight(e.dueDate) > cursor)
       .reduce((acc, e) => acc + e.amountMad, 0);
     const daysFromCursor = Math.max(
       1,
       Math.round((nextPayday.getTime() - cursor.getTime()) / (1000 * 60 * 60 * 24)) + 1,
     );
-    const safeDailySpendMadForDay = Math.max(0, balanceBeforeToday - committedFromCursor) / daysFromCursor;
+    const safeDailySpendMadForDay = Math.max(0, simulatedPot - committedFromCursor) / daysFromCursor;
+    previousRate = safeDailySpendMadForDay;
 
     points.push({
       date: new Date(cursor),
@@ -453,4 +546,59 @@ export async function getDiscretionaryCategoryBreakdown(
     }))
     .sort((a, b) => b.shareMad - a.shareMad)
     .slice(0, 5);
+}
+
+export interface CycleOutlook {
+  cycleStart: Date;
+  cycleEnd: Date; // jour de paie de ce cycle
+  committedOutflowMad: number;
+}
+
+/**
+ * Aperçu des `cycleCount` prochains cycles de paie (le premier = jusqu'à la
+ * prochaine paie, comme computeBalanceProjection ; les suivants = d'une paie
+ * à la suivante). Pour chaque cycle, additionne les échéances connues
+ * (abonnements/dettes/factures — mêmes exclusions que partout ailleurs dans
+ * ce fichier, virements internes exclus) qui tombent dans sa fenêtre. Sert à
+ * repérer un cycle futur anormalement chargé (facture trimestrielle, etc.)
+ * avant qu'il n'arrive — pas de notion de solde ici, juste le total des
+ * échéances par cycle.
+ */
+export async function getMultiCycleOutlook(
+  ctx: HouseholdContext,
+  payDay: number,
+  cycleCount = 3,
+): Promise<CycleOutlook[]> {
+  const today = atMidnight(new Date());
+  const cycles: CycleOutlook[] = [];
+  let cycleStart = today;
+  let cycleEnd = estimateNextPayday(payDay, today);
+
+  for (let i = 0; i < cycleCount; i++) {
+    const monthsToFetch = new Set<string>();
+    for (let cursor = new Date(cycleStart); cursor <= cycleEnd; cursor = addDays(cursor, 1)) {
+      monthsToFetch.add(`${cursor.getFullYear()}-${cursor.getMonth() + 1}`);
+    }
+
+    const eventsByMonth = await Promise.all(
+      Array.from(monthsToFetch).map((ym) => {
+        const [y, m] = ym.split('-').map(Number);
+        return getMonthEvents(ctx, y, m);
+      }),
+    );
+    const allEvents = eventsByMonth.flat();
+
+    const committedOutflowMad = allEvents
+      .filter(
+        (e) => e.affectsBalance && e.status !== 'paid' && e.dueDate >= cycleStart && e.dueDate <= cycleEnd,
+      )
+      .reduce((acc, e) => acc + e.amountMad, 0);
+
+    cycles.push({ cycleStart, cycleEnd, committedOutflowMad });
+
+    cycleStart = addDays(cycleEnd, 1);
+    cycleEnd = estimateNextPayday(payDay, cycleStart);
+  }
+
+  return cycles;
 }

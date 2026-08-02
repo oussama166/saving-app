@@ -3,7 +3,8 @@ import { prisma } from '@/lib/prisma';
 import { requireSession } from '@/lib/auth';
 import { getHouseholdContext } from '@/lib/household';
 import { requireFeatureAccess } from '@/lib/features';
-import { getMonthEvents, computeBalanceProjection, getTodayDiscretionarySpendMad, getDiscretionaryCategoryBreakdown } from '@/lib/billCalendar';
+import { getMonthEvents, computeBalanceProjection, getTodayDiscretionarySpendMad, getDiscretionaryCategoryBreakdown, getMultiCycleOutlook } from '@/lib/billCalendar';
+import { captureDailyBudgetSnapshot, getBudgetDisciplineScore } from '@/lib/budgetDiscipline';
 
 // Vue calendrier des paiements — agrège abonnements/dettes/virements
 // récurrents/factures manuelles pour un mois donné (?year&month, défaut :
@@ -30,10 +31,17 @@ export async function GET(req: Request) {
 
     // Dépendent du résultat de la projection (safeDailySpendMad du jour) —
     // récupérés après, pas dans le même Promise.all.
-    const [todaySpentMad, categoryBreakdown] = await Promise.all([
+    const [todaySpentMad, categoryBreakdown, disciplineScore, multiCycleOutlook] = await Promise.all([
       getTodayDiscretionarySpendMad(ctx),
       getDiscretionaryCategoryBreakdown(ctx, projection.safeDailySpendMad),
+      getBudgetDisciplineScore(ctx),
+      getMultiCycleOutlook(ctx, payDay),
     ]);
+
+    // Fire-and-forget côté réponse (on ne bloque pas l'utilisateur dessus),
+    // mais awaited ici pour rester dans le cycle de vie de la requête
+    // serverless — idempotent (upsert), voir lib/budgetDiscipline.ts.
+    await captureDailyBudgetSnapshot(ctx, projection.safeDailySpendMad, todaySpentMad);
 
     const minProjectedBalanceMad = projection.points.reduce(
       (min, p) => Math.min(min, p.balanceMad),
@@ -53,6 +61,12 @@ export async function GET(req: Request) {
           minProjectedBalanceMad,
           todaySpentMad,
           categoryBreakdown,
+          disciplineScore,
+          multiCycleOutlook: multiCycleOutlook.map((c) => ({
+            cycleStart: c.cycleStart.toISOString(),
+            cycleEnd: c.cycleEnd.toISOString(),
+            committedOutflowMad: c.committedOutflowMad,
+          })),
           points: projection.points.map((p) => ({
             date: p.date.toISOString(),
             balanceMad: p.balanceMad,

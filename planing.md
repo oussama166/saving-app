@@ -120,7 +120,7 @@ Nécessaire en premier car le Dashboard et Saisie dépendent conceptuellement de
 - Routes `GET/POST/PUT/DELETE /api/goals` sur le modèle `SavingsGoal` (déjà en base, jamais exposé côté UI).
 - Composant `GoalsTable` : cible, épargné, contribution/mois, % progression, mois restants (calculé), statut coloré (🟢/🟠/🔴 selon seuils de progression).
 - Réutiliser `app/components/InterestSimulator.tsx` en l'enrichissant avec les "scénarios de référence" du site 1 (Conservateur/Modéré/Optimiste/Agressif à différents horizons) — soit en paramétrant le composant existant, soit en dupliquant en `CompoundInterestScenarios`.
-- Bloc statique "Conseils financiers Tanger" (banques/épargne, investissement Maroc/international, erreurs fatales) — contenu texte, pas de backend nécessaire.
+- Bloc statique "Conseils financiers" (banques/épargne, investissement Maroc/international, erreurs fatales) — contenu texte, pas de backend nécessaire.
 
 ## Phase 6 — Page Analyse & Trends (nouvelle, `/app/analyse`)
 
@@ -142,7 +142,7 @@ Page cliente avec 4 onglets internes (état local, comme le site 1) :
 - **Diagnostic** : réutilise les métriques déjà calculées par `/api/dashboard` (profil dépensier, point fort/faible détecté par règles simples — ex. si `Loisirs.usedPct > 80%` → point faible), plus une carte "Recommandation du mois". Peut évoluer plus tard vers un vrai appel au `FinanceAgent` existant (`app/api/chat/route.ts`) pour générer la recommandation dynamiquement au lieu de règles statiques.
 - **Règles d'Or** : contenu statique (règle du loyer, voiture, smartphone, restaurant, crédit conso, règle 3-6-12), calculs simples basés sur `UserSettings.referenceIncome`.
 - **Simulations** : réutilise `InterestSimulator`.
-- **Benchmarks Maroc** : contenu statique (banques, courtiers, prix immobilier Tanger).
+- **Benchmarks Maroc** : contenu statique (banques, courtiers, prix immobilier).
 
 ## Phase 9 — Vérification & QA
 

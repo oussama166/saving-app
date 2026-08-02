@@ -73,6 +73,9 @@ model User {
   kakeiboEntries     KakeiboEntry[]
   agentChatMessages  AgentChatMessage[]
   bills              Bill[]
+  dailyBudgetSnapshots DailyBudgetSnapshot[]
+  subscriptionRemindersSent SubscriptionReminderSent[]
+  goldenRuleSnapshots GoldenRuleSnapshot[]
 }
 
 // Règle de virement automatique récurrent entre deux comptes du même foyer
@@ -306,6 +309,50 @@ model Bill {
   updatedAt  DateTime  @updatedAt
 }
 
+// Photo quotidienne du budget journalier sécuritaire calculé (voir
+// computeBalanceProjection) + du réalisé (getTodayDiscretionarySpendMad),
+// capturée à chaque chargement de /calendrier ou /api/calendar — jamais via
+// un cron (même contrainte que catchUpSubscriptionCharges, hébergement
+// gratuit). Une ligne par (userId=ctx.budgetOwnerId, jour) : upsert tant que
+// le jour est "aujourd'hui" (le réalisé se complète au fil de la journée),
+// puis figée pour de bon une fois le jour passé — sert d'historique pour le
+// score de discipline budgétaire (voir lib/budgetDiscipline.ts).
+model DailyBudgetSnapshot {
+  id                String   @id @default(cuid())
+  userId            String
+  user              User     @relation(fields: [userId], references: [id])
+  date              DateTime // toujours à minuit (jour concerné, pas un timestamp précis)
+  safeDailySpendMad Float
+  spentMad          Float
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@unique([userId, date])
+  @@index([userId])
+}
+
+// Historique du score de conformité aux "Règles d'Or" (voir lib/goldenRules.ts,
+// app/coach page onglet Règles d'Or) — une ligne par (userId=budgetOwnerId,
+// jour), capturée à chaque visite de la page Coach IA, même principe que
+// DailyBudgetSnapshot (pas de cron, hébergement gratuit). rulesJson stocke le
+// statut ('respected'|'exceeded'|'info') de chaque règle au format
+// JSON.stringify({ruleId: status}) — sert à détecter les règles nouvellement
+// franchies (comparaison avec le snapshot précédent) sans table séparée par
+// règle.
+model GoldenRuleSnapshot {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  date      DateTime // toujours à minuit (jour concerné, pas un timestamp précis)
+  scorePct  Int
+  rulesJson String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, date])
+  @@index([userId])
+}
+
 // Somme cumulée des transactions archivées (exportées vers Google Sheets puis
 // supprimées de la base) pour une catégorie. Permet aux calculs "depuis le
 // début" (ex: solde du Fonds d'Urgence) de rester exacts même après un
@@ -371,6 +418,7 @@ model Subscription {
   lastChargedYearMonth String? // "2026-07" — dernier mois pour lequel une transaction a été générée
   transactions         Transaction[]
   planChanges          SubscriptionPlanChange[]
+  remindersSent        SubscriptionReminderSent[]
   createdAt            DateTime      @default(now())
   updatedAt            DateTime      @updatedAt
 }
@@ -568,6 +616,24 @@ model BudgetAlertSent {
   sentAt     DateTime @default(now())
 
   @@unique([categoryId, yearMonth, threshold])
+}
+
+// Rappel avant prélèvement d'abonnement (2 à 5 jours avant la prochaine
+// facturation, voir lib/subscriptions.ts::getNextBillingDate et
+// app/api/cron/subscription-reminders/route.ts) — une entrée par abonnement
+// et par mois de facturation, même pattern anti-doublon que BudgetAlertSent
+// (create() AVANT l'envoi de l'email, pour ne jamais renvoyer en boucle si
+// Resend est temporairement en panne).
+model SubscriptionReminderSent {
+  id             String       @id @default(cuid())
+  userId         String
+  user           User         @relation(fields: [userId], references: [id])
+  subscriptionId String
+  subscription   Subscription @relation(fields: [subscriptionId], references: [id])
+  yearMonth      String // "2026-08" — mois du prélèvement à venir concerné
+  sentAt         DateTime     @default(now())
+
+  @@unique([subscriptionId, yearMonth])
 }
 
 // Suivi des dettes/prêts (crédit conso, prêt immobilier, dette personnelle

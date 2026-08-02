@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireSession } from '@/lib/auth';
-import { catchUpSubscriptionCharges, getNextBillingDate } from '@/lib/subscriptions';
+import { catchUpSubscriptionCharges, getNextBillingDate, getUpcomingSubscriptionReminders } from '@/lib/subscriptions';
 import { getHouseholdContext } from '@/lib/household';
 import { requireFeatureAccess } from '@/lib/features';
 
@@ -15,14 +15,19 @@ export async function GET() {
     await catchUpSubscriptionCharges(userId);
     const ctx = await getHouseholdContext(userId);
 
-    const [subscriptions, accounts, categories] = await Promise.all([
+    const [subscriptions, accounts, categories, upcomingReminders] = await Promise.all([
       prisma.subscription.findMany({
         where: { userId: { in: ctx.memberIds } },
-        include: { category: true, account: true, _count: { select: { planChanges: true } } },
+        include: { category: true, account: true, _count: { select: { planChanges: true, transactions: true } } },
         orderBy: { billingDay: 'asc' },
       }),
       prisma.account.findMany({ where: { userId: { in: ctx.memberIds } }, orderBy: { createdAt: 'asc' } }),
       prisma.category.findMany({ where: { userId: ctx.budgetOwnerId, type: 'expense' }, orderBy: { order: 'asc' } }),
+      // Abonnements dont le prochain prélèvement tombe dans 2-5 jours (voir
+      // lib/subscriptions.ts) — affichés en bannière pour laisser le temps de
+      // suspendre/annuler avant d'être débité (même fenêtre que le rappel
+      // email envoyé par le cron /api/cron/subscription-reminders).
+      getUpcomingSubscriptionReminders(userId),
     ]);
 
     const data = subscriptions.map((sub) => ({
@@ -39,6 +44,7 @@ export async function GET() {
       accountName: sub.account.name,
       nextBillingDate: sub.isActive ? getNextBillingDate(sub).toISOString() : null,
       planChangeCount: sub._count.planChanges,
+      transactionCount: sub._count.transactions,
     }));
 
     const totalMonthly = subscriptions.filter((s) => s.isActive).reduce((acc, s) => acc + s.price, 0);
@@ -50,6 +56,10 @@ export async function GET() {
         totalMonthly,
         accounts: accounts.map((a) => ({ id: a.id, name: a.name })),
         categories: categories.map((c) => ({ id: c.id, name: c.name })),
+        upcomingReminders: upcomingReminders.map((r) => ({
+          ...r,
+          nextBillingDate: r.nextBillingDate.toISOString(),
+        })),
       },
     });
   } catch (error) {

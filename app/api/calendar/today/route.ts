@@ -4,6 +4,7 @@ import { requireSession } from '@/lib/auth';
 import { getHouseholdContext } from '@/lib/household';
 import { requireFeatureAccess } from '@/lib/features';
 import { computeBalanceProjection, getTodayDiscretionarySpendMad, getDiscretionaryCategoryBreakdown } from '@/lib/billCalendar';
+import { captureDailyBudgetSnapshot } from '@/lib/budgetDiscipline';
 
 // Version allégée de /api/calendar : uniquement les chiffres du jour (pas la
 // grille du mois ni la série complète jusqu'à la paie) — pensée pour être
@@ -24,6 +25,8 @@ export async function GET() {
       getTodayDiscretionarySpendMad(ctx),
       getDiscretionaryCategoryBreakdown(ctx, projection.safeDailySpendMad),
     ]);
+
+    await captureDailyBudgetSnapshot(ctx, projection.safeDailySpendMad, todaySpentMad);
 
     const minProjectedBalanceMad = projection.points.reduce(
       (min, p) => Math.min(min, p.balanceMad),

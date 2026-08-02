@@ -123,17 +123,23 @@ function NavGroupDropdown({
   items,
   pathname,
   t,
+  badgeKeys,
 }: {
   labelKey: string;
   icon: React.ReactNode;
   items: DesktopNavItem[];
   pathname: string;
   t: (key: string) => string;
+  // Clés d'items (ex: "nav.calendrier") pour lesquelles afficher un point
+  // rouge — sur l'item ET sur le bouton du groupe, pour rester visible sans
+  // avoir à ouvrir le menu déroulant (voir TopNav > calendarAtRisk).
+  badgeKeys?: Set<string>;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isGroupActive = items.some((item) => pathname === item.href);
+  const groupHasBadge = badgeKeys ? items.some((item) => badgeKeys.has(item.key)) : false;
 
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
@@ -179,6 +185,7 @@ function NavGroupDropdown({
       >
         {icon}
         {t(labelKey)}
+        {groupHasBadge && <span className="w-1.5 h-1.5 rounded-full bg-red-500" />}
         <ChevronDown className={`w-3.5 h-3.5 transition-transform ${open ? "rotate-180" : ""}`} />
         {isGroupActive && (
           <span className="absolute left-2 right-2 -bottom-[1px] h-0.5 rounded-full bg-blue-500" />
@@ -201,6 +208,7 @@ function NavGroupDropdown({
               >
                 {item.icon}
                 {t(item.key)}
+                {badgeKeys?.has(item.key) && <span className="w-1.5 h-1.5 rounded-full bg-red-500 ml-auto" />}
               </Link>
             );
           })}
@@ -216,6 +224,12 @@ export default function TopNav() {
   const { t } = useLanguage();
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  // Point rouge sur "Calendrier" si le budget sécuritaire du jour est déjà à
+  // 0 DH ou entièrement consommé (voir /api/calendar/today) — silencieux
+  // (pas de badge) si la fonctionnalité Calendrier est désactivée pour
+  // l'utilisateur ou si l'appel échoue. Un seul appel léger au montage, pas
+  // besoin de le rafraîchir en continu pour un simple indicateur visuel.
+  const [calendarAtRisk, setCalendarAtRisk] = useState(false);
 
   useEffect(() => {
     if (AUTH_PATHS.includes(pathname) || pathname.startsWith("/admin")) return;
@@ -226,6 +240,18 @@ export default function TopNav() {
       })
       .catch(() => {});
   }, [pathname]);
+
+  useEffect(() => {
+    if (AUTH_PATHS.includes(pathname) || pathname.startsWith("/admin")) return;
+    fetch("/api/calendar/today")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((result) => {
+        if (result?.success) setCalendarAtRisk(result.data.remainingTodayMad <= 0);
+      })
+      .catch(() => {});
+  }, [pathname]);
+
+  const badgeKeys = calendarAtRisk ? new Set(["nav.calendrier"]) : undefined;
 
   // Close the mobile menu whenever the route changes (covers back/forward nav).
   const [lastPathname, setLastPathname] = useState(pathname);
@@ -279,6 +305,7 @@ export default function TopNav() {
                   items={entry.items}
                   pathname={pathname}
                   t={t}
+                  badgeKeys={badgeKeys}
                 />
               );
             }
@@ -402,6 +429,7 @@ export default function TopNav() {
               >
                 {link.icon}
                 {t(link.key)}
+                {badgeKeys?.has(link.key) && <span className="w-1.5 h-1.5 rounded-full bg-red-500 ml-auto" />}
               </Link>
             );
           })}
