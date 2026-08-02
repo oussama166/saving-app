@@ -17,6 +17,7 @@ import {
   CalendarClock,
   Wallet,
   History,
+  BellRing,
 } from "lucide-react";
 import {
   SUBSCRIPTION_CATALOG,
@@ -40,6 +41,15 @@ interface SubscriptionItem {
   accountName: string;
   nextBillingDate: string | null;
   planChangeCount: number;
+  transactionCount: number;
+}
+
+interface UpcomingReminder {
+  subscriptionId: string;
+  name: string;
+  price: number;
+  nextBillingDate: string;
+  daysUntil: number;
 }
 
 interface OptionItem {
@@ -125,6 +135,7 @@ export default function AbonnementsPage() {
 function AbonnementsPageContent() {
   const [subscriptions, setSubscriptions] = useState<SubscriptionItem[]>([]);
   const [totalMonthly, setTotalMonthly] = useState(0);
+  const [upcomingReminders, setUpcomingReminders] = useState<UpcomingReminder[]>([]);
   const [accounts, setAccounts] = useState<OptionItem[]>([]);
   const [categories, setCategories] = useState<OptionItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -134,6 +145,7 @@ function AbonnementsPageContent() {
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [deleteAlsoTransactions, setDeleteAlsoTransactions] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [expandedHistoryId, setExpandedHistoryId] = useState<string | null>(null);
   const [planHistoryCache, setPlanHistoryCache] = useState<Record<string, PlanChangeItem[]>>({});
@@ -148,6 +160,7 @@ function AbonnementsPageContent() {
           setTotalMonthly(result.data.totalMonthly);
           setAccounts(result.data.accounts);
           setCategories(result.data.categories);
+          setUpcomingReminders(result.data.upcomingReminders ?? []);
         }
       })
       .catch((err) => console.error("Subscriptions fetch error:", err))
@@ -323,13 +336,18 @@ function AbonnementsPageContent() {
     }
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (id: string, deleteTransactions: boolean) => {
     setBusyId(id);
     try {
-      const res = await fetch(`/api/subscriptions/${id}`, { method: "DELETE" });
+      const res = await fetch(`/api/subscriptions/${id}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ deleteTransactions }),
+      });
       const result = await res.json();
       if (result.success) {
         setConfirmDeleteId(null);
+        setDeleteAlsoTransactions(false);
         load();
       }
     } catch (err) {
@@ -376,6 +394,28 @@ function AbonnementsPageContent() {
             </div>
           </div>
         </div>
+
+        {upcomingReminders.length > 0 && (
+          <div className="p-5 border bg-amber-500/10 rounded-2xl border-amber-500/20 space-y-3">
+            <div className="flex items-center gap-2.5">
+              <BellRing className="w-4.5 h-4.5 text-amber-400 shrink-0" />
+              <p className="text-[13px] font-bold text-amber-400">
+                {upcomingReminders.length > 1
+                  ? `${upcomingReminders.length} prélèvements arrivent bientôt`
+                  : "Un prélèvement arrive bientôt"}
+              </p>
+            </div>
+            <div className="space-y-1.5">
+              {upcomingReminders.map((r) => (
+                <p key={r.subscriptionId} className="text-[13px] text-body-soft pl-7">
+                  <span className="font-bold text-ink">{r.name}</span> — {r.price.toFixed(2)} DH,{" "}
+                  {r.daysUntil <= 1 ? "prélevé demain" : `prélevé dans ${r.daysUntil} jours`} (
+                  {formatDate(r.nextBillingDate)})
+                </p>
+              ))}
+            </div>
+          </div>
+        )}
 
         {showForm && (
           <div className="p-6 border bg-surface rounded-2xl border-line space-y-4">
@@ -637,7 +677,7 @@ function AbonnementsPageContent() {
                     {confirmDeleteId === sub.id ? (
                       <div className="flex items-center gap-1.5">
                         <button
-                          onClick={() => handleDelete(sub.id)}
+                          onClick={() => handleDelete(sub.id, deleteAlsoTransactions)}
                           disabled={busyId === sub.id}
                           className="p-2 border rounded-lg border-red-500/20 bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors disabled:opacity-50"
                           aria-label="Confirmer la suppression"
@@ -649,7 +689,10 @@ function AbonnementsPageContent() {
                           )}
                         </button>
                         <button
-                          onClick={() => setConfirmDeleteId(null)}
+                          onClick={() => {
+                            setConfirmDeleteId(null);
+                            setDeleteAlsoTransactions(false);
+                          }}
                           className="p-2 border rounded-lg border-line text-body-soft hover:bg-surface-alt transition-colors"
                           aria-label="Annuler"
                         >
@@ -667,6 +710,24 @@ function AbonnementsPageContent() {
                     )}
                   </div>
                 </div>
+
+                {confirmDeleteId === sub.id && sub.transactionCount > 0 && (
+                  <div className="mt-3 pt-3 border-t border-line-subtle">
+                    <label className="flex items-start gap-2 text-[11px] text-body-soft cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={deleteAlsoTransactions}
+                        onChange={(e) => setDeleteAlsoTransactions(e.target.checked)}
+                        className="mt-0.5"
+                      />
+                      <span>
+                        Supprimer aussi {sub.transactionCount > 1 ? `les ${sub.transactionCount} dépenses` : "la dépense"} déjà
+                        enregistrée{sub.transactionCount > 1 ? "s" : ""} pour cet abonnement (le solde du compte sera rétabli).
+                        Sinon, l&apos;historique reste dans tes dépenses.
+                      </span>
+                    </label>
+                  </div>
+                )}
 
                 {expandedHistoryId === sub.id && (
                   <div className="mt-3 pt-3 border-t border-line-subtle space-y-1.5">

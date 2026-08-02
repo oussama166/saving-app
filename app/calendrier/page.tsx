@@ -17,12 +17,17 @@ import {
   CreditCard,
   Receipt,
   ArrowRightLeft,
+  PiggyBank,
+  Download,
 } from "lucide-react";
 import FeatureGate from "../components/FeatureGate";
 import CalendarOutlook from "../components/CalendarOutlook";
+import CalendarSimulator from "../components/CalendarSimulator";
+import BudgetDisciplineCard from "../components/BudgetDisciplineCard";
+import MultiCycleOutlook from "../components/MultiCycleOutlook";
 import { useLanguage } from "../components/LanguageProvider";
 
-type SourceType = "subscription" | "debt" | "recurringTransfer" | "bill";
+type SourceType = "subscription" | "debt" | "recurringTransfer" | "bill" | "savingsGoal";
 type Status = "paid" | "upcoming" | "late";
 
 interface CalendarEvent {
@@ -49,6 +54,14 @@ interface CategoryShare {
   shareMad: number;
 }
 
+interface DisciplineScore {
+  totalDays: number;
+  daysOnBudget: number;
+  scorePct: number;
+  worstWeekday: { key: string; overspendRatePct: number } | null;
+  recentDays: { date: string; safeDailySpendMad: number; spentMad: number; onBudget: boolean }[];
+}
+
 interface CalendarData {
   events: CalendarEvent[];
   projection: {
@@ -60,6 +73,8 @@ interface CalendarData {
     minProjectedBalanceMad: number;
     todaySpentMad: number;
     categoryBreakdown: CategoryShare[];
+    disciplineScore: DisciplineScore;
+    multiCycleOutlook: { cycleStart: string; cycleEnd: string; committedOutflowMad: number }[];
     points: ProjectionPoint[];
   };
 }
@@ -93,6 +108,7 @@ const SOURCE_META: Record<SourceType, { icon: typeof Repeat; labelKey: string }>
   debt: { icon: CreditCard, labelKey: "calendar.source.debt" },
   recurringTransfer: { icon: ArrowRightLeft, labelKey: "calendar.source.transfer" },
   bill: { icon: Receipt, labelKey: "calendar.source.bill" },
+  savingsGoal: { icon: PiggyBank, labelKey: "calendar.source.savingsGoal" },
 };
 
 const STATUS_STYLES: Record<Status, string> = {
@@ -175,6 +191,7 @@ function CalendrierPageContent() {
     }
     setMonth(m);
     setYear(y);
+    setSelectedDay(null);
   };
 
   const eventsByDay = useMemo(() => {
@@ -202,6 +219,23 @@ function CalendrierPageContent() {
     });
     return map;
   }, [data, year, month]);
+
+  // Solde projeté en FIN de journée, même filtre que dailyBudgetByDay — sert
+  // au panneau de détail affiché quand on clique sur une case du calendrier.
+  const dailyBalanceByDay = useMemo(() => {
+    const map = new Map<number, number>();
+    (data?.projection.points ?? []).forEach((p) => {
+      const d = new Date(p.date);
+      if (d.getFullYear() === year && d.getMonth() + 1 === month) {
+        map.set(d.getDate(), p.balanceMad);
+      }
+    });
+    return map;
+  }, [data, year, month]);
+
+  // Case du calendrier cliquée — un clic sur le même jour désélectionne.
+  const [selectedDay, setSelectedDay] = useState<number | null>(null);
+  const toggleDay = (day: number) => setSelectedDay((prev) => (prev === day ? null : day));
 
   const upcoming = useMemo(
     () => (data?.events ?? []).filter((e) => e.status !== "paid").sort((a, b) => a.dueDate.localeCompare(b.dueDate)),
@@ -282,10 +316,17 @@ function CalendrierPageContent() {
           <div className="p-3 border bg-blue-600/20 rounded-xl border-blue-500/20">
             <CalendarDays className="w-6 h-6 text-blue-400" />
           </div>
-          <div>
+          <div className="flex-1">
             <h1 className="text-3xl font-bold tracking-tight text-ink">{t("calendar.title")}</h1>
             <p className="text-subtle text-sm mt-1 italic">{t("calendar.subtitle")}</p>
           </div>
+          <a
+            href="/api/calendar/export"
+            className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold border rounded-lg bg-surface border-line text-subtle hover:text-body hover:border-blue-500/40 transition-colors"
+          >
+            <Download className="w-3.5 h-3.5" />
+            {t("calendar.exportIcs")}
+          </a>
         </header>
 
         {loading ? (
@@ -328,12 +369,18 @@ function CalendrierPageContent() {
                     const dayBudget = day ? dailyBudgetByDay.get(day) : undefined;
                     const isToday =
                       day === today.getDate() && month === today.getMonth() + 1 && year === today.getFullYear();
+                    const isSelected = day !== null && day === selectedDay;
                     return (
-                      <div
+                      <button
                         key={i}
-                        className={`aspect-square rounded-lg border p-1 flex flex-col items-center justify-start gap-0.5 ${
-                          day ? "border-line-subtle" : "border-transparent"
-                        } ${isToday ? "bg-blue-500/10 border-blue-500/30" : ""}`}
+                        type="button"
+                        disabled={!day}
+                        onClick={() => day && toggleDay(day)}
+                        className={`aspect-square rounded-lg border p-1 flex flex-col items-center justify-start gap-0.5 transition-colors ${
+                          day ? "border-line-subtle cursor-pointer hover:border-blue-500/40 hover:bg-surface-alt" : "border-transparent cursor-default"
+                        } ${isToday ? "bg-blue-500/10 border-blue-500/30" : ""} ${
+                          isSelected ? "ring-2 ring-blue-500 border-blue-500/50" : ""
+                        }`}
                       >
                         {day && (
                           <>
@@ -357,10 +404,99 @@ function CalendrierPageContent() {
                             )}
                           </>
                         )}
-                      </div>
+                      </button>
                     );
                   })}
                 </div>
+
+                {selectedDay !== null && (
+                  <div className="mt-4 pt-4 border-t border-line-subtle">
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="text-sm font-bold text-ink">
+                        {new Date(year, month - 1, selectedDay).toLocaleDateString("fr-FR", {
+                          weekday: "long",
+                          day: "numeric",
+                          month: "long",
+                        })}
+                      </h3>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedDay(null)}
+                        className="p-1 rounded-lg text-faint hover:text-body hover:bg-surface-alt transition-colors"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+
+                    <div className="flex items-center gap-4 mb-3">
+                      {dailyBudgetByDay.has(selectedDay) && (
+                        <div>
+                          <p
+                            className={`text-lg font-black tabular-nums ${
+                              (dailyBudgetByDay.get(selectedDay) ?? 0) <= 0 ? "text-red-400" : "text-blue-400"
+                            }`}
+                          >
+                            {formatMAD(dailyBudgetByDay.get(selectedDay) ?? 0)}
+                          </p>
+                          <p className="text-[9px] uppercase font-bold tracking-widest text-subtle">
+                            {t("calendar.outlook.dailyBudgetTitle")}
+                          </p>
+                        </div>
+                      )}
+                      {dailyBalanceByDay.has(selectedDay) && (
+                        <div>
+                          <p
+                            className={`text-lg font-black tabular-nums ${
+                              (dailyBalanceByDay.get(selectedDay) ?? 0) < 0 ? "text-red-400" : "text-body"
+                            }`}
+                          >
+                            {formatMAD(dailyBalanceByDay.get(selectedDay) ?? 0)}
+                          </p>
+                          <p className="text-[9px] uppercase font-bold tracking-widest text-subtle">
+                            {t("calendar.projection.balanceCol")}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+
+                    {(eventsByDay.get(selectedDay) ?? []).length === 0 ? (
+                      <p className="text-xs text-subtle italic">{t("calendar.noUpcoming")}</p>
+                    ) : (
+                      <div className="space-y-1.5">
+                        {(eventsByDay.get(selectedDay) ?? []).map((e) => {
+                          const meta = SOURCE_META[e.sourceType];
+                          const Icon = meta.icon;
+                          return (
+                            <div
+                              key={e.id}
+                              className={`flex items-center gap-2.5 p-2.5 rounded-lg border ${STATUS_STYLES[e.status]}`}
+                            >
+                              <Icon className="w-3.5 h-3.5 shrink-0" />
+                              <div className="min-w-0 flex-1">
+                                <p className="text-xs font-bold text-body truncate">{e.name}</p>
+                                <p className="text-[10px] text-subtle">
+                                  {t(meta.labelKey)}
+                                  {!e.affectsBalance && ` · ${t("calendar.internalTransfer")}`}
+                                </p>
+                              </div>
+                              <span className="text-xs font-black tabular-nums">{formatMAD(e.amountMad)}</span>
+                              {e.sourceType === "bill" && e.status !== "paid" && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleMarkPaid(e)}
+                                  className="p-1 rounded-lg hover:bg-white/10 transition-colors"
+                                  title={t("calendar.markPaid")}
+                                >
+                                  <Check className="w-3 h-3" />
+                                </button>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div className="p-6 border bg-surface rounded-2xl border-line">
@@ -430,6 +566,12 @@ function CalendrierPageContent() {
                   categoryBreakdown={data.projection.categoryBreakdown}
                 />
               )}
+
+              <CalendarSimulator />
+
+              {data && <BudgetDisciplineCard {...data.projection.disciplineScore} />}
+
+              {data && <MultiCycleOutlook cycles={data.projection.multiCycleOutlook} />}
 
               <div className="p-6 border bg-surface-alt/50 rounded-2xl border-line">
                 <div className="flex items-center gap-2 mb-4">

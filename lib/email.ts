@@ -151,6 +151,47 @@ export async function sendBudgetAlertEmail(
   });
 }
 
+export async function sendSubscriptionReminderEmail(
+  to: string,
+  params: {
+    name: string;
+    price: number;
+    nextBillingDate: Date;
+    daysUntil: number;
+  },
+): Promise<boolean> {
+  const { name, price, nextBillingDate, daysUntil } = params;
+  const fmt = (n: number) => `${Math.round(n).toLocaleString("fr-FR")} DH`;
+  const dateLabel = nextBillingDate.toLocaleDateString("fr-FR", {
+    day: "numeric",
+    month: "long",
+  });
+  const dayLabel = daysUntil <= 1 ? "demain" : `dans ${daysUntil} jours`;
+
+  return sendEmail({
+    to,
+    subject: `${name} sera prélevé ${dayLabel} — Wealth OS`,
+    html: wrapEmailHtml(
+      `Prélèvement à venir — ${name}`,
+      `
+        <p style="font-size: 14px; line-height: 1.6;">
+          <strong>${name}</strong> (${fmt(price)}) sera prélevé <strong>${dayLabel}</strong>,
+          le ${dateLabel}.
+        </p>
+        <p style="font-size: 14px; line-height: 1.6;">
+          Si tu veux éviter ce prélèvement, tu as le temps de suspendre ou d'annuler l'abonnement avant cette date.
+        </p>
+        <p style="margin: 24px 0;">
+          <a href="${getSiteUrl()}/abonnements" style="background: #7c3aed; color: white; text-decoration: none; padding: 12px 20px; border-radius: 10px; font-size: 14px; font-weight: 700; display: inline-block;">
+            Gérer mes abonnements
+          </a>
+        </p>
+        <p style="font-size: 12px; color: #64748b;">Tu ne recevras pas d'autre rappel pour ce prélèvement.</p>
+      `,
+    ),
+  });
+}
+
 export async function sendWeeklyDigestEmail(
   to: string,
   data: {

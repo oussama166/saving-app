@@ -62,7 +62,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: false, error: 'Données de projection invalides' }, { status: 400 });
     }
 
-    const systemPrompt = `Tu es un conseiller financier basé à Tanger, Maroc, spécialisé en gestion de trésorerie court terme. Style: ultra concis, chiffré, jamais générique. Les chiffres (solde, budget journalier, échéances) sont déjà calculés — tu ne fais que les commenter, jamais les recalculer. ${aiLanguageInstruction(locale)}`;
+    const systemPrompt = `Tu es un conseiller financier basé à Casablanca, Maroc, spécialisé en gestion de trésorerie court terme. Style: ultra concis, chiffré, jamais générique. Les chiffres (solde, budget journalier, échéances) sont déjà calculés — tu ne fais que les commenter, jamais les recalculer. ${aiLanguageInstruction(locale)}`;
 
     const eventsLines = (upcomingEvents ?? [])
       .map((e) => `- ${e.name} (${e.sourceType}): ${Math.round(e.amountMad)} DH le ${e.dueDate.slice(0, 10)}`)
