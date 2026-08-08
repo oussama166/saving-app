@@ -8,7 +8,12 @@ const nextConfig: NextConfig = {
   // Nécessaire pour partager le site via un tunnel (ngrok, etc.) : sans ça,
   // la page HTML initiale charge mais tout le JS/hydratation/fetch échoue
   // silencieusement ("le site charge mais rien ne fonctionne").
-  allowedDevOrigins: ["*.ngrok-free.app", "*.ngrok.io", "*.ngrok.app"],
+  allowedDevOrigins: [
+    "*.ngrok-free.app",
+    "*.ngrok.io",
+    "*.ngrok.app",
+    "192.168.0.124",
+  ],
 
   // pdfkit lit ses fichiers de métriques des 14 polices PDF standard
   // (*.afm) depuis son propre dossier via `fs.readFileSync(__dirname + ...)`

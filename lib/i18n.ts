@@ -138,6 +138,8 @@ const fr: Dict = {
     "Ton email n'est pas encore vérifié. Vérifie ta boîte de réception.",
   "emailVerify.sent": "Email de vérification envoyé.",
   "emailVerify.resend": "Renvoyer l'email",
+  "pwaInstall.title": "Installe l'app sur cet appareil pour un accès plus rapide.",
+  "pwaInstall.installButton": "Installer",
 
   // Dashboard
   "dashboard.title": "Personal Wealth OS",
@@ -629,6 +631,8 @@ const en: Dict = {
   "emailVerify.notVerified": "Your email isn't verified yet. Check your inbox.",
   "emailVerify.sent": "Verification email sent.",
   "emailVerify.resend": "Resend email",
+  "pwaInstall.title": "Install the app on this device for faster access.",
+  "pwaInstall.installButton": "Install",
 
   "dashboard.title": "Personal Wealth OS",
   "dashboard.welcome": "Welcome back. Your financial health score is",
@@ -1110,6 +1114,8 @@ const es: Dict = {
     "Tu email aún no está verificado. Revisa tu bandeja de entrada.",
   "emailVerify.sent": "Email de verificación enviado.",
   "emailVerify.resend": "Reenviar email",
+  "pwaInstall.title": "Instala la app en este dispositivo para un acceso más rápido.",
+  "pwaInstall.installButton": "Instalar",
 
   "dashboard.title": "Personal Wealth OS",
   "dashboard.welcome":
@@ -1595,6 +1601,8 @@ const ar: Dict = {
     "لم يتم التحقق من بريدك الإلكتروني بعد. تحقق من صندوق الوارد.",
   "emailVerify.sent": "تم إرسال بريد التحقق.",
   "emailVerify.resend": "إعادة إرسال البريد",
+  "pwaInstall.title": "ثبّت التطبيق على هذا الجهاز لوصول أسرع.",
+  "pwaInstall.installButton": "تثبيت",
 
   "dashboard.title": "Personal Wealth OS",
   "dashboard.welcome": "مرحبًا بعودتك. درجة صحتك المالية هي",

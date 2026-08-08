@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import TopNav from "./components/TopNav";
 import EmailVerificationBanner from "./components/EmailVerificationBanner";
+import InstallAppBanner from "./components/InstallAppBanner";
 import ServiceWorkerRegister from "./components/ServiceWorkerRegister";
 import DevEnvBadge from "./components/DevEnvBadge";
 import FinanceAgent from "./components/FinanceAgent";
@@ -78,6 +79,7 @@ export default async function RootLayout({
             <DevEnvBadge />
             <TopNav />
             <EmailVerificationBanner />
+            <InstallAppBanner />
             {children}
             <FinanceAgent />
           </LanguageProvider>
