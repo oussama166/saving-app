@@ -163,6 +163,7 @@ Le guide complet est dans [`DEPLOYMENT.md`](./DEPLOYMENT.md) (création de la ba
 | `npm run migrate`                          | Applique les migrations en attente (locale ou Turso selon l'env) et les marque comme faites     |
 | `npm run migrate:check`                    | Liste les migrations en attente sans rien exécuter                                              |
 | `npm run test-push -- <email>`             | Envoie une notification push de test à un utilisateur (debug)                                   |
+| `npm run test-sheets`                      | Vérifie la connexion Google Sheets (compte de service, accès au spreadsheet)                    |
 
 ## Structure du dépôt
 
