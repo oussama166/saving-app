@@ -21,6 +21,6 @@ const adapter = new PrismaLibSql({
 
 export const prisma =
   globalForPrisma.prisma ||
-  new PrismaClient({ adapter } as any)
+  new PrismaClient({ adapter })
 
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma

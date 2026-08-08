@@ -2,11 +2,28 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { generateSecureToken } from '@/lib/tokens';
 import { sendPasswordResetEmail } from '@/lib/email';
+import { getRateLimitKey, isRateLimited, recordFailedAttempt } from '@/lib/rateLimit';
 
 const RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1h — plus court que la vérification d'email, c'est sensible
 
 export async function POST(req: Request) {
   try {
+    // Anti-abus par IP — sans ça, n'importe qui peut spammer la boîte mail
+    // d'un tiers en déclenchant des emails de réinitialisation en boucle
+    // (voir lib/rateLimit.ts, même mécanisme que signup).
+    const rateLimitKey = getRateLimitKey('forgot-password', req);
+    const { limited, retryAfterSeconds } = isRateLimited(rateLimitKey);
+    if (limited) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: `Trop de demandes. Réessaie dans ${Math.ceil((retryAfterSeconds ?? 60) / 60)} min.`,
+        },
+        { status: 429, headers: { 'Retry-After': String(retryAfterSeconds ?? 60) } },
+      );
+    }
+    recordFailedAttempt(rateLimitKey);
+
     const { email } = (await req.json()) as { email?: string };
     if (!email) {
       return NextResponse.json({ success: false, error: 'Email requis' }, { status: 400 });

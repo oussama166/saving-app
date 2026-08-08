@@ -2,9 +2,7 @@
 
 import { HeartPulse } from "lucide-react";
 import type { HealthBudget } from "@/lib/financials";
-import { DEFAULT_LOCALE, useLanguage } from "./LanguageProvider";
-import { getSession } from "@/lib/auth";
-import { getUserLocale } from "@/lib/getLocale";
+import { useLanguage } from "./LanguageProvider";
 
 interface Props {
   budget: HealthBudget;

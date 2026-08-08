@@ -3,6 +3,7 @@ import { notifyRefresh } from '@/lib/sse';
 import { checkAndSendBudgetAlert } from '@/lib/budgetAlerts';
 import { getHouseholdMemberIds } from '@/lib/household';
 import { sendSubscriptionReminderEmail } from '@/lib/email';
+import { sendPushToUser } from '@/lib/webPush';
 
 // Fenêtre de rappel avant prélèvement : 2 à 5 jours avant getNextBillingDate
 // (voir demande utilisateur — "un rappel 2 à 5 jours avant le prochain
@@ -306,7 +307,7 @@ export async function sendDueSubscriptionReminders(): Promise<{ sent: number; sk
     const memberIds = await getHouseholdMemberIds(sub.userId);
     const members = await prisma.user.findMany({
       where: { id: { in: memberIds } },
-      select: { email: true },
+      select: { id: true, email: true },
     });
     if (members.length === 0) continue;
 
@@ -316,12 +317,21 @@ export async function sendDueSubscriptionReminders(): Promise<{ sent: number; sk
 
     await Promise.all(
       members.map((m) =>
-        sendSubscriptionReminderEmail(m.email, {
-          name: sub.name,
-          price: sub.price,
-          nextBillingDate,
-          daysUntil: d,
-        }),
+        Promise.all([
+          sendSubscriptionReminderEmail(m.email, {
+            name: sub.name,
+            price: sub.price,
+            nextBillingDate,
+            daysUntil: d,
+          }),
+          // Canal additionnel (voir lib/webPush.ts) — dégradé silencieusement
+          // sans clés VAPID ou si l'utilisateur n'a aucun appareil abonné.
+          sendPushToUser(m.id, {
+            title: `Prélèvement à venir : ${sub.name}`,
+            body: `${sub.price} MAD dans ${d} jour${d > 1 ? 's' : ''} (${nextBillingDate.toLocaleDateString('fr-FR')})`,
+            url: '/abonnements',
+          }),
+        ]),
       ),
     );
     sent += 1;

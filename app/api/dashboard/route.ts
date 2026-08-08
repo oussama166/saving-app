@@ -8,6 +8,7 @@ import { getRatesToMad } from "@/lib/exchangeRates";
 import { requireFeatureAccess } from "@/lib/features";
 import { resolveBudgetCycleStart } from "@/lib/budgetCycle";
 import { computeBudgetMethodResult, getBudgetMethodDef } from "@/lib/budgetMethods";
+import { captureNetWorthSnapshot } from "@/lib/netWorthHistory";
 
 export const dynamic = "force-dynamic";
 
@@ -225,6 +226,17 @@ export async function GET() {
         actual: b.spentAmount,
       })),
     };
+
+    // Capture le point du jour pour le graphique d'évolution du patrimoine
+    // net (voir lib/netWorthHistory.ts) — réutilise les totaux déjà calculés
+    // ci-dessus, aucune requête supplémentaire. Idempotent (upsert par jour),
+    // jamais bloquant pour le reste de la réponse en cas d'échec.
+    await captureNetWorthSnapshot(ctx, {
+      checkingBalanceMad: totalCheckingBalance,
+      savingsLockedMad: totalSavingsLocked,
+      portfolioValueMad: portfolio.globalLiveValue,
+      debtsMad: totalDebts,
+    }).catch((err) => console.error('captureNetWorthSnapshot a échoué:', err));
 
     const recentTransactions = await prisma.transaction.findMany({
       where: { userId: { in: ctx.memberIds } },
