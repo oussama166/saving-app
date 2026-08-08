@@ -7,7 +7,7 @@ export async function GET() {
     start(controller) {
       addSSEClient(controller);
     },
-    cancel(controller) {
+    cancel() {
       // In some environments, this might be needed
     },
   });

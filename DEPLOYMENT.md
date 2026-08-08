@@ -41,20 +41,35 @@ Note quelque part l'URL (`libsql://...`) et le token — ce sont `TURSO_DATABASE
 
 ## 2. Appliquer les migrations sur Turso
 
-Prisma Migrate n'est pas supporté directement contre Turso : on applique le SQL des migrations directement, comme en local. Un script est fourni :
+Prisma Migrate n'est pas supporté directement contre Turso : on applique le SQL des migrations directement, comme en local. `scripts/run-migrations.ts` fait ça de façon idempotente (garde un registre `_AppSchemaMigrations` dans la base elle-même, donc rejouable sans risque — voir le fichier pour le détail) :
 
 ```bash
-chmod +x scripts/apply-turso-migrations.sh
-./scripts/apply-turso-migrations.sh wealthos-prod
+TURSO_DATABASE_URL=libsql://wealthos-prod-....turso.io TURSO_AUTH_TOKEN=... npm run migrate
 ```
 
-Ça applique les 13 migrations dans l'ordre (schéma complet : utilisateurs, comptes, transactions, objectifs, abonnements, admin...). Vérifie que ça s'est bien passé :
+Ou, en ayant déjà ces variables dans `.env` local pointées sur la base cible :
 
 ```bash
+npm run migrate
+```
+
+Vérifie que ça s'est bien passé :
+
+```bash
+npm run migrate:check
+# ou directement :
 turso db shell wealthos-prod "SELECT name FROM sqlite_master WHERE type='table';"
 ```
 
-Pour toute **future** modification de schéma, le workflow reste : écrire le `migration.sql` à la main (comme fait jusqu'ici), l'appliquer en local (script Python existant) **et** sur Turso (`turso db shell wealthos-prod < prisma/migrations/<nom>/migration.sql`).
+**Cas particulier — base déjà existante avec des tables créées à la main** (ex: prod actuel, dont les migrations ont été appliquées une par une avant que ce script existe) : le registre `_AppSchemaMigrations` est vide au premier lancement, donc `npm run migrate` tenterait de rejouer TOUTES les migrations depuis le début et échouerait sur la première (`CREATE TABLE` sur une table qui existe déjà). Dans ce cas, lance d'abord une seule fois :
+
+```bash
+npm run migrate -- --baseline
+```
+
+Ça marque tout ce qui est actuellement en attente comme déjà appliqué, sans exécuter la moindre requête SQL. Ensuite, `npm run migrate` n'appliquera plus que les VRAIES nouvelles migrations à venir.
+
+Pour toute **future** modification de schéma : écrire le `migration.sql` à la main (comme fait jusqu'ici) dans `prisma/migrations/<timestamp>_<nom>/`, puis lancer `npm run migrate` en local (base `dev.db`) et contre Turso (avec les bonnes variables d'env) — plus besoin de se souvenir manuellement de quel fichier a déjà tourné où.
 
 ## 3. Installer les nouvelles dépendances en local
 

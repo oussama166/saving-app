@@ -12,7 +12,11 @@ const HEADER_ROW = [
   'Montant (DH)',
 ];
 
-function getSheetsClient() {
+// Exporté (pas seulement usage interne) pour permettre à
+// scripts/test-google-sheets.ts de tester l'authentification/les permissions
+// indépendamment de appendArchivedTransactions (qui, elle, écrit dans le
+// vrai onglet "Archive" utilisé par le cron d'archivage réel).
+export function getSheetsClient() {
   const email = process.env.GOOGLE_SHEETS_CLIENT_EMAIL;
   const privateKey = process.env.GOOGLE_SHEETS_PRIVATE_KEY?.replace(/\\n/g, '\n');
 

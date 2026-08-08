@@ -8,7 +8,11 @@
     "build": "prisma generate && next build",
     "start": "next start",
     "lint": "eslint",
-    "create-admin": "tsx scripts/create-admin.ts"
+    "create-admin": "tsx scripts/create-admin.ts",
+    "test-push": "tsx scripts/test-push.ts",
+    "test-sheets": "tsx scripts/test-google-sheets.ts",
+    "migrate": "tsx scripts/run-migrations.ts",
+    "migrate:check": "tsx scripts/run-migrations.ts --check"
   },
   "dependencies": {
     "@ai-sdk/google": "^3.0.83",
@@ -34,6 +38,7 @@
     "react-dom": "19.2.4",
     "react-markdown": "^10.1.0",
     "recharts": "^3.8.1",
+    "web-push": "^3.6.7",
     "yahoo-finance2": "^3.15.3",
     "zod": "^3.25.76"
   },
@@ -44,6 +49,8 @@
     "@types/qrcode": "^1.5.6",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/web-push": "^3.6.4",
+    "dotenv": "^17.4.2",
     "eslint": "^9",
     "eslint-config-next": "16.2.9",
     "tailwindcss": "^4",

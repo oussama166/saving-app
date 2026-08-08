@@ -4,6 +4,7 @@ import { hashPassword, createSessionToken, SESSION_COOKIE, SESSION_COOKIE_OPTION
 import { seedDefaultsForUser } from '@/lib/seedDefaults';
 import { generateSecureToken } from '@/lib/tokens';
 import { sendVerificationEmail } from '@/lib/email';
+import { getRateLimitKey, isRateLimited, recordFailedAttempt } from '@/lib/rateLimit';
 
 const VERIFICATION_TOKEN_TTL_MS = 24 * 60 * 60 * 1000; // 24h
 
@@ -11,6 +12,24 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export async function POST(req: Request) {
   try {
+    // Anti-abus par IP (pas par email, contrairement au login — un
+    // spammeur créant des comptes en masse fait varier l'email à chaque
+    // essai, donc la clé qui compte ici est l'IP seule). Voir
+    // lib/rateLimit.ts. Chaque tentative est comptée, succès ou échec, pour
+    // plafonner le nombre total d'inscriptions depuis une même IP.
+    const rateLimitKey = getRateLimitKey('signup', req);
+    const { limited, retryAfterSeconds } = isRateLimited(rateLimitKey);
+    if (limited) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: `Trop de tentatives d'inscription. Réessaie dans ${Math.ceil((retryAfterSeconds ?? 60) / 60)} min.`,
+        },
+        { status: 429, headers: { 'Retry-After': String(retryAfterSeconds ?? 60) } },
+      );
+    }
+    recordFailedAttempt(rateLimitKey);
+
     const { email, password, name } = (await req.json()) as {
       email?: string;
       password?: string;

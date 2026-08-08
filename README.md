@@ -119,6 +119,8 @@ Voir `.env.example` pour le détail commenté. Résumé :
 | `RECURRING_TRANSFERS_SECRET`                                                                | Non                  | Exécution des virements récurrents (cron externe quotidien)               |
 | `SUBSCRIPTION_REMINDERS_SECRET`                                                             | Non                  | Rappel email 2-5j avant prélèvement d'abonnement (cron externe quotidien) |
 | `GOOGLE_SHEETS_CLIENT_EMAIL` / `GOOGLE_SHEETS_PRIVATE_KEY` / `GOOGLE_SHEETS_SPREADSHEET_ID` | Non                  | Export Google Sheets                                                      |
+| `SENTRY_DSN`                                                                                | Non                  | Monitoring d'erreurs (`lib/errorMonitoring.ts`) — sans clé, erreurs seulement en console |
+| `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` / `NEXT_PUBLIC_VAPID_PUBLIC_KEY`  | Non                  | Notifications push (`lib/webPush.ts`) — sans clés, bouton caché dans Profil |
 
 > Note : `lib/aiProvider.ts` utilise uniquement Gemini (`coachModel`) pour toutes les fonctionnalités IA (Coach IA + chat flottant). `OPENROUTER_API_KEY` figure dans `.env.example` mais n'est pas câblée dans le code actuel.
 
@@ -128,23 +130,17 @@ Le schéma vit dans `prisma/schema.prisma`, les migrations dans `prisma/migratio
 
 **En local** : `npx prisma migrate deploy` (ou laisser Next.js régénérer le client via `npm run dev`/`npm run build`, qui inclut `prisma generate`).
 
-**Sur Turso** (preprod ou prod) : pas de client Prisma direct contre Turso pour les migrations — on applique le SQL brut via le CLI Turso.
+**Sur Turso** (preprod ou prod) : via `scripts/run-migrations.ts` (voir [`DEPLOYMENT.md`](./DEPLOYMENT.md) pour le détail), qui applique le SQL brut ET suit dans une table `_AppSchemaMigrations` ce qui a déjà été appliqué (idempotent, ré-exécutable sans risque) :
 
 ```bash
-# Nouvelle base vide : applique toutes les migrations dans l'ordre
-./scripts/apply-turso-migrations.sh <nom-de-la-base>
+# Voir ce qui reste à appliquer, sans rien exécuter
+npm run migrate:check
 
-# Base déjà à jour sur les migrations précédentes : applique seulement la nouvelle
-turso db shell <nom-de-la-base> < prisma/migrations/<horodatage_nom>/migration.sql
+# Applique toutes les migrations pas encore marquées comme faites
+npm run migrate
 ```
 
-Vérification après coup :
-
-```bash
-turso db shell <nom-de-la-base> "SELECT name FROM sqlite_master WHERE type='table';"
-```
-
-Workflow pour toute évolution de schéma : modifier `prisma/schema.prisma`, écrire à la main le `migration.sql` correspondant (nom `AAAAMMJJHHMMSS_description`), l'appliquer en local, puis sur chaque base Turso concernée (preprod avant tout, prod avant/au déploiement).
+Workflow pour toute évolution de schéma : modifier `prisma/schema.prisma`, écrire à la main le `migration.sql` correspondant (nom `AAAAMMJJHHMMSS_description`), l'appliquer en local, puis sur chaque base Turso concernée (preprod avant tout, prod avant/au déploiement) via `npm run migrate`.
 
 ## Déploiement (prod / preprod)
 
@@ -164,7 +160,9 @@ Le guide complet est dans [`DEPLOYMENT.md`](./DEPLOYMENT.md) (création de la ba
 | `npm run start`                            | Lance le build de production                                                                    |
 | `npm run lint`                             | ESLint                                                                                          |
 | `npm run create-admin`                     | Crée un compte admin (base pointée par `TURSO_DATABASE_URL`/`TURSO_AUTH_TOKEN`, sinon `dev.db`) |
-| `./scripts/apply-turso-migrations.sh <db>` | Applique les migrations Prisma sur une base Turso                                               |
+| `npm run migrate`                          | Applique les migrations en attente (locale ou Turso selon l'env) et les marque comme faites     |
+| `npm run migrate:check`                    | Liste les migrations en attente sans rien exécuter                                              |
+| `npm run test-push -- <email>`             | Envoie une notification push de test à un utilisateur (debug)                                   |
 
 ## Structure du dépôt
 

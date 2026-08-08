@@ -13,6 +13,13 @@
  * Le mot de passe est toujours demandé en interactif (jamais en argument
  * CLI, pour éviter qu'il finisse dans l'historique du shell).
  */
+// Doit être le tout premier import : contrairement à `next dev`/`next build`
+// (qui chargent .env automatiquement) et à `npx prisma ...` (via
+// prisma.config.ts), un script tsx lancé directement ne charge JAMAIS .env
+// tout seul — sans cette ligne, process.env.TURSO_DATABASE_URL reste vide
+// et lib/prisma.ts retombe silencieusement sur le fichier local dev.db au
+// lieu de la base Turso configurée.
+import 'dotenv/config';
 import readline from 'node:readline';
 import bcrypt from 'bcryptjs';
 import { prisma } from '../lib/prisma';

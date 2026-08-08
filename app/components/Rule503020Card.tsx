@@ -16,7 +16,7 @@ interface Rule503020Props {
 }
 
 export default function Rule503020Card({ rule }: Rule503020Props) {
-  const { t, locale } = useLanguage();
+  const { t } = useLanguage();
   const items = [
     {
       label: t("dashboard.card2.needs"),

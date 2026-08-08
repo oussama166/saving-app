@@ -76,6 +76,8 @@ model User {
   dailyBudgetSnapshots DailyBudgetSnapshot[]
   subscriptionRemindersSent SubscriptionReminderSent[]
   goldenRuleSnapshots GoldenRuleSnapshot[]
+  netWorthSnapshots NetWorthSnapshot[]
+  pushSubscriptions PushSubscription[]
 }
 
 // Règle de virement automatique récurrent entre deux comptes du même foyer
@@ -634,6 +636,45 @@ model SubscriptionReminderSent {
   sentAt         DateTime     @default(now())
 
   @@unique([subscriptionId, yearMonth])
+}
+
+// Historique du patrimoine net (voir lib/netWorthHistory.ts, dashboard) —
+// une ligne par (userId=budgetOwnerId, jour), capturée à chaque chargement
+// du dashboard à partir des totaux déjà calculés par /api/dashboard (aucune
+// requête supplémentaire), même principe que DailyBudgetSnapshot. Alimente
+// le graphique d'évolution du patrimoine net dans le temps.
+model NetWorthSnapshot {
+  id                  String   @id @default(cuid())
+  userId              String
+  user                User     @relation(fields: [userId], references: [id])
+  date                DateTime // toujours à minuit (jour concerné)
+  checkingBalanceMad  Float
+  savingsLockedMad    Float
+  portfolioValueMad   Float
+  debtsMad            Float
+  netWorthMad         Float
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@unique([userId, date])
+  @@index([userId])
+}
+
+// Abonnement Web Push (endpoint + clés de chiffrement navigateur) — voir
+// lib/webPush.ts. Un utilisateur peut avoir plusieurs abonnements (un par
+// appareil/navigateur où il a activé les notifications). endpoint est
+// unique côté navigateur (URL du service push, ex: FCM), donc @unique
+// global suffit à éviter les doublons lors d'un ré-abonnement.
+model PushSubscription {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
+
+  @@index([userId])
 }
 
 // Suivi des dettes/prêts (crédit conso, prêt immobilier, dette personnelle

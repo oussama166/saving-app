@@ -6,6 +6,7 @@ import DetailedBudgetTable from "./components/DetailedBudgetTable";
 import BudgetMethodCard from "./components/BudgetMethodCard";
 import DailyBudgetWidget from "./components/DailyBudgetWidget";
 import Visualizations from "./components/Visualizations";
+import NetWorthChart from "./components/NetWorthChart";
 import InterestSimulator from "./components/InterestSimulator";
 import { Bell } from "lucide-react";
 import { useLanguage } from "./components/LanguageProvider";
@@ -239,6 +240,8 @@ function DashboardContent() {
             </div>
           </div>
         </div>
+
+        <NetWorthChart />
 
         <Visualizations data={chartData} />
 
