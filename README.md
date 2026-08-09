@@ -15,7 +15,7 @@ Langue de l'interface : français, anglais, espagnol, arabe (`fr`/`en`/`es`/`ar`
 - [Scripts](#scripts)
 - [Structure du dépôt](#structure-du-dépôt)
 - [Concepts clés de l'architecture](#concepts-clés-de-larchitecture)
-- [Tâches planifiées (cron externe)](#tâches-planifiées-cron-externe)
+- [Tâches planifiées](#tâches-planifiées)
 - [Sécurité](#sécurité)
 
 ## Stack technique
@@ -114,10 +114,11 @@ Voir `.env.example` pour le détail commenté. Résumé :
 | `GOOGLE_GENERATIVE_AI_API_KEY`                                                              | Oui pour le Coach IA | Clé Gemini (modèle utilisé par `lib/aiProvider.ts`)                       |
 | `OPENROUTER_API_KEY`                                                                        | Non                  | Présent dans l'env mais non branché actuellement (voir note ci-dessous)   |
 | `GEOAPIFY_API_KEY`                                                                          | Non                  | Suggestion de catégorie par géolocalisation                               |
-| `BACKUP_SECRET` / `BACKUP_ARCHIVE_MONTHS`                                                   | Non                  | Archivage planifié (cron externe)                                         |
-| `WEEKLY_DIGEST_SECRET`                                                                      | Non                  | Digest hebdomadaire par email (cron externe)                              |
-| `RECURRING_TRANSFERS_SECRET`                                                                | Non                  | Exécution des virements récurrents (cron externe quotidien)               |
-| `SUBSCRIPTION_REMINDERS_SECRET`                                                             | Non                  | Rappel email 2-5j avant prélèvement d'abonnement (cron externe quotidien) |
+| `CRON_SECRET`                                                                               | Non                  | Cron quotidien natif Vercel (`/api/cron/daily`, voir `vercel.json`)       |
+| `BACKUP_SECRET` / `BACKUP_ARCHIVE_MONTHS`                                                   | Non                  | Archivage planifié (déclenchement manuel ou cron externe)                |
+| `WEEKLY_DIGEST_SECRET`                                                                      | Non                  | Digest hebdomadaire par email (redéclenchement manuel ponctuel)          |
+| `RECURRING_TRANSFERS_SECRET`                                                                | Non                  | Exécution des virements récurrents (redéclenchement manuel ponctuel)     |
+| `SUBSCRIPTION_REMINDERS_SECRET`                                                             | Non                  | Rappel email 2-5j avant prélèvement d'abonnement (redéclenchement manuel ponctuel) |
 | `GOOGLE_SHEETS_CLIENT_EMAIL` / `GOOGLE_SHEETS_PRIVATE_KEY` / `GOOGLE_SHEETS_SPREADSHEET_ID` | Non                  | Export Google Sheets                                                      |
 | `SENTRY_DSN`                                                                                | Non                  | Monitoring d'erreurs (`lib/errorMonitoring.ts`) — sans clé, erreurs seulement en console |
 | `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` / `NEXT_PUBLIC_VAPID_PUBLIC_KEY`  | Non                  | Notifications push (`lib/webPush.ts`) — sans clés, bouton caché dans Profil |
@@ -212,16 +213,19 @@ Sans foyer (cas par défaut), les deux valeurs retombent sur l'utilisateur lui-m
 
 **i18n (`lib/i18n.ts`)** — Dictionnaires plats par clé (`t(locale, key, fallback?)` côté serveur, `useLanguage()` côté client), 4 locales tenues à parité stricte (même nombre de clés). Mise en page LTR pour les 4, y compris l'arabe.
 
-## Tâches planifiées (cron externe)
+## Tâches planifiées
 
-Le plan gratuit Vercel ne garantit pas de cron interne fiable en continu — ces routes sont donc pensées pour être appelées par un service de cron externe (ex. [cron-job.org](https://cron-job.org)), chacune protégée par un header secret dédié :
+**Cron principal (`vercel.json`, natif Vercel)** — `GET /api/cron/daily`, déclenché automatiquement par Vercel tous les jours à 8h UTC (voir `vercel.json`). Regroupe en une seule route les 3 tâches quotidiennes/hebdo (rappels d'abonnements + virements récurrents tous les jours, digest hebdomadaire uniquement le lundi) : le plan Hobby de Vercel limite à 2 cron jobs par projet, donc tout tient dans un seul. Authentifié via `Authorization: Bearer <CRON_SECRET>`, ajouté automatiquement par Vercel — et Vercel contourne nativement sa propre Deployment Protection pour ses appels cron, donc aucun service externe ni bypass token nécessaire.
 
-| Route                                   | Fréquence conseillée        | Header                         |
-| --------------------------------------- | --------------------------- | ------------------------------ |
-| `POST /api/backup/archive`              | Mensuelle                   | `x-backup-secret`              |
-| `POST /api/cron/weekly-digest`          | Hebdomadaire (ex. lundi 8h) | `x-cron-secret`                |
-| `POST /api/cron/recurring-transfers`    | Quotidienne                 | `x-recurring-transfers-secret` |
-| `POST /api/cron/subscription-reminders` | Quotidienne                 | `x-cron-secret`                |
+**Routes individuelles (redéclenchement manuel ponctuel)** — restent utilisables séparément (ex. pour rejouer une tâche précise sans attendre le prochain passage du cron quotidien), chacune protégée par son propre header secret :
+
+| Route                                   | Header                         |
+| --------------------------------------- | ------------------------------- |
+| `POST /api/cron/weekly-digest`          | `x-cron-secret`                |
+| `POST /api/cron/recurring-transfers`    | `x-recurring-transfers-secret` |
+| `POST /api/cron/subscription-reminders` | `x-cron-secret`                |
+
+**Archivage (`POST /api/backup/archive`)** — volontairement **hors** du cron automatique (opération destructrice : supprime des transactions de la base après archivage Google Sheets). Déclenchement manuel via `x-backup-secret`, ou via un cron externe (ex. [cron-job.org](https://cron-job.org)) mensuel si tu veux l'automatiser en connaissance de cause.
 
 ## Sécurité
 
