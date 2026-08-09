@@ -9,8 +9,10 @@ import DevEnvBadge from "./components/DevEnvBadge";
 import FinanceAgent from "./components/FinanceAgent";
 import { ThemeProvider, THEME_INIT_SCRIPT } from "./components/ThemeProvider";
 import { LanguageProvider } from "./components/LanguageProvider";
+import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { getUserLocale } from "@/lib/getLocale";
+import { isSessionRevoked } from "@/lib/sessionTracking";
 import { DEFAULT_LOCALE, dirFor } from "@/lib/i18n";
 
 const geistSans = Geist({
@@ -49,6 +51,18 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const session = await getSession();
+
+  // Révocation à distance ("déconnecter cet appareil" depuis un autre
+  // appareil, voir Profil > Appareils connectés / lib/sessionTracking.ts) —
+  // le cookie JWT lui-même reste cryptographiquement valide jusqu'à
+  // expiration naturelle (30 jours), donc c'est ce check, au niveau du
+  // layout racine (donc à chaque changement de page), qui fait réellement
+  // effet. Pas instantané sur un appel API isolé déjà en vol — compromis
+  // volontaire, voir le commentaire en tête de lib/sessionTracking.ts.
+  if (session && (await isSessionRevoked(session.jti))) {
+    redirect("/api/auth/force-logout");
+  }
+
   const initialLocale = session
     ? await getUserLocale(session.userId)
     : DEFAULT_LOCALE;

@@ -17,6 +17,7 @@ import {
   HelpCircle,
 } from "lucide-react";
 import FeatureGate from "../components/FeatureGate";
+import DebtStrategyComparison from "../components/DebtStrategyComparison";
 
 interface DebtItem {
   id: string;
@@ -324,6 +325,8 @@ function DettesPageContent() {
             </div>
           </div>
         </div>
+
+        <DebtStrategyComparison debts={debts.filter((d) => d.isActive && d.currentBalance > 0)} />
 
         {showForm && (
           <div className="p-6 border bg-surface rounded-2xl border-line space-y-4">

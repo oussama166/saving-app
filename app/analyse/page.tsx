@@ -1,9 +1,10 @@
 import React from 'react';
-import { getUserSettings, getFinancialRatios, getMonthlyAnalytics, getTopCategoriesTrend } from '@/lib/financials';
+import { getUserSettings, getFinancialRatios, getMonthlyAnalytics, getTopCategoriesTrend, getTopMerchants } from '@/lib/financials';
 import MonthlyHistoryTable from '../components/MonthlyHistoryTable';
 import FinancialRatios from '../components/FinancialRatios';
 import TrendSummaryCards from '../components/TrendSummaryCards';
 import CategoryTrends from '../components/CategoryTrends';
+import MerchantSpending from '../components/MerchantSpending';
 import TrendsInsight from '../components/TrendsInsight';
 import { requireSession } from '@/lib/auth';
 import { getHouseholdContext } from '@/lib/household';
@@ -20,10 +21,11 @@ export default async function AnalysePage() {
   }
   const ctx = await getHouseholdContext(userId);
   const { referenceIncome } = await getUserSettings(ctx);
-  const [monthly, ratios, topCategories] = await Promise.all([
+  const [monthly, ratios, topCategories, topMerchants] = await Promise.all([
     getMonthlyAnalytics(ctx, 6),
     getFinancialRatios(ctx, referenceIncome),
     getTopCategoriesTrend(ctx, 6, 5),
+    getTopMerchants(ctx, 6, 10),
   ]);
 
   return (
@@ -51,6 +53,8 @@ export default async function AnalysePage() {
           </div>
           <TrendsInsight monthly={monthly} topCategories={topCategories} />
         </div>
+
+        <MerchantSpending data={topMerchants} />
       </div>
     </main>
   );

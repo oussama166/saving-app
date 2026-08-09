@@ -45,6 +45,9 @@ export async function deleteUserDataInTx(tx: Prisma.TransactionClient, userId: s
   await tx.aiAdviceCache.deleteMany({ where: { userId } });
   await tx.csvImportProfile.deleteMany({ where: { userId } });
   await tx.featureAccessGrant.deleteMany({ where: { userId } });
+  await tx.session.deleteMany({ where: { userId } });
+  await tx.travelExpense.deleteMany({ where: { userId } });
+  await tx.travelBudget.deleteMany({ where: { userId } });
 
   // Foyer partagé (voir lib/household.ts) : max 2 membres, donc retirer
   // n'importe quel membre laisse au plus 1 personne — un foyer "à 1" n'a pas

@@ -5,6 +5,7 @@ import { seedDefaultsForUser } from '@/lib/seedDefaults';
 import { generateSecureToken } from '@/lib/tokens';
 import { sendVerificationEmail } from '@/lib/email';
 import { getRateLimitKey, isRateLimited, recordFailedAttempt } from '@/lib/rateLimit';
+import { createSessionRecord } from '@/lib/sessionTracking';
 
 const VERIFICATION_TOKEN_TTL_MS = 24 * 60 * 60 * 1000; // 24h
 
@@ -74,7 +75,8 @@ export async function POST(req: Request) {
     // l'inscription si RESEND_API_KEY est absent ou si Resend est en panne.
     await sendVerificationEmail(user.email, verificationToken);
 
-    const token = await createSessionToken({ userId: user.id, email: user.email });
+    const { token, jti } = await createSessionToken({ userId: user.id, email: user.email });
+    await createSessionRecord({ userId: user.id, jti, rawUserAgent: req.headers.get('user-agent') });
 
     const response = NextResponse.json({
       success: true,

@@ -19,6 +19,7 @@ import RealBudgetOptimizer from "../components/RealBudgetOptimizer";
 import WebhookTokenCard from "../components/WebhookTokenCard";
 import PushNotificationCard from "../components/PushNotificationCard";
 import AccountSecurityCard from "../components/AccountSecurityCard";
+import SessionsCard from "../components/SessionsCard";
 import TwoFactorCard from "../components/TwoFactorCard";
 import HouseholdCard from "../components/HouseholdCard";
 import AccountsCard from "../components/AccountsCard";
@@ -459,6 +460,8 @@ function ProfilPageContent() {
         ) : (
           <FeatureDisabledInlineCard featureName="Sécurité du compte" message={subfeatureMessage("profile.account_security")} />
         )}
+
+        <SessionsCard />
 
         {isSubfeatureAllowed("profile.two_factor") ? (
           <TwoFactorCard />

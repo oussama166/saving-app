@@ -11,6 +11,7 @@ import {
 import { generateSecureToken } from '@/lib/tokens';
 import { sendVerificationEmail } from '@/lib/email';
 import { deleteUserAccount } from '@/lib/deleteUserData';
+import { createSessionRecord, deleteSessionRecord } from '@/lib/sessionTracking';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const VERIFICATION_TOKEN_TTL_MS = 24 * 60 * 60 * 1000; // 24h
@@ -79,7 +80,7 @@ export async function GET() {
 // remet emailVerified à false + renvoie un nouvel email de vérification.
 export async function PATCH(req: Request) {
   try {
-    const { userId } = await requireSession();
+    const { userId, jti: currentJti } = await requireSession();
     const { name, email, currentPassword } = (await req.json()) as {
       name?: string;
       email?: string;
@@ -141,7 +142,13 @@ export async function PATCH(req: Request) {
       user: { id: updated.id, email: updated.email, name: updated.name, emailVerified: updated.emailVerified },
     });
     if (emailChanged) {
-      const token = await createSessionToken({ userId: updated.id, email: updated.email });
+      // L'email fait partie du payload JWT, donc un nouveau jeton = un
+      // nouveau jti — on ferme l'ancienne ligne Session (sinon elle traîne
+      // indéfiniment, plus jamais rattachée à un cookie réel) et on ouvre
+      // la nouvelle, best-effort dans les deux cas.
+      await deleteSessionRecord(currentJti);
+      const { token, jti } = await createSessionToken({ userId: updated.id, email: updated.email });
+      await createSessionRecord({ userId: updated.id, jti, rawUserAgent: req.headers.get('user-agent') });
       response.cookies.set(SESSION_COOKIE, token, SESSION_COOKIE_OPTIONS);
     }
     return response;
