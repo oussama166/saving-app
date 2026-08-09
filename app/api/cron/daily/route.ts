@@ -52,9 +52,7 @@ export async function GET(req: Request) {
   // Digest hebdomadaire : seulement le lundi, même si cette route tourne
   // tous les jours (voir lib/weeklyDigest.ts, historiquement pensé pour un
   // cron externe hebdomadaire dédié).
-  // ⚠️ TEMPORAIRE — forcé à true pour tester le digest hors lundi. À remettre
-  // à `new Date().getUTCDay() === 1` juste après le test.
-  const isMonday = true;
+  const isMonday = new Date().getUTCDay() === 1;
   if (isMonday) {
     try {
       const users = await prisma.user.findMany({
