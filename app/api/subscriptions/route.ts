@@ -45,6 +45,11 @@ export async function GET() {
       nextBillingDate: sub.isActive ? getNextBillingDate(sub).toISOString() : null,
       planChangeCount: sub._count.planChanges,
       transactionCount: sub._count.transactions,
+      createdAt: sub.createdAt.toISOString(),
+      // Calculé côté serveur (pas dans le composant client, voir
+      // SubscriptionAlerts.tsx) : un `new Date()`/Date.now() en plein rendu
+      // React est considéré impur par le linter (react-hooks/purity).
+      activeMonths: Math.floor((Date.now() - sub.createdAt.getTime()) / (1000 * 60 * 60 * 24 * 30.44)),
     }));
 
     const totalMonthly = subscriptions.filter((s) => s.isActive).reduce((acc, s) => acc + s.price, 0);

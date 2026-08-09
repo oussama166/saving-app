@@ -8,6 +8,7 @@ import {
   SESSION_COOKIE_OPTIONS,
 } from '@/lib/auth';
 import { getRateLimitKey, isRateLimited, recordFailedAttempt, clearAttempts } from '@/lib/rateLimit';
+import { createSessionRecord } from '@/lib/sessionTracking';
 
 export async function POST(req: Request) {
   try {
@@ -69,7 +70,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: true, twoFactorRequired: true, challengeToken });
     }
 
-    const token = await createSessionToken({ userId: user.id, email: user.email });
+    const { token, jti } = await createSessionToken({ userId: user.id, email: user.email });
+    await createSessionRecord({ userId: user.id, jti, rawUserAgent: req.headers.get('user-agent') });
 
     const response = NextResponse.json({
       success: true,

@@ -328,6 +328,70 @@ export async function getTopCategoriesTrend(ctx: HouseholdContext, monthsCount =
   });
 }
 
+export interface MerchantSpending {
+  merchant: string;
+  total: number;
+  count: number;
+  // Catégorie la plus fréquente pour ce marchand sur la période — un
+  // marchand peut avoir plusieurs catégories (ex: un supermarché catégorisé
+  // tantôt "Courses", tantôt "Maison"), on affiche juste celle qui domine.
+  dominantCategory: string;
+}
+
+/**
+ * Classement des `topN` marchands (dépenses uniquement) par montant cumulé
+ * sur les `monthsCount` derniers mois — complète getTopCategoriesTrend en
+ * descendant d'un niveau : une catégorie générique comme "Courses" peut
+ * masquer qu'un seul marchand y pèse disproportionnellement.
+ */
+export async function getTopMerchants(ctx: HouseholdContext, monthsCount = 6, topN = 10): Promise<MerchantSpending[]> {
+  const months = buildMonthBuckets(monthsCount);
+
+  const transactions = await prisma.transaction.findMany({
+    where: {
+      userId: { in: ctx.memberIds },
+      date: { gte: months[0].start },
+      category: { type: 'expense' },
+      amount: { lt: 0 },
+    },
+    include: { category: true, account: { select: { currency: true } } },
+  });
+
+  const rates = await ratesForAccounts(transactions);
+  const totals = new Map<string, number>();
+  const counts = new Map<string, number>();
+  const categoryCounts = new Map<string, Map<string, number>>(); // marchand -> catégorie -> occurrences
+
+  for (const tx of transactions) {
+    // Le marchand brut peut contenir un préfixe de rejet (voir
+    // app/api/webhook/apple-pay/route.ts, "[REJECTED/OVER BUDGET] ...") —
+    // on le retire pour ne pas fragmenter le même marchand en deux entrées.
+    const merchant = tx.merchant.replace(/^\[REJECTED\/OVER BUDGET\]\s*/, '').trim();
+    if (!merchant) continue;
+
+    const abs = Math.abs(toMad(tx.amount, tx.account.currency, rates));
+    totals.set(merchant, (totals.get(merchant) ?? 0) + abs);
+    counts.set(merchant, (counts.get(merchant) ?? 0) + 1);
+
+    if (!categoryCounts.has(merchant)) categoryCounts.set(merchant, new Map());
+    const catMap = categoryCounts.get(merchant)!;
+    catMap.set(tx.category.name, (catMap.get(tx.category.name) ?? 0) + 1);
+  }
+
+  const ranked = [...totals.entries()].sort((a, b) => b[1] - a[1]).slice(0, topN);
+
+  return ranked.map(([merchant, total]) => {
+    const catMap = categoryCounts.get(merchant)!;
+    const dominantCategory = [...catMap.entries()].sort((a, b) => b[1] - a[1])[0][0];
+    return {
+      merchant,
+      total: Math.round(total),
+      count: counts.get(merchant) ?? 0,
+      dominantCategory,
+    };
+  });
+}
+
 export interface HealthBudget {
   budgetPct: number; // % du revenu de référence alloué à "Santé & Médical"
   plannedMonthly: number; // prévu ce mois-ci (budgetPct * revenu de référence)

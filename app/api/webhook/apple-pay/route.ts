@@ -5,11 +5,26 @@ import { requireWebhookAuth } from "@/lib/webhookAuth";
 import { guessTransactionCategory } from "@/lib/placeCategory";
 import { checkAndSendBudgetAlert } from "@/lib/budgetAlerts";
 import { getHouseholdContext } from "@/lib/household";
+import { getRateLimitKey, isRateLimited, recordFailedAttempt } from "@/lib/rateLimit";
 
 // Accepte soit un token de webhook dédié (header `Authorization: Bearer
 // <token>`, généré depuis la page Profil — utilisé par l'iOS Shortcut),
 // soit le cookie de session classique (appel depuis l'app elle-même).
 export async function POST(req: Request) {
+  // Rate limit sur les échecs SEULEMENT (jamais sur les appels réussis) —
+  // le token étant un secret 256 bits, un brute-force réel est déjà
+  // irréaliste ; ça sert surtout à limiter le bruit/DoS de requêtes
+  // invalides, sans jamais pénaliser l'utilisateur légitime qui peut
+  // déclencher ce webhook plusieurs fois par jour (un achat = un appel).
+  const rateLimitKey = getRateLimitKey("webhook-apple-pay", req);
+  const { limited, retryAfterSeconds } = isRateLimited(rateLimitKey);
+  if (limited) {
+    return NextResponse.json(
+      { error: "Trop de tentatives échouées. Réessaie plus tard." },
+      { status: 429, headers: { "Retry-After": String(retryAfterSeconds ?? 60) } },
+    );
+  }
+
   try {
     const { userId } = await requireWebhookAuth(req);
     const { merchant, amount, date, location, latitude, longitude } =
@@ -154,6 +169,7 @@ export async function POST(req: Request) {
     });
   } catch (error) {
     if (error instanceof Error && error.message === "UNAUTHENTICATED") {
+      recordFailedAttempt(rateLimitKey);
       return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
     }
     console.error("Apple Pay Webhook Error:", error);

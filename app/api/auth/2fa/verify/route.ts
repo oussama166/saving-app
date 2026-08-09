@@ -8,6 +8,7 @@ import {
 } from '@/lib/auth';
 import { verifyTotpCode, consumeRecoveryCode } from '@/lib/twoFactor';
 import { getRateLimitKey, isRateLimited, recordFailedAttempt, clearAttempts } from '@/lib/rateLimit';
+import { createSessionRecord } from '@/lib/sessionTracking';
 
 // Étape 2 du login pour un compte avec 2FA activée (voir app/api/auth/login
 // pour l'étape 1 — mot de passe + émission du challengeToken). Accepte soit
@@ -75,7 +76,8 @@ export async function POST(req: Request) {
 
     clearAttempts(rateLimitKey);
 
-    const token = await createSessionToken({ userId: user.id, email: user.email });
+    const { token, jti } = await createSessionToken({ userId: user.id, email: user.email });
+    await createSessionRecord({ userId: user.id, jti, rawUserAgent: req.headers.get('user-agent') });
     const response = NextResponse.json({
       success: true,
       user: { id: user.id, email: user.email, name: user.name },

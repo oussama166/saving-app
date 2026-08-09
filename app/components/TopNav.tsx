@@ -19,6 +19,7 @@ import {
   CreditCard,
   Gem,
   CalendarDays,
+  Plane,
 } from "lucide-react";
 import Link from "next/link";
 import ThemeToggle from "./ThemeToggle";
@@ -66,6 +67,11 @@ const navLinks = [
     icon: <CalendarDays className="w-4 h-4" />,
     href: "/calendrier",
   },
+  {
+    key: "nav.voyage",
+    icon: <Plane className="w-4 h-4" />,
+    href: "/voyage",
+  },
   { key: "nav.profil", icon: <User className="w-4 h-4" />, href: "/profil" },
 ];
 
@@ -100,6 +106,7 @@ const desktopNav: DesktopNavEntry[] = [
       { key: "nav.abonnements", icon: <Repeat className="w-4 h-4" />, href: "/abonnements" },
       { key: "nav.dettes", icon: <CreditCard className="w-4 h-4" />, href: "/dettes" },
       { key: "nav.calendrier", icon: <CalendarDays className="w-4 h-4" />, href: "/calendrier" },
+      { key: "nav.voyage", icon: <Plane className="w-4 h-4" />, href: "/voyage" },
     ],
   },
   {

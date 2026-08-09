@@ -26,6 +26,7 @@ import {
   type SubscriptionCatalogEntry,
 } from "../../lib/subscriptionCatalog";
 import FeatureGate from "../components/FeatureGate";
+import SubscriptionAlerts from "../components/SubscriptionAlerts";
 
 interface SubscriptionItem {
   id: string;
@@ -42,6 +43,8 @@ interface SubscriptionItem {
   nextBillingDate: string | null;
   planChangeCount: number;
   transactionCount: number;
+  createdAt: string;
+  activeMonths: number;
 }
 
 interface UpcomingReminder {
@@ -416,6 +419,8 @@ function AbonnementsPageContent() {
             </div>
           </div>
         )}
+
+        <SubscriptionAlerts subscriptions={subscriptions} />
 
         {showForm && (
           <div className="p-6 border bg-surface rounded-2xl border-line space-y-4">

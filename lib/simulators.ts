@@ -73,6 +73,99 @@ export function simulateDebtPayoff(
   return { months, totalInterest, totalPaid: balance + totalInterest };
 }
 
+export interface MultiDebtInput {
+  id: string;
+  name: string;
+  balance: number;
+  annualRatePct: number;
+  minPayment: number;
+}
+
+export interface MultiDebtPayoffResult {
+  months: number;
+  totalInterest: number;
+  // Ordre dans lequel chaque dette est intégralement soldée — utile pour
+  // afficher "1. Carte Visa (mois 4) → 2. Prêt perso (mois 11)...".
+  payoffOrder: { id: string; name: string; monthPaidOff: number }[];
+}
+
+/**
+ * Simule le remboursement de PLUSIEURS dettes en parallèle selon une
+ * stratégie d'ordre de priorité (boule de neige = solde le plus faible
+ * d'abord, motivant psychologiquement ; avalanche = taux le plus élevé
+ * d'abord, mathématiquement optimal). Chaque mois : le minimum est payé sur
+ * TOUTES les dettes encore actives, et tout le budget restant
+ * (`extraMonthlyBudget` + les minimums libérés par les dettes déjà soldées,
+ * technique dite du "snowball rollover") est concentré sur la première dette
+ * de la liste triée selon la stratégie.
+ *
+ * Retourne null si le budget total (somme des minimums + extra) ne couvre
+ * même pas les intérêts cumulés du mois pour au moins une dette qui ne
+ * reçoit que son minimum — la dette ne serait jamais soldée.
+ */
+export function simulateMultiDebtPayoff(
+  debts: MultiDebtInput[],
+  extraMonthlyBudget: number,
+  strategy: 'snowball' | 'avalanche',
+  maxMonths = 600,
+): MultiDebtPayoffResult | null {
+  if (debts.length === 0) return null;
+
+  const order = [...debts].sort((a, b) =>
+    strategy === 'snowball' ? a.balance - b.balance : b.annualRatePct - a.annualRatePct,
+  );
+
+  const remaining = new Map(order.map((d) => [d.id, d.balance]));
+  const monthlyRates = new Map(order.map((d) => [d.id, d.annualRatePct / 100 / 12]));
+  const payoffOrder: { id: string; name: string; monthPaidOff: number }[] = [];
+
+  let totalInterest = 0;
+  let months = 0;
+
+  while ([...remaining.values()].some((b) => b > 0.01) && months < maxMonths) {
+    months += 1;
+
+    // Budget du mois = extra + minimums des dettes déjà soldées (rollover).
+    let freeBudget = extraMonthlyBudget;
+    for (const d of order) {
+      if ((remaining.get(d.id) ?? 0) <= 0.01) freeBudget += d.minPayment;
+    }
+
+    // 1) Intérêts + minimum sur chaque dette encore active.
+    for (const d of order) {
+      const bal = remaining.get(d.id) ?? 0;
+      if (bal <= 0.01) continue;
+      const interest = bal * (monthlyRates.get(d.id) ?? 0);
+      totalInterest += interest;
+      const principal = Math.min(d.minPayment - interest, bal + interest);
+      const newBal = bal + interest - Math.max(principal, 0);
+      remaining.set(d.id, Math.max(newBal, 0));
+    }
+
+    // 2) Le budget libre est concentré sur la première dette active (ordre
+    // stratégie), une seule à la fois — cœur de la méthode snowball/avalanche.
+    for (const d of order) {
+      if (freeBudget <= 0) break;
+      const bal = remaining.get(d.id) ?? 0;
+      if (bal <= 0.01) continue;
+      const payment = Math.min(freeBudget, bal);
+      remaining.set(d.id, bal - payment);
+      freeBudget -= payment;
+    }
+
+    // Enregistre les dettes qui viennent d'être soldées ce mois-ci.
+    for (const d of order) {
+      if ((remaining.get(d.id) ?? 0) <= 0.01 && !payoffOrder.some((p) => p.id === d.id)) {
+        payoffOrder.push({ id: d.id, name: d.name, monthPaidOff: months });
+      }
+    }
+  }
+
+  if ([...remaining.values()].some((b) => b > 0.01)) return null; // pas soldé dans maxMonths
+
+  return { months, totalInterest, payoffOrder };
+}
+
 /**
  * Capital nécessaire pour générer `desiredMonthlyIncome` de revenu passif à
  * vie, selon la "règle des 4%" (taux de retrait annuel sécuritaire standard

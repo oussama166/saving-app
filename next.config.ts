@@ -30,6 +30,30 @@ const nextConfig: NextConfig = {
   outputFileTracingIncludes: {
     "/api/reports/bilan-pdf": ["./node_modules/pdfkit/js/data/**"],
   },
+
+  // Headers de sécurité de base, appliqués à toutes les routes. Pas de
+  // Content-Security-Policy ici volontairement : le script inline de
+  // détection du thème (THEME_INIT_SCRIPT, voir app/layout.tsx) exigerait
+  // soit 'unsafe-inline' (protection très réduite contre l'injection de
+  // script) soit un système de nonce par requête (plus de travail, à faire
+  // séparément si besoin). Ce qui suit reste à risque de casse ~nul et
+  // apporte déjà une vraie protection anti-clickjacking/MIME-sniffing.
+  async headers() {
+    return [
+      {
+        source: "/:path*",
+        headers: [
+          { key: "X-Frame-Options", value: "SAMEORIGIN" },
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+          {
+            key: "Permissions-Policy",
+            value: "camera=(), microphone=(), geolocation=(), interest-cohort=()",
+          },
+        ],
+      },
+    ];
+  },
 };
 
 export default nextConfig;

@@ -3,11 +3,23 @@ import { prisma } from "@/lib/prisma";
 import { requireWebhookAuth } from "@/lib/webhookAuth";
 import { addManualContribution } from "@/lib/goalContributions";
 import { getHouseholdContext } from "@/lib/household";
+import { getRateLimitKey, isRateLimited, recordFailedAttempt } from "@/lib/rateLimit";
 
 // Accepte soit un token de webhook dédié (header `Authorization: Bearer
 // <token>`, généré depuis la page Profil), soit le cookie de session
 // classique (appel depuis l'app elle-même).
 export async function POST(req: Request) {
+  // Rate limit sur les échecs seulement — voir même remarque dans
+  // app/api/webhook/apple-pay/route.ts.
+  const rateLimitKey = getRateLimitKey("webhook-salary", req);
+  const { limited, retryAfterSeconds } = isRateLimited(rateLimitKey);
+  if (limited) {
+    return NextResponse.json(
+      { error: "Trop de tentatives échouées. Réessaie plus tard." },
+      { status: 429, headers: { "Retry-After": String(retryAfterSeconds ?? 60) } },
+    );
+  }
+
   try {
     const { userId } = await requireWebhookAuth(req);
     const body = await req.json();
@@ -72,6 +84,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ success: true, allocated: savingsGoals.length });
   } catch (error) {
     if (error instanceof Error && error.message === "UNAUTHENTICATED") {
+      recordFailedAttempt(rateLimitKey);
       return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
     }
     console.error("Salary Webhook Error:", error);

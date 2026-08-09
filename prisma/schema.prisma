@@ -78,6 +78,9 @@ model User {
   goldenRuleSnapshots GoldenRuleSnapshot[]
   netWorthSnapshots NetWorthSnapshot[]
   pushSubscriptions PushSubscription[]
+  sessions          Session[]
+  travelBudgets     TravelBudget[]
+  travelExpenses    TravelExpense[]
 }
 
 // Règle de virement automatique récurrent entre deux comptes du même foyer
@@ -677,6 +680,27 @@ model PushSubscription {
   @@index([userId])
 }
 
+// Traçabilité des sessions de connexion (page Profil > "Appareils connectés")
+// — voir lib/sessionTracking.ts. Le cookie de session reste un JWT stateless
+// (lib/auth.ts, importé par middleware.ts en Edge Runtime, incompatible avec
+// Prisma) : cette table ne remplace PAS ce mécanisme, elle l'accompagne.
+// Chaque login/vérif 2FA crée une ligne (jti = claim du JWT correspondant).
+// "Révoquer" une session (bouton dans l'UI) marque revokedAt — appliqué au
+// prochain chargement de page via le check dans app/layout.tsx (pas
+// instantané sur un appel API isolé déjà en vol, seulement au prochain
+// rendu du layout racine, cf. lib/sessionTracking.ts).
+model Session {
+  id         String    @id @default(cuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id])
+  jti        String    @unique
+  userAgent  String?
+  createdAt  DateTime  @default(now())
+  revokedAt  DateTime?
+
+  @@index([userId])
+}
+
 // Suivi des dettes/prêts (crédit conso, prêt immobilier, dette personnelle
 // entre proches...) — utilisé pour calculer le patrimoine net (dashboard,
 // calculateur de Zakat) comme actifs (comptes + portfolio) moins
@@ -722,6 +746,48 @@ model DebtPayment {
   transactionId String?      @unique
   transaction   Transaction? @relation(fields: [transactionId], references: [id])
   createdAt     DateTime     @default(now())
+}
+
+// Budget temporaire dans une devise étrangère (voyage, séjour à l'étranger)
+// — distinct des comptes multi-devises permanents (Account.currency) : pas
+// de solde qui persiste, juste une enveloppe allouée pour une période donnée
+// avec ses propres dépenses (TravelExpense), sans toucher aux comptes/
+// catégories du budget principal. Visible par tout le foyer (comme le reste
+// des données financières), créé par userId mais interrogé via
+// ctx.memberIds — voir lib/household.ts.
+model TravelBudget {
+  id           String          @id @default(cuid())
+  userId       String
+  user         User            @relation(fields: [userId], references: [id])
+  name         String // "Voyage à Paris"
+  currency     String // devise du budget ET de toutes ses dépenses, ex: "EUR"
+  budgetAmount Float // montant alloué, dans `currency`
+  startDate    DateTime?
+  endDate      DateTime?
+  isActive     Boolean         @default(true) // false = clôturé (archivé, plus affiché par défaut)
+  expenses     TravelExpense[]
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+}
+
+// Une dépense loguée manuellement dans un TravelBudget — toujours dans la
+// devise du budget parent (pas de conversion), volontairement simple (pas de
+// compte/catégorie associés, contrairement à Transaction) : ce tracker sert
+// à suivre "combien il me reste sur mon enveloppe voyage", pas à alimenter
+// le budget mensuel principal.
+model TravelExpense {
+  id             String       @id @default(cuid())
+  travelBudgetId String
+  travelBudget   TravelBudget @relation(fields: [travelBudgetId], references: [id])
+  userId         String
+  user           User         @relation(fields: [userId], references: [id])
+  merchant       String
+  amount         Float // dans la devise du TravelBudget parent, toujours positif
+  date           DateTime     @default(now())
+  note           String?
+  createdAt      DateTime     @default(now())
+
+  @@index([travelBudgetId])
 }
 
 // Foyer partagé (couple/famille, max 2 membres) — voir lib/household.ts pour

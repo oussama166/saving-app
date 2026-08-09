@@ -18,6 +18,14 @@ function getSecretKey() {
 export interface SessionPayload {
   userId: string;
   email: string;
+  // Identifiant unique de CE jeton précis (une valeur par login/vérif 2FA,
+  // pas par utilisateur) — sert de clé de corrélation avec la table Session
+  // (voir lib/sessionTracking.ts) pour la liste "appareils connectés" et la
+  // révocation à distance. Optionnel côté type seulement pour rester
+  // compatible avec d'anciens jetons déjà émis avant l'ajout de ce champ
+  // (ils restent valides jusqu'à expiration naturelle, simplement invisibles
+  // dans la liste des sessions).
+  jti?: string;
 }
 
 export async function hashPassword(password: string) {
@@ -28,12 +36,26 @@ export async function verifyPassword(password: string, hash: string) {
   return bcrypt.compare(password, hash);
 }
 
-export async function createSessionToken(payload: SessionPayload) {
-  return new SignJWT({ ...payload })
+/**
+ * Émet un nouveau jeton de session. Génère aussi un `jti` (identifiant
+ * unique de CE jeton, via `crypto.randomUUID()` — API Web Crypto globale,
+ * disponible aussi bien en runtime Node qu'Edge, donc rien à ajouter à
+ * l'import list) et l'inclut dans le JWT. Le retour expose `jti`
+ * séparément pour que l'appelant (routes login / 2FA verify, jamais
+ * middleware.ts) puisse créer la ligne Session correspondante — voir
+ * lib/sessionTracking.ts, gardé dans un fichier séparé pour ne pas faire
+ * entrer Prisma dans ce module (importé par middleware.ts, Edge Runtime).
+ */
+export async function createSessionToken(
+  payload: SessionPayload,
+): Promise<{ token: string; jti: string }> {
+  const jti = crypto.randomUUID();
+  const token = await new SignJWT({ ...payload, jti })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime(`${SESSION_TTL_SECONDS}s`)
     .sign(getSecretKey());
+  return { token, jti };
 }
 
 export async function verifySessionToken(
@@ -43,7 +65,11 @@ export async function verifySessionToken(
     const { payload } = await jwtVerify(token, getSecretKey());
     if (typeof payload.userId !== "string" || typeof payload.email !== "string")
       return null;
-    return { userId: payload.userId, email: payload.email };
+    return {
+      userId: payload.userId,
+      email: payload.email,
+      jti: typeof payload.jti === "string" ? payload.jti : undefined,
+    };
   } catch {
     return null;
   }
